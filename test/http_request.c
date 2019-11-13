@@ -1,12 +1,17 @@
 #include "http.h"
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if(argc<3){
+        fprintf(stderr, "Usage: ./http_request.out TARGET_IP PORT REQ_TARGET\n");
+        exit(1);
+    }
+
     http_t *http_get_request=malloc(sizeof(http_t));
 
-    char *req_target="/test.html";
-    char *target_ip="20.20.102.1";
-    char *port="80";
+    char *req_target=argv[3];
+    char *target_ip=argv[1];
+    char *port=argv[2];
     int sockfd=create_tcp_conn(target_ip, port);
     // header fields
     // char *host="20.20.102.1";
