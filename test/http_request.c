@@ -16,6 +16,7 @@ int main(void)
     http_get_request->req.req_target=req_target;
     http_get_request->target=target_ip;
     http_get_request->port=atoi(port);
+    http_get_request->version=ONE_ONE;
 
     http_get_request->headers=malloc(sizeof(http_header_t));
     http_get_request->headers->field_name="Host";
@@ -23,9 +24,18 @@ int main(void)
     http_get_request->headers->next=NULL;
     http_get_request->msg_body=NULL;
 
-    char *rawdata;
+    char *rawdata=malloc(10240*sizeof(char));
 
-    http_request(sockfd, http_get_request, &rawdata);
+    int numbytes=http_request(sockfd, http_get_request, rawdata);
 
+    if(numbytes==-1)
+    {
+        perror("error recv");
+        close(sockfd);
+        exit(1);
+    }
+    printf("client: received %d bytes\n%s\n", numbytes, rawdata);
+    
+    close(sockfd);
     return 0;
 }

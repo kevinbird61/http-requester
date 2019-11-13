@@ -37,7 +37,7 @@ typedef struct _http_header_t {
 /* http */
 typedef struct _http_t {
     /* statistics */
-    http_msg_type           type;               // request/response
+    u8                      type;               // request/response
     u32                     content_length;
     u8                      *target;            // target/peer IP
     u16                     port;               // port

@@ -1,6 +1,6 @@
 #include "http.h"
 
-int http_request(int sockfd, http_t *http_request, char **rawdata)
+int http_request(int sockfd, http_t *http_request, char *rawdata)
 {
     /* http_t to string format */
 
@@ -12,6 +12,7 @@ int http_request(int sockfd, http_t *http_request, char **rawdata)
     sprintf(req, "%s %s HTTP/%s\r\n", 
         get_http_method_token(http_request->req.method_token), http_request->req.req_target,
         get_http_version(http_request->version));
+    // printf("Start-line: %s\n", req);
     // header fields
     while(http_request->headers!=NULL)
     {
@@ -31,6 +32,13 @@ int http_request(int sockfd, http_t *http_request, char **rawdata)
     sprintf(req, "%s\r\n", req);
 
     printf("HTTP header: %s\n", req);
+
+    // send
+    send(sockfd, req, strlen(req), 0);
+    
+    int numbytes=recv(sockfd, rawdata, 10240, 0);
+
+    return numbytes;
 }
 
 int http_parser(const char *rawdata, http_t *http_packet)

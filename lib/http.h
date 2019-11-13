@@ -16,7 +16,7 @@ char *get_http_status_code(status_code_map status_code);
 int encap_http_status_code(int http_status_code);
 
 // send out the request, and store the return data on which rawdata points to
-int http_request(int sockfd, http_t *http_request, char **rawdata);
+int http_request(int sockfd, http_t *http_request, char *rawdata);
 
 // parsing the rawdata, and fill them into data structure (response)
 int http_parser(const char *rawdata, http_t *http_packet);
