@@ -5,9 +5,9 @@ char *get_http_version(http_version_map http_version)
     switch(http_version)
     {
         case ONE_ZERO:
-            return "1.0";
+            return "HTTP/1.0";
         case ONE_ONE:
-            return "1.1";
+            return "HTTP/1.1";
         default:
             return NULL;
     }
@@ -15,9 +15,9 @@ char *get_http_version(http_version_map http_version)
 
 int encap_http_version(char *version)
 {
-    if(!strncmp(version, "1.0", 3)){
+    if(!strncmp(version, "HTTP/1.0", 3)){
         return ONE_ZERO;
-    } else if(!strncmp(version, "1.1", 3)){
+    } else if(!strncmp(version, "HTTP/1.1", 3)){
         return ONE_ONE;
     } else {
         return 0;

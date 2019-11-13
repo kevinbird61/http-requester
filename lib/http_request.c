@@ -11,15 +11,15 @@ int http_request(int sockfd, http_t *http_request, char *rawdata)
     char *method=get_http_method_token(http_request->req.method_token),
         *req_target=http_request->req.req_target,
         *http_ver=get_http_version(http_request->version);
-    // check req size (9: other SP & HTTP)
-    int size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+9;
+    // check req size (+9: other SP & HTTP)
+    int size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+4;
     if(limit<=size_start_line){
         limit=size_start_line;
         req=realloc(req, (limit)*sizeof(char));
     }
     // string copy
     // snprintf(req, size_start_line, "%s %s HTTP/%s\r\n", method, req_target, http_ver);
-    sprintf(req, "%s %s HTTP/%s\r\n", method, req_target, http_ver);
+    sprintf(req, "%s %s %s\r\n", method, req_target, http_ver);
     // printf("HTTP header: %s (%p)\n", req, &req);
     /**************************************************** header fields ****************************************************/
     while(http_request->headers!=NULL)
@@ -40,7 +40,7 @@ int http_request(int sockfd, http_t *http_request, char *rawdata)
         // printf("HTTP header: %s (%p)\n", req, &req);
         free(buf);
     }
-    printf("Size: %d, strlen(req): %ld\n", limit, strlen(req));
+    // printf("Size: %d, strlen(req): %ld\n", limit, strlen(req));
     // printf("HTTP header: %s (%p)\n", req, &req);
     req=realloc(req, (limit+=2)*sizeof(char));
     // snprintf(req, limit, "%s\r\n", req);
@@ -50,10 +50,10 @@ int http_request(int sockfd, http_t *http_request, char *rawdata)
     printf("HTTP header:\n%s\n", req);
 
     // send
-    send(sockfd, req, strlen(req), 0);
+    send(sockfd, req, strlen(req), 0);    
     
-    // FIXME: 
-    int numbytes=recv(sockfd, rawdata, 1024, 0);
+    // FIXME: polling to fetch all data from RX
+    int numbytes=recv(sockfd, rawdata, 10240, 0);
 
     return numbytes;
 }
