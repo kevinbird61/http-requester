@@ -46,6 +46,7 @@ int encap_http_method_token(char *method)
 
 char *get_http_status_code(status_code_map status_code)
 {
+    /* TODO: support more status code */
     switch(status_code)
     {
         case TWO_O_O:
