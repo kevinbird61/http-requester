@@ -28,5 +28,8 @@ int main(void)
     // parse response
     http_parser(rawdata, http_get_response);
 
+    // also using debug func to examin the result!
+    debug_http_obj(http_get_response);
+
     return 0;
 }

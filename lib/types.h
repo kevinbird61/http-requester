@@ -19,7 +19,7 @@ typedef enum {
 } status_code_map;
 
 typedef enum {
-    ONE_ZERO,
+    ONE_ZERO=1,
     ONE_ONE
 } http_version_map;
 

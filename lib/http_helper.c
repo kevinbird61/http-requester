@@ -15,9 +15,9 @@ char *get_http_version(http_version_map http_version)
 
 int encap_http_version(char *version)
 {
-    if(!strncmp(version, "HTTP/1.0", 3)){
+    if(!strncmp(version, "HTTP/1.0", 8)){
         return ONE_ZERO;
-    } else if(!strncmp(version, "HTTP/1.1", 3)){
+    } else if(!strncmp(version, "HTTP/1.1", 8)){
         return ONE_ONE;
     } else {
         return 0;

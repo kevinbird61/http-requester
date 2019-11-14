@@ -10,10 +10,10 @@ all: $(OBJS) $(EXEC) $(TEST)
 %.o: lib/%.c 
 	$(CC) $(CFLAGS) -c $^ $(LIBS)
 
-%.exe: src/%.c
+%.exe: src/%.c $(OBJS)
 	$(CC) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
 
-%.out: test/%.c
+%.out: test/%.c $(OBJS)
 	$(CC) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
 
 .PHONY=clean
