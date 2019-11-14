@@ -10,7 +10,7 @@ struct header_token_list_t {
  */
 int http_recast(http_t *http_packet, char **rawdata)
 {
-    // default req size is 64, using realloc to scale
+    // default req size is 32, using realloc to scale
     int limit=32;
     if(*rawdata!=NULL){
         free(*rawdata);

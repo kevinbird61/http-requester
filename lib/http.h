@@ -22,8 +22,7 @@ int http_recast(http_t *http_packet, char **rawdata);
 /** http_interpret.c:
  * - interpret from file/string, and make up http_t structure
  */
-int http_interpret(char *rawdata, http_t *http_packet);
-int http_interpret_from_file(const char *filename, http_t *http_packet);
+int http_interpret(const char *filename, http_t *http_packet);
 
 /** http_process.c: 
  * - check whether the syntax/grammar is conformable with HTTP/1.1 or not.
