@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     char sendbuf[1024], buf[MAXDATASIZE];
 
     // send GET request
-    snprintf(sendbuf, 1024, "GET /test.html HTTP/1.1\r\nHost: %s\r\n\r\n", argv[1]);
+    snprintf(sendbuf, 1024, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", argv[1]);
     send(client_sock_fd, sendbuf, strlen(sendbuf), 0);
     // recv the result (test.html is small enough)
     int numbytes=recv(client_sock_fd, buf, MAXDATASIZE-1, 0);

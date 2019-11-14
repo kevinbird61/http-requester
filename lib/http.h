@@ -8,6 +8,17 @@
 #include "conn.h"
 #include "types.h"
 
+/** http_state_machine.c
+ * - check and send the request(s), if not pass the checking, function will return error code.
+ * - send out the request(s)
+ * - using HTTP state machine to parse/analyze the data until finish.
+ *      - if there has any 3xx status code, we need to send the request again, also require the "Location" field-value.
+ *      - if there has any field-name/value violate RFC7230, abort the process and return error code. 
+ *      - log everything.
+ * - after finish the request, log the response and close the socket, free the memory.
+ */
+int http_state_machine(int sockfd, http_t *http_request);
+
 /* http_request.c: 
  * - send out the request, and store the return data on which rawdata points to.
  */

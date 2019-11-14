@@ -34,7 +34,10 @@ typedef struct _http_header_t {
     struct _http_header_t   *next;
 } http_header_t;
 
-/* http */
+/** http request/response
+ * - current design goal is ease to use
+ * - require compact the memory usage
+ */
 typedef struct _http_t {
     /* statistics */
     u8                      type;               // request/response
