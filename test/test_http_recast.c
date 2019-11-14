@@ -12,8 +12,7 @@ int main(int argc, char **argv)
     char *req_target=argv[3];
     char *target_ip=argv[1];
     char *port=argv[2];
-    int sockfd=create_tcp_conn(target_ip, port);
-    
+
     // header fields
     // FIXME: need to check return value
     http_get_request->req.method_token=encap_http_method_token("GET");
@@ -28,18 +27,12 @@ int main(int argc, char **argv)
     http_get_request->headers->next=NULL;
     http_get_request->msg_body=NULL;
 
-    char *rawdata=malloc(10240*sizeof(char));
+    debug_http_obj(http_get_request);
 
-    int numbytes=http_request(sockfd, http_get_request, rawdata);
+    char *rawdata=malloc(16*sizeof(char));
+    http_recast(http_get_request, &rawdata);
 
-    if(numbytes==-1)
-    {
-        perror("error recv");
-        close(sockfd);
-        exit(1);
-    }
-    printf("client: received %d bytes\n\n%s\n", numbytes, rawdata);
-    
-    close(sockfd);
+    printf("\nHTTP packet (using http_recast):\n%s\n", rawdata);
+
     return 0;
 }

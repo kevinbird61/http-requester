@@ -12,11 +12,14 @@ void debug_http_obj(http_t *http_obj)
         printf("[Status code: %s][Reason Phrase: %s]\n", get_http_status_code(http_obj->req.method_token), http_obj->req.req_target);
     }
     printf("=============Header-Fields=============\n");
-    while(http_obj->headers!=NULL){
-        printf("[%-20s]:[%s]\n", http_obj->headers->field_name, http_obj->headers->field_value);
-        http_obj->headers=http_obj->headers->next;
+    http_header_t *temp=http_obj->headers;
+    while(temp!=NULL){
+        printf("[%-20s]:[%s]\n", temp->field_name, temp->field_value);
+        temp=temp->next;
     }
     printf("=============Message-Body=============\n");
-    printf("%s\n", http_obj->msg_body);
+    if(http_obj->msg_body!=NULL){
+        printf("%s\n", http_obj->msg_body);
+    }
     printf("=============Debug-Done=============\n");
 }

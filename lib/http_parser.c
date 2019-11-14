@@ -8,12 +8,15 @@ struct header_token_list_t {
 /**
  * - recast http_obj back into rawdata string, ease for sending 
  */
-int http_recast(http_t *http_packet, char *rawdata)
+int http_recast(http_t *http_packet, char **rawdata)
 {
     // default req size is 64, using realloc to scale
     int limit=32;
-    rawdata=malloc(limit*sizeof(char));
-
+    if(*rawdata!=NULL){
+        free(*rawdata);
+    } 
+    *rawdata=malloc(limit*sizeof(char));
+    
     /**************************************************** start line ****************************************************/
     char *method=get_http_method_token(http_packet->req.method_token),
         *req_target=http_packet->req.req_target,
@@ -22,11 +25,11 @@ int http_recast(http_t *http_packet, char *rawdata)
     int size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+4;
     if(limit<=size_start_line){
         limit=size_start_line;
-        rawdata=realloc(rawdata, (limit)*sizeof(char));
+        *rawdata=realloc(*rawdata, (limit)*sizeof(char));
     }
     // string copy
     // snprintf(req, size_start_line, "%s %s HTTP/%s\r\n", method, req_target, http_ver);
-    sprintf(rawdata, "%s %s %s\r\n", method, req_target, http_ver);
+    sprintf(*rawdata, "%s %s %s\r\n", method, req_target, http_ver);
     // printf("HTTP header: %s (%p)\n", req, &req);
     /**************************************************** header fields ****************************************************/
     while(http_packet->headers!=NULL)
@@ -37,25 +40,24 @@ int http_recast(http_t *http_packet, char *rawdata)
         sprintf(buf, "%s: %s\r\n", http_packet->headers->field_name, http_packet->headers->field_value);
         // printf("Buf: %s\n", buf);
         // check size, if not enough, scale it
-        if(limit<=(strlen(buf)+strlen(rawdata))){
+        if(limit<=(strlen(buf)+strlen(*rawdata))){
             limit+=(strlen(buf));
-            rawdata=realloc(rawdata, limit*sizeof(char));
+            *rawdata=realloc(*rawdata, limit*sizeof(char));
         }
         // snprintf(req, limit, "%s%s", req, buf);
-        sprintf(rawdata, "%s%s", rawdata, buf);
+        sprintf(*rawdata, "%s%s", *rawdata, buf);
         http_packet->headers=http_packet->headers->next;
         // printf("HTTP header: %s (%p)\n", req, &req);
         free(buf);
     }
     // printf("Size: %d, strlen(req): %ld\n", limit, strlen(req));
     // printf("HTTP header: %s (%p)\n", req, &req);
-    rawdata=realloc(rawdata, (limit+=2)*sizeof(char));
+    *rawdata=realloc(*rawdata, (limit+=2)*sizeof(char));
     // snprintf(req, limit, "%s\r\n", req);
-    sprintf(rawdata, "%s\r\n", rawdata);
+    sprintf(*rawdata, "%s\r\n", *rawdata);
 
     // print for debug
-    printf("HTTP header:\n%s\n", rawdata);
-    rawdata=rawdata;
+    // printf("HTTP header:\n%s\n", rawdata);
 }
 
 /** (Need optimized & refactor) 

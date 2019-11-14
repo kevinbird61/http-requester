@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/epoll.h>
 
 #include "conn.h"
 #include "types.h"
@@ -18,7 +17,7 @@ int http_request(int sockfd, http_t *http_request, char *rawdata);
  * - parsing the rawdata, and fill them into data structure (response).
  */
 int http_parser(char *rawdata, http_t *http_packet);
-int http_recast(http_t *http_packet, char *rawdata);
+int http_recast(http_t *http_packet, char **rawdata);
 
 /** http_interpret.c:
  * - interpret from file/string, and make up http_t structure
