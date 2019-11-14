@@ -32,7 +32,7 @@ int http_recast(http_t *http_packet, char **rawdata)
     sprintf(*rawdata, "%s %s %s\r\n", method, req_target, http_ver);
     // printf("HTTP header: %s (%p)\n", req, &req);
     /**************************************************** header fields ****************************************************/
-    while(http_packet->headers!=NULL)
+    while(http_packet->headers!=NULL && http_packet->headers->field_name!=NULL)
     {
         int header_size=(strlen(http_packet->headers->field_name)+strlen(http_packet->headers->field_value)+4);
         char *buf=malloc(header_size*sizeof(char));
