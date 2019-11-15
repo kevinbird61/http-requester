@@ -29,8 +29,7 @@ int main(int argc, char *argv[])
 
     int sockfd, new_fd;
     struct addrinfo hints, *servinfo, *p;
-    struct sockaddr_storage their_addr; // 連線者的位址資訊 
-    socklen_t sin_size;
+    struct sockaddr_storage their_addr;     // info of incoming connections
     struct sigaction sa;
     int yes=1;
     char s[INET6_ADDRSTRLEN];
@@ -91,7 +90,7 @@ int main(int argc, char *argv[])
     printf("server: waiting for connections...\n");
 
     while(1) { // main accept
-        sin_size = sizeof(their_addr);
+        int sin_size = sizeof(their_addr);
         new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
         if (new_fd == -1) {
             perror("accept");

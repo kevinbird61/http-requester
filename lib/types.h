@@ -6,11 +6,21 @@ typedef unsigned short      u16;
 typedef unsigned int        u32;
 typedef unsigned long long  u64;
 
+/* TODO: error code enum */
 typedef enum {
+    ERR_NONE=0,                     // success
+    ERR_ILLEGAL_CHAR,               // parse illegal char
+    ERR_SOMETHING
+} error_code;
+
+/* request/response enum */
+typedef enum {
+    UNDEFINED,
     REQ,
     RES
 } http_msg_type;
 
+/* TODO: status code enum */
 typedef enum {
     TWO_O_O=1,
     THREE_O_O,
@@ -18,16 +28,18 @@ typedef enum {
     FOUR_O_FOUR
 } status_code_map;
 
+/* version enum */
 typedef enum {
     ONE_ZERO=1,
     ONE_ONE
 } http_version_map;
 
+/* TODO: method token enum */
 typedef enum {
     GET=1
 } method_token_map;
 
-/* using linked-list to store the data */
+/* using linked-list to store the header fields */
 typedef struct _http_header_t {
     u8                      *field_name;
     u8                      *field_value;
