@@ -58,7 +58,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     select(sockfd, &readfds, NULL, NULL, &tv);
     */
 
-    int buf_size=32, buf_idx=0, parse_len=0, flag=1;
+    int buf_size=64, chunk=64, buf_idx=0, parse_len=0, flag=1;
     char bytebybyte, *bufbybuf;
     char *readbuf=malloc(buf_size*sizeof(char)), *tmp; // pre-allocated 32 bytes
     http_msg_type msg_state=UNDEFINED;
@@ -77,7 +77,7 @@ int http_state_machine(int sockfd, http_t *http_request)
             case '\r':
                 pstate=next_parse_state(pstate, CR);
                 state=next_http_state(state, RES);
-                printf("Type: %d\n", state);
+                // printf("Type: %d\n", state);
                 if(state<MSG_BODY && parse_len>0){
                     // parse last-element of START-LINE, or field-value
                     if(state>HEADER){
@@ -111,7 +111,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                 // for parsing field-name & value
                 if(state==HEADER && parse_len>0){
                     state=next_http_state(state, RES);
-                    printf("Type: %d\n", state);
+                    // printf("Type: %d\n", state);
                     tmp=malloc(parse_len*sizeof(char));
                     memset(tmp, 0x0, parse_len);
                     strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
@@ -139,7 +139,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                 parse_len++;
                 // check size, if not enough, then realloc
                 if(strlen(readbuf)==buf_size){
-                    buf_size+=buf_size; 
+                    buf_size+=chunk; 
                     readbuf=realloc(readbuf, buf_size*sizeof(char));
                     if(readbuf==NULL){
                         perror("Realloc failure, check the memory.");
@@ -152,9 +152,10 @@ int http_state_machine(int sockfd, http_t *http_request)
     tmp=malloc(parse_len*sizeof(char));
     memset(tmp, 0x0, parse_len);
     strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-    printf("MSG_BODY: %s\n", tmp);
-    printf("Sizeof reabuf: %ld\n%s\n", strlen(readbuf), readbuf);
-    
+    // printf("MSG_BODY: %s\n", tmp);
+    // printf("Sizeof reabuf: %ld\n%s\n", strlen(readbuf), readbuf);
+    printf("Sizeof reabuf: %ld\n", strlen(readbuf));
+
     // 4. finish, log the response and close the connection.
     close(sockfd);
 
@@ -193,6 +194,8 @@ http_state next_http_state(http_state cur_state, http_msg_type type)
             return FIELD_VALUE;
         case FIELD_VALUE:
             return HEADER;
+        case MSG_BODY:
+            return MSG_BODY;
     }
 }
 

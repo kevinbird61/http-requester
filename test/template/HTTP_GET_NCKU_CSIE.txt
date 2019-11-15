@@ -1,0 +1,4 @@
+GET /ncku_csie/ HTTP/1.1
+Host: www.csie.ncku.edu.tw
+Connection: keep-alive
+
