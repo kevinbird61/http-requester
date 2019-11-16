@@ -81,18 +81,17 @@ int http_state_machine(int sockfd, http_t *http_request)
                 if(state<MSG_BODY && parse_len>0){
                     // parse last-element of START-LINE, or field-value
                     if(state>HEADER){
-                        tmp=malloc((parse_len-1)*sizeof(char));
-                        memset(tmp, 0x0, parse_len-1);
-                        strncpy(tmp, readbuf+(buf_idx-parse_len+1), parse_len-1);
+                        // header fields
+                        puts("[Field-value]\n");
+                        fwrite(readbuf+(buf_idx-parse_len+1), sizeof(char), parse_len-1, stdout);
+                        puts("\n");
                     } else {
-                        tmp=malloc(parse_len*sizeof(char));
-                        memset(tmp, 0x0, parse_len);
-                        strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
+                        // (last-element) start-line
+                        puts("[Start line]\n");
+                        fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+                        puts("\n");
                     }
-                    // strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    printf("[HTTP:%d] Parse_len: %d, %s\n", state, parse_len, tmp);
                     parse_len=0;
-                    free(tmp);
                 }
                 break;
             case '\n':
@@ -102,7 +101,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                     state=MSG_BODY;
                     printf("Go to MSG BODY\n");
                     // printf("Current data: %s\n\n", readbuf);
-                } else if(pstate==NEXT && state!=MSG_BODY) {
+                } else if(pstate==NEXT && state==MSG_BODY) {
                     printf("Parsing process has been done.\n");
                     flag=0;
                 }
@@ -111,23 +110,17 @@ int http_state_machine(int sockfd, http_t *http_request)
                 // for parsing field-name & value
                 if(state==HEADER && parse_len>0){
                     state=next_http_state(state, RES);
-                    // printf("Type: %d\n", state);
-                    tmp=malloc(parse_len*sizeof(char));
-                    memset(tmp, 0x0, parse_len);
-                    strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    printf("Parse_len: %d, %s\n", parse_len, tmp);
+                    fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+                    puts("\n");
                     parse_len=0;
-                    free(tmp);
                 }
             case ' ':
                 if(state>=START_LINE && state<=REASON_OR_RESOURCE && parse_len>0){
                     // always RES
                     state=next_http_state(state, RES);
-                    tmp=malloc((parse_len)*sizeof(char));
-                    memset(tmp, 0x0, parse_len);
-                    strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    printf("Parse_len: %d, %s\n", parse_len, tmp);
-                    free(tmp);
+                    puts("[Start line]\n");
+                    fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+                    puts("\n");
                     parse_len=0;
                     break;
                 }
@@ -149,10 +142,16 @@ int http_state_machine(int sockfd, http_t *http_request)
         }
     }
 
+    /* this would encounter malloc error. (msg_body may have 40K~50K) 
     tmp=malloc(parse_len*sizeof(char));
+    if(tmp==NULL){
+        perror("malloc error");
+        exit(1);
+    }
     memset(tmp, 0x0, parse_len);
     strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
     // printf("MSG_BODY: %s\n", tmp);
+    */
     // printf("Sizeof reabuf: %ld\n%s\n", strlen(readbuf), readbuf);
     printf("Sizeof reabuf: %ld\n", strlen(readbuf));
 
