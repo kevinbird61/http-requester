@@ -60,7 +60,8 @@ int http_state_machine(int sockfd, http_t *http_request)
 
     int buf_size=64, chunk=64, buf_idx=0, parse_len=0, flag=1;
     char bytebybyte, *bufbybuf;
-    char *readbuf=malloc(buf_size*sizeof(char)), *tmp; // pre-allocated 32 bytes
+    char *readbuf=malloc(buf_size*sizeof(char)); // pre-allocated 32 bytes
+    memset(readbuf, 0x0, buf_idx);
     http_msg_type msg_state=UNDEFINED;
     http_state state=START_LINE;
     parse_state pstate=NON;
@@ -71,7 +72,21 @@ int http_state_machine(int sockfd, http_t *http_request)
         if(!recv(sockfd, &bytebybyte, 1, 0)){
             break;
         }
-        // printf("Parse state: %d, HTTP state: %d\n", pstate, state);
+
+        /* record */
+        readbuf[buf_idx]=bytebybyte;
+        buf_idx++;
+        parse_len++;
+        // check size, if not enough, then realloc
+        if(strlen(readbuf)==buf_size){
+            buf_size+=chunk; 
+            readbuf=realloc(readbuf, buf_size*sizeof(char));
+            if(readbuf==NULL){
+                perror("Realloc failure, check the memory.");
+                exit(1);
+            }
+        }
+
         // read byte, check the byte 
         switch(bytebybyte){
             case '\r':
@@ -99,8 +114,6 @@ int http_state_machine(int sockfd, http_t *http_request)
                 state=next_http_state(state, RES);
                 if(pstate==NEXT && state!=MSG_BODY){
                     state=MSG_BODY;
-                    printf("Go to MSG BODY\n");
-                    // printf("Current data: %s\n\n", readbuf);
                 } else if(pstate==NEXT && state==MSG_BODY) {
                     printf("Parsing process has been done.\n");
                     flag=0;
@@ -110,11 +123,13 @@ int http_state_machine(int sockfd, http_t *http_request)
                 // for parsing field-name & value
                 if(state==HEADER && parse_len>0){
                     state=next_http_state(state, RES);
-                    fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+                    puts("[Field-name]\n");
+                    fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
                     puts("\n");
                     parse_len=0;
                 }
             case ' ':
+                // parse only when in start-line state 
                 if(state>=START_LINE && state<=REASON_OR_RESOURCE && parse_len>0){
                     // always RES
                     state=next_http_state(state, RES);
@@ -127,33 +142,17 @@ int http_state_machine(int sockfd, http_t *http_request)
             default:
                 // append to readbuf
                 pstate=NON;
-                readbuf[buf_idx]=bytebybyte;
-                buf_idx++;
-                parse_len++;
-                // check size, if not enough, then realloc
-                if(strlen(readbuf)==buf_size){
-                    buf_size+=chunk; 
-                    readbuf=realloc(readbuf, buf_size*sizeof(char));
-                    if(readbuf==NULL){
-                        perror("Realloc failure, check the memory.");
-                        exit(1);
-                    }
-                }
         }
     }
 
-    /* this would encounter malloc error. (msg_body may have 40K~50K) 
-    tmp=malloc(parse_len*sizeof(char));
-    if(tmp==NULL){
-        perror("malloc error");
-        exit(1);
-    }
-    memset(tmp, 0x0, parse_len);
-    strncpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-    // printf("MSG_BODY: %s\n", tmp);
-    */
-    // printf("Sizeof reabuf: %ld\n%s\n", strlen(readbuf), readbuf);
-    printf("Sizeof reabuf: %ld\n", strlen(readbuf));
+    /* malloc would encounter malloc error. (msg_body may have 40K~50K) */
+    printf("[Header]\n");
+    // fwrite(readbuf, sizeof(char), buf_idx, stdout);
+    printf("%s\n", readbuf);
+
+    // printf("[MSG_BODY]\n");
+    // fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+    // printf("Sizeof reabuf: %ld\n", strlen(readbuf));
 
     // 4. finish, log the response and close the connection.
     close(sockfd);
