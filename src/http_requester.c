@@ -90,7 +90,7 @@ void print_manual()
     printf("*********************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
     printf("\n");
-    printf("Usage: [sudo] ./http-goon.exe\n");
+    printf("Usage: [sudo] ./http_requester.exe\n");
     printf("\t-h: Print this helper function.\n");
     printf("\t-c, --conc NUM: Specify number of concurrent connections.\n");
     printf("\t-n, --conn NUM: Specify number of total connections.\n");

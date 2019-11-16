@@ -31,6 +31,8 @@ typedef enum {
     NEXT
 } parse_state;
 
+/* helper function */
+char *get_http_state(http_state state);
 http_state next_http_state(http_state cur_state, http_msg_type type);
 parse_state next_parse_state(parse_state cur_pstate, parse_state nxt_pstate);
 
@@ -97,12 +99,12 @@ int http_state_machine(int sockfd, http_t *http_request)
                     // parse last-element of START-LINE, or field-value
                     if(state>HEADER){
                         // header fields
-                        puts("[Field-value]\n");
+                        printf("[Field-value] %s\n", get_http_state(state));
                         fwrite(readbuf+(buf_idx-parse_len+1), sizeof(char), parse_len-1, stdout);
                         puts("\n");
                     } else {
                         // (last-element) start-line
-                        puts("[Start line]\n");
+                        printf("[Start line] %s\n", get_http_state(state));
                         fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
                         puts("\n");
                     }
@@ -114,6 +116,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                 state=next_http_state(state, RES);
                 if(pstate==NEXT && state!=MSG_BODY){
                     state=MSG_BODY;
+
                 } else if(pstate==NEXT && state==MSG_BODY) {
                     printf("Parsing process has been done.\n");
                     flag=0;
@@ -123,7 +126,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                 // for parsing field-name & value
                 if(state==HEADER && parse_len>0){
                     state=next_http_state(state, RES);
-                    puts("[Field-name]\n");
+                    printf("[Field-name] %s\n", get_http_state(state));
                     fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
                     puts("\n");
                     parse_len=0;
@@ -133,7 +136,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                 if(state>=START_LINE && state<=REASON_OR_RESOURCE && parse_len>0){
                     // always RES
                     state=next_http_state(state, RES);
-                    puts("[Start line]\n");
+                    printf("[Start line] %s\n", get_http_state(state));
                     fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
                     puts("\n");
                     parse_len=0;
@@ -158,6 +161,32 @@ int http_state_machine(int sockfd, http_t *http_request)
     close(sockfd);
 
     return 0;
+}
+
+char *get_http_state(http_state state)
+{
+    switch(state){
+        case START_LINE:
+            return "Start-line (Init state)";
+        case VER:
+            return "HTTP version";
+        case CODE_OR_TOKEN:
+            return "Status code or Method token";
+        case REASON_OR_RESOURCE:
+            return "REASON phrase or Target resource";
+        case HEADER:
+            return "Header section";
+        case FIELD_NAME:
+            return "Field-name";
+        case FIELD_VALUE:
+            return "Field-value";
+        case MSG_BODY:
+            return "Message-body";
+        case END:
+            return "End of parsing process";
+        case ABORT:
+            return "Failure";
+    }
 }
 
 http_state next_http_state(http_state cur_state, http_msg_type type)

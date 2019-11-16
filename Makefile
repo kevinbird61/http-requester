@@ -23,4 +23,4 @@ all: $(OBJS) $(EXEC) $(TEST) $(TOOLS)
 .PHONY=clean
 
 clean:
-	rm *.exe *.o *.out*.app
+	rm *.exe *.o *.out *.app
