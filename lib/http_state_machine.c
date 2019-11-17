@@ -110,31 +110,31 @@ int http_state_machine(int sockfd, http_t *http_request)
                 // printf("Type: %d\n", state);
                 if(state<MSG_BODY && parse_len>0){
                     // parse last-element of START-LINE, or field-value
-                    // char *tmp;
+                    char *tmp;
                     if(state>HEADER){
                         // header fields
-                        printf("[Field-value] %s\n", get_http_state(state));
-                        fwrite(readbuf+(buf_idx-parse_len+1), sizeof(char), parse_len-1, stdout);
-                        puts("\n");
+                        // printf("[Field-value] %s\n", get_http_state(state));
+                        // fwrite(readbuf+(buf_idx-parse_len+1), sizeof(char), parse_len-1, stdout);
+                        // puts("\n");
 
-                        // tmp=malloc((parse_len-1)*sizeof(char));
-                        // memcpy(tmp, readbuf+(buf_idx-parse_len+1), parse_len-1);
-                        // syslog("DEBUG", __func__, "Parse ", get_http_state(state), ": ", tmp);
+                        tmp=malloc((parse_len-1)*sizeof(char));
+                        memcpy(tmp, readbuf+(buf_idx-parse_len+1), parse_len-1);
+                        // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
 
                         //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     } else {
                         // (last-element) start-line
-                        printf("[Start line] %s\n", get_http_state(state));
-                        fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
-                        puts("\n");
+                        //printf("[Start line] %s\n", get_http_state(state));
+                        //fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+                        //puts("\n");
                         
-                        //tmp=malloc((parse_len)*sizeof(char));
-                        //memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                        //syslog("DEBUG", __func__, "Parse ", get_http_state(state), ": ", tmp);
+                        tmp=malloc((parse_len)*sizeof(char));
+                        memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
+                        // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
 
                         //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     }
-                    // free(tmp);
+                    free(tmp);
                     parse_len=0;
                 }
                 break;
@@ -152,17 +152,18 @@ int http_state_machine(int sockfd, http_t *http_request)
             case ':':
                 // for parsing field-name & value
                 if(state==HEADER && parse_len>0){
+                    
+                    //printf("[Field-name] %s\n", get_http_state(state));
+                    //fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
+                    //puts("\n");
+
+                    char *tmp=malloc((parse_len)*sizeof(char));
+                    memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
+                    // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
+                    free(tmp);
+
+                    // syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     state=next_http_state(state, RES);
-                    printf("[Field-name] %s\n", get_http_state(state));
-                    fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
-                    puts("\n");
-
-                    // char *tmp=malloc((parse_len)*sizeof(char));
-                    // memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    // syslog("DEBUG", __func__, "Parse ", get_http_state(state), ": ", tmp);
-                    // free(tmp);
-
-                    //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     parse_len=0;
                 }
             case ' ':
@@ -170,14 +171,14 @@ int http_state_machine(int sockfd, http_t *http_request)
                 if(state>=START_LINE && state<=REASON_OR_RESOURCE && parse_len>0){
                     // always RES
                     state=next_http_state(state, RES);
-                    printf("[Start line] %s\n", get_http_state(state));
-                    fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
-                    puts("\n");
+                    //printf("[Start line] %s\n", get_http_state(state));
+                    //fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
+                    //puts("\n");
                     
-                    //char *tmp=malloc((parse_len)*sizeof(char));
-                    //memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    //syslog("DEBUG", __func__, "Parse ", get_http_state(state), ": ", tmp);
-                    //free(tmp);
+                    char *tmp=malloc((parse_len)*sizeof(char));
+                    memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
+                    // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
+                    free(tmp);
 
                     //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
 
@@ -198,7 +199,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     // printf("[MSG_BODY]\n");
     // fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
     // printf("Sizeof reabuf: %ld\n", strlen(readbuf));
-    //syslog("DEBUG", __func__, "Total received: ", itoa(strlen(readbuf)), " bytes.");
+    // syslog("DEBUG", __func__, "Total received: ", itoa(strlen(readbuf)), " bytes.");
 
     // 4. finish, log the response and close the connection.
     close(sockfd);

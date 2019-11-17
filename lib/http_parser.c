@@ -52,13 +52,14 @@ int http_recast(http_t *http_packet, char **rawdata)
     
     // printf("HTTP header: %s (%p)\n", req, &req);
     /**************************************************** header fields ****************************************************/
-    while(http_packet->headers!=NULL && http_packet->headers->field_name!=NULL)
+    while(http_packet->headers!=NULL && http_packet->headers->field_name!=NULL && http_packet->headers->field_value!=NULL)
     {
         int header_size=(strlen(http_packet->headers->field_name)+strlen(http_packet->headers->field_value)+4);
         char *buf=malloc(header_size*sizeof(char));
         // snprintf(buf, header_size, "%s: %s\r\n", http_request->headers->field_name, http_request->headers->field_value);
         sprintf(buf, "%s: %s\r\n", http_packet->headers->field_name, http_packet->headers->field_value);
-        syslog("DEBUG", __func__, http_packet->headers->field_name, ": ", http_packet->headers->field_value);
+        // printf("%s: %s\n", http_packet->headers->field_name, http_packet->headers->field_value);
+        syslog("DEBUG", __func__, http_packet->headers->field_name, http_packet->headers->field_value);
         // printf("Buf: %s\n", buf);
         // check size, if not enough, scale it
         if(limit<=(strlen(buf)+strlen(*rawdata))){

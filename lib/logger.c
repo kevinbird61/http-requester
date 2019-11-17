@@ -10,7 +10,8 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
 
     str=info_args;
     va_start(ap, info_args);
-    while(str!=NULL && strlen(str)>0){
+    while(str!=NULL){
+        if(strlen(str)<=0){ break;}
         if(alloc_size <= (strlen(loginfo)+strlen(str))){
             // realloc 
             alloc_size+=64*(1+strlen(str)/64);
