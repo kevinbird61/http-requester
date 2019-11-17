@@ -1,4 +1,5 @@
 #include "http.h"
+#include "logger.h"
 
 struct header_token_list_t {
     char *token;
@@ -6,7 +7,7 @@ struct header_token_list_t {
 };
 
 /**
- * - recast http_obj back into rawdata string, ease for sending 
+ * - recast http_obj back into rawdata string, ease for sending
  */
 int http_recast(http_t *http_packet, char **rawdata)
 {
@@ -18,18 +19,37 @@ int http_recast(http_t *http_packet, char **rawdata)
     *rawdata=malloc(limit*sizeof(char));
     
     /**************************************************** start line ****************************************************/
-    char *method=get_http_method_token(http_packet->req.method_token),
-        *req_target=http_packet->req.req_target,
-        *http_ver=get_http_version(http_packet->version);
-    // check req size (+9: other SP & HTTP)
-    int size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+4;
-    if(limit<=size_start_line){
-        limit=size_start_line;
-        *rawdata=realloc(*rawdata, (limit)*sizeof(char));
+    int size_start_line=0;
+    if(http_packet->type==REQ || http_packet->type==UNDEFINED){
+        // REQUEST/UNDEFINED
+        char *method=get_http_method_token(http_packet->req.method_token),
+            *req_target=http_packet->req.req_target,
+            *http_ver=get_http_version(http_packet->version);
+        // check req size (+9: other SP & HTTP)
+        size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+4;
+        syslog("DEBUG", __func__, "Recasting a HTTP request. Start-line: ", method, " ", req_target, " ", http_ver);
+        if(limit<=size_start_line){
+            limit=size_start_line;
+            *rawdata=realloc(*rawdata, (limit)*sizeof(char));
+        }
+        // snprintf(req, size_start_line, "%s %s HTTP/%s\r\n", method, req_target, http_ver);
+        sprintf(*rawdata, "%s %s %s\r\n", method, req_target, http_ver);
+
+    } else if(http_packet->type==RES) {
+        char *status=get_http_status_code(http_packet->res.status_code),
+            *rea_phrase=http_packet->res.rea_phrase,
+            *http_ver=get_http_version(http_packet->version);
+        // check req size (+9: other SP & HTTP)
+        size_start_line=strlen(status)+strlen(rea_phrase)+strlen(http_ver)+4;
+        syslog("DEBUG", __func__, "Recasting a HTTP response. Start-line: ", http_ver, " ", status, " ", rea_phrase);
+        if(limit<=size_start_line){
+            limit=size_start_line;
+            *rawdata=realloc(*rawdata, (limit)*sizeof(char));
+        }
+        // snprintf
+        sprintf(*rawdata, "%s %s %s\r\n", http_ver, status, rea_phrase);
     }
-    // string copy
-    // snprintf(req, size_start_line, "%s %s HTTP/%s\r\n", method, req_target, http_ver);
-    sprintf(*rawdata, "%s %s %s\r\n", method, req_target, http_ver);
+    
     // printf("HTTP header: %s (%p)\n", req, &req);
     /**************************************************** header fields ****************************************************/
     while(http_packet->headers!=NULL && http_packet->headers->field_name!=NULL)
@@ -38,6 +58,7 @@ int http_recast(http_t *http_packet, char **rawdata)
         char *buf=malloc(header_size*sizeof(char));
         // snprintf(buf, header_size, "%s: %s\r\n", http_request->headers->field_name, http_request->headers->field_value);
         sprintf(buf, "%s: %s\r\n", http_packet->headers->field_name, http_packet->headers->field_value);
+        syslog("DEBUG", __func__, http_packet->headers->field_name, ": ", http_packet->headers->field_value);
         // printf("Buf: %s\n", buf);
         // check size, if not enough, scale it
         if(limit<=(strlen(buf)+strlen(*rawdata))){

@@ -15,7 +15,7 @@ typedef enum {
 
 /* request/response enum */
 typedef enum {
-    UNDEFINED,
+    UNDEFINED=0,
     REQ,
     RES
 } http_msg_type;

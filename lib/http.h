@@ -5,8 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "conn.h"
+#include "utils.h"
 #include "types.h"
+#include "conn.h"
 
 /** http_state_machine.c
  * - check and send the request(s), if not pass the checking, function will return error code.
