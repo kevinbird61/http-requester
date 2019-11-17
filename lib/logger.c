@@ -3,7 +3,7 @@
 int syslog(const char *action_type, const char *func_name, char *info_args, ...)
 {
     va_list ap;
-    int alloc_size=64*(1+(strlen(action_type)+strlen(func_name)+25)/64);    // 25= 6(bracket) + 19(getdate)
+    int alloc_size=64*(1+((strlen(action_type)+strlen(func_name)+25)/64));    // 25= 6(bracket) + 19(getdate)
     char *loginfo=malloc(alloc_size*sizeof(char)), *str;
 
     sprintf(loginfo, "[%s][%s][%s]", getdate(), action_type, func_name);
@@ -15,7 +15,7 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
         if(!strlen(str)){ break;}
         if(alloc_size <= (strlen(loginfo)+strlen(str))){
             // realloc 
-            alloc_size+=64*(1+strlen(str)/64);
+            alloc_size=64*(1+(strlen(loginfo)+strlen(str))/64);
             loginfo=realloc(loginfo, alloc_size*sizeof(char));
             if(loginfo==NULL){
                 fprintf(stderr, "Malloc(logger) failure.");
