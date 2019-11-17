@@ -10,8 +10,9 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
 
     str=info_args;
     va_start(ap, info_args);
-    while(str!=NULL){
-        if(strlen(str)<=0){ break;}
+    while(str && *info_args++){
+        printf("%s, %ld\n", str, strlen(str));
+        if(!strlen(str)){ break;}
         if(alloc_size <= (strlen(loginfo)+strlen(str))){
             // realloc 
             alloc_size+=64*(1+strlen(str)/64);
@@ -22,8 +23,8 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
             }
         }
         sprintf(loginfo, "%s %s", loginfo, str);
-        str=va_arg(ap, char *);
-    } 
+        str=(char *)va_arg(ap, char *);
+    }
     va_end(ap);
     
     if(strlen(loginfo)==alloc_size){
@@ -35,6 +36,6 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
     // write into logfile
     char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+1)*sizeof(char));
     sprintf(logfile, "%s%s%s", log_dir, log_filename, log_ext);
-    FILE *logfd=fopen(logfile, "a+");
+    FILE *logfd=fopen(logfile, "a");
     fwrite(loginfo, sizeof(char), strlen(loginfo), logfd);
 }

@@ -49,7 +49,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     // logging
     char *reqlen=itoa(strlen(req));
     int sendbytes=send(sockfd, req, strlen(req), 0);
-    char *sent=itoa(sendbytes);
+    char *sent=(char*)itoa(sendbytes);
 
     syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent);
 
@@ -119,7 +119,7 @@ int http_state_machine(int sockfd, http_t *http_request)
 
                         tmp=malloc((parse_len-1)*sizeof(char));
                         memcpy(tmp, readbuf+(buf_idx-parse_len+1), parse_len-1);
-                        // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
+                        // syslog("DEBUG", __func__, "Parse Field-value");
 
                         //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     } else {
@@ -130,7 +130,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                         
                         tmp=malloc((parse_len)*sizeof(char));
                         memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                        // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
+                        // syslog("DEBUG", __func__, "Parse start line");
 
                         //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     }
