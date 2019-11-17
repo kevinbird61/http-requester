@@ -22,6 +22,7 @@ static char *log_filename="http_request";
 static char *log_ext=".log";
 
 int syslog(const char *action_type, const char *func_name, char *info_args, ...);
+int syslog_simple(const char *action_type, const char *func_name, char *info_arg);
 // int psyslog(int thread_id, char *info_args, ...);
 
 #endif

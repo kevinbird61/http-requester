@@ -51,7 +51,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     int sendbytes=send(sockfd, req, strlen(req), 0);
     char *sent=(char*)itoa(sendbytes);
 
-    syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent);
+    syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent, NULL);
 
     // 3. recv and parse, until enter finish/abort state (state machine part)
     // - remember: if response status code is 302, we need to send a new redirect request.
@@ -72,7 +72,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     char bytebybyte, *bufbybuf;
     char *readbuf=malloc(buf_size*sizeof(char)); // pre-allocated 32 bytes
     if(readbuf==NULL){
-        syslog("ERROR", __func__, "MALLOC error when alloc to *readbuf. Current buf_size: ", itoa(buf_size));
+        syslog("ERROR", __func__, "MALLOC error when alloc to *readbuf. Current buf_size: ", itoa(buf_size), NULL);
         exit(1);
     }
     memset(readbuf, 0x0, buf_idx);
@@ -96,10 +96,11 @@ int http_state_machine(int sockfd, http_t *http_request)
             buf_size+=chunk; 
             readbuf=realloc(readbuf, buf_size*sizeof(char));
             if(readbuf==NULL){
-                syslog("ERROR", __func__, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: ", itoa(buf_size));
+                syslog("ERROR", __func__, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: ", itoa(buf_size), NULL);
                 exit(1);
             }
-            //syslog("DEBUG", __func__, "REALLOC readbuf size. Current buf_size: ", itoa(buf_size));
+            // if you feel this message is too noisy, can comment this line or increase chunk size
+            //syslog("DEBUG", __func__, "REALLOC readbuf size. Current buf_size: ", itoa(buf_size), NULL);
         }
 
         // read byte, check the byte 
@@ -118,10 +119,9 @@ int http_state_machine(int sockfd, http_t *http_request)
                         // puts("\n");
 
                         tmp=malloc((parse_len-1)*sizeof(char));
-                        memcpy(tmp, readbuf+(buf_idx-parse_len+1), parse_len-1);
-                        // syslog("DEBUG", __func__, "Parse Field-value");
+                        snprintf(tmp, parse_len-1, "%s", readbuf+1+(buf_idx-parse_len));
+                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, NULL);
 
-                        //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
                     } else {
                         // (last-element) start-line
                         //printf("[Start line] %s\n", get_http_state(state));
@@ -129,10 +129,8 @@ int http_state_machine(int sockfd, http_t *http_request)
                         //puts("\n");
                         
                         tmp=malloc((parse_len)*sizeof(char));
-                        memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                        // syslog("DEBUG", __func__, "Parse start line");
-
-                        //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
+                        snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
+                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, NULL);
                     }
                     free(tmp);
                     parse_len=0;
@@ -152,18 +150,14 @@ int http_state_machine(int sockfd, http_t *http_request)
             case ':':
                 // for parsing field-name & value
                 if(state==HEADER && parse_len>0){
-                    
-                    //printf("[Field-name] %s\n", get_http_state(state));
+                    state=next_http_state(state, RES);
                     //fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
                     //puts("\n");
 
-                    char *tmp=malloc((parse_len)*sizeof(char));
-                    memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
+                    char *tmp=malloc((parse_len-1)*sizeof(char));
+                    snprintf(tmp, parse_len-1, "%s", readbuf+1+(buf_idx-parse_len));
+                    syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp, NULL);
                     free(tmp);
-
-                    // syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
-                    state=next_http_state(state, RES);
                     parse_len=0;
                 }
             case ' ':
@@ -176,12 +170,9 @@ int http_state_machine(int sockfd, http_t *http_request)
                     //puts("\n");
                     
                     char *tmp=malloc((parse_len)*sizeof(char));
-                    memcpy(tmp, readbuf+(buf_idx-parse_len), parse_len);
-                    // syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp);
+                    snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
+                    syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp, NULL);
                     free(tmp);
-
-                    //syslog("DEBUG", __func__, "Parsing state ", get_http_state(state));
-
                     parse_len=0;
                     break;
                 }
@@ -199,7 +190,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     // printf("[MSG_BODY]\n");
     // fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
     // printf("Sizeof reabuf: %ld\n", strlen(readbuf));
-    // syslog("DEBUG", __func__, "Total received: ", itoa(strlen(readbuf)), " bytes.");
+    syslog("DEBUG", __func__, "Total received: ", itoa(strlen(readbuf)), " bytes.", NULL);
 
     // 4. finish, log the response and close the connection.
     close(sockfd);
