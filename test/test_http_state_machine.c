@@ -13,6 +13,9 @@ int main(int argc, char *argv[])
     http_interpret(argv[1], http_req);
     // create connection
     int sockfd=create_tcp_conn(argv[2], argv[3]);
+    if(sockfd<0){
+        exit(1);
+    }
     // using http state machine to process
     http_state_machine(sockfd, http_req);
 

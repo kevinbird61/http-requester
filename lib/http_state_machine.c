@@ -190,7 +190,7 @@ int http_state_machine(int sockfd, http_t *http_request)
     // printf("[MSG_BODY]\n");
     // fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
     // printf("Sizeof reabuf: %ld\n", strlen(readbuf));
-    syslog("DEBUG", __func__, "Total received: ", itoa(strlen(readbuf)), " bytes.", NULL);
+    syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes.", NULL);
 
     // 4. finish, log the response and close the connection.
     close(sockfd);

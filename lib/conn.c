@@ -14,7 +14,7 @@ int create_tcp_conn(const char *target, const char *port)
     if((rv=getaddrinfo(target, port, &hints, &res))!=0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
+        return -1;
     }
 
     for(p=res; p!=NULL; p=p->ai_next)
@@ -37,7 +37,7 @@ int create_tcp_conn(const char *target, const char *port)
     if(p==NULL)
     {
         fprintf(stderr, "Failed to connect.\n");
-        return 1;
+        return -1;
     }
 
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof(s));
