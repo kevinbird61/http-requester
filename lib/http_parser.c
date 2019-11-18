@@ -172,4 +172,8 @@ int http_parser(char *rawdata, http_t *http_packet)
             get_http_status_code(http_packet->res.status_code),
             http_packet->res.rea_phrase);*/
     }
+
+    // free
+    free(token);
+    free(headers);
 }

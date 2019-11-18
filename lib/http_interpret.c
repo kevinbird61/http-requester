@@ -15,15 +15,32 @@ int http_interpret(const char *filename, http_t *http_packet)
         //printf("%s", buf);
         if(req==NULL){
             req=malloc((read)*sizeof(char));
+            if(req==NULL){
+                // syslog
+                exit(1);
+            }
             sprintf(req, "%s", buf);
         } else {
             req=realloc(req, (strlen(req)+read)*sizeof(char));
+            if(req==NULL){
+                // syslog
+                exit(1);
+            }
             sprintf(req, "%s%s", req, buf);
         }
     }
     req=realloc(req, (strlen(req)+2)*sizeof(char));
+    if(req==NULL){
+        // syslog
+        exit(1);
+    }
     sprintf(req, "%s\r\n", req);
 
     // parsing 
     http_parser(req, http_packet);
+
+    // free
+    free(buf);
+    free(req);
+    fclose(fp);
 }
