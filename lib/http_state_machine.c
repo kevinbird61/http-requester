@@ -70,29 +70,27 @@ int http_state_machine(int sockfd, http_t *http_request)
 
     int buf_size=64, chunk=64, buf_idx=0, parse_len=0, flag=1;
     char bytebybyte, *bufbybuf;
-    char *readbuf=malloc(buf_size*sizeof(char)); // pre-allocated 32 bytes
+    char *readbuf=calloc(buf_size, sizeof(char)); // pre-allocated 32 bytes
     if(readbuf==NULL){
         syslog("ERROR", __func__, "MALLOC error when alloc to *readbuf. Current buf_size: ", itoa(buf_size), NULL);
         exit(1);
     }
-    memset(readbuf, 0x0, buf_idx);
     http_msg_type msg_state=UNDEFINED;
     http_state state=START_LINE;
     parse_state pstate=NON;
     // current using http_t
-    http_t *http_response=malloc(sizeof(http_t));
+    // http_t *http_response=malloc(sizeof(http_t));
     // scenario 1: byte-by-byte reading
     while(flag){
         if(!recv(sockfd, &bytebybyte, 1, 0)){
             break;
         }
-
         /* record */
         readbuf[buf_idx]=bytebybyte;
         buf_idx++;
         parse_len++;
         // check size, if not enough, then realloc
-        if(strlen(readbuf)==buf_size){
+        if(buf_idx==buf_size){
             buf_size+=chunk; 
             readbuf=realloc(readbuf, buf_size*sizeof(char));
             if(readbuf==NULL){

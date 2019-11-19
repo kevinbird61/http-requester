@@ -55,5 +55,10 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
     FILE *logfd=fopen(logfile, "a+");
     fwrite(loginfo, sizeof(char), strlen(loginfo), logfd);
 
+    free(str);
+    free(loginfo);
+    free(logfile);
+    fclose(logfd);
+
     return 0;
 }

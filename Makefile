@@ -1,5 +1,5 @@
 CC:=gcc
-CFLAGS:=-std=gnu99 -g
+CFLAGS:=-std=gnu99 -g3
 LIBS:=-Ilib/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
