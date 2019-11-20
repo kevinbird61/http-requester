@@ -37,11 +37,15 @@ int http_recast(http_t *http_packet, char **rawdata);
  */
 int http_interpret(const char *filename, http_t *http_packet);
 
-/** http_process.c: 
+/** http_header_conf_check.c: 
  * - check whether the syntax/grammar is conformable with HTTP/1.1 or not.
  * - autocorrect/strip the useless or error part
  */
-int http_process(http_t *http_packet);
+// create http_header_status_obj
+http_header_status_t *create_http_header_status(char *readbuf);
+// insert & check
+int insert_new_header_field_name(u32 idx, u16 offset);
+int insert_new_header_field_value(u32 idx, u16 offset);
 
 /** http_helper.c:
  * - encap/decap those mapping code (with prefix `get_*`/`encap_*`)

@@ -146,6 +146,57 @@ typedef struct _http_t {
     u8                      *msg_body;
 }__attribute__((packed)) http_t;
 
+struct offset_t {
+    u16 idx;    // record the starting index(address) of the buffer
+    u16 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
+}__attribute__((packed)); // 4 bytes
+
+typedef struct _http_header_status_t {
+    // dirty bit (record existence), using 32 bits to store
+    u32 host_dirty: 1,
+        user_agent_dirty: 1,
+        allow_dirty: 1,
+        server_dirty: 1,
+        transfer_encoding_dirty: 1,
+        te_dirty: 1,
+        trailer_dirty: 1,
+        date_dirty: 1,
+        cache_control_dirty: 1,
+        expires_dirty: 1,
+        last_modified_dirty: 1,
+        etag_dirty: 1,
+        connection_dirty: 1,
+        keepalive_dirty: 1,
+        spare: 2,
+        accept_dirty: 1,
+        accept_charset_dirty: 1,
+        accept_encoding_dirty: 1,
+        accept_language_dirty: 1,
+        cookie_dirty: 1,
+        set_cookie_dirty: 1,
+        spare2: 2,
+        content_length_dirty: 1,
+        content_type_dirty: 1,
+        content_encoding_dirty: 1,
+        content_language_dirty: 1,
+        content_location_dirty: 1,
+        spare3: 3;
+    u32 curr_bit; // record current bit (to let caller know which header is processing)
+    // store idx & offset of each header field
+    struct offset_t host, user_agent, allow, server, date;
+    struct offset_t cache_control, expires, last_modified, etag, connection, keepalive;
+    struct offset_t accept, accept_charset, accept_encoding, accept_language, cookie, set_cookie; /* FIXME: cookie & set_cookie could be multiple */
+    struct offset_t content_type, content_encoding, content_language, content_location;
+    // using union to save conflict part
+    union {
+        struct offset_t transfer_encoding, te;
+        struct offset_t content_length;
+    };
+    /** store buffer ptr (start from http message header) 
+     * - assign the actual buffer ptr to here when call create func
+    */
+    u8 *buff;
+} __attribute__((aligned(64))) http_header_status_t;    // align with 64
 
 
 #endif
