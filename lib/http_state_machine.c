@@ -3,36 +3,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "logger.h"
 #include "http.h"
-
-// http parsing state
-typedef enum {
-    // start-line states
-    START_LINE=1,
-    VER,
-    CODE_OR_TOKEN,
-    REASON_OR_RESOURCE,
-    // header fields
-    HEADER,
-    FIELD_NAME,
-    FIELD_VALUE,
-    // msg body
-    MSG_BODY,
-    // terminate successfully
-    END,
-    // terminate with error 
-    ABORT
-} http_state;
-
-// character
-typedef enum {
-    NON,
-    CR,
-    LF,
-    CRLF,
-    NEXT
-} parse_state;
 
 /* helper function */
 char *get_http_state(http_state state);
