@@ -49,8 +49,8 @@ int http_state_machine(int sockfd, http_t *http_request)
     http_msg_type msg_state=UNDEFINED;
     http_state state=START_LINE;
     parse_state pstate=NON;
-    // current using http_t
-    // http_t *http_response=malloc(sizeof(http_t));
+    // http_header_status_t - conformance check
+    http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
     // scenario 1: byte-by-byte reading
     while(flag){
         if(!recv(sockfd, &bytebybyte, 1, 0)){
@@ -64,6 +64,7 @@ int http_state_machine(int sockfd, http_t *http_request)
         if(buf_idx==buf_size){
             buf_size+=chunk; 
             readbuf=realloc(readbuf, buf_size*sizeof(char));
+            http_h_status_check->buff=readbuf;
             if(readbuf==NULL){
                 syslog("ERROR", __func__, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: ", itoa(buf_size), NULL);
                 exit(1);
@@ -82,24 +83,16 @@ int http_state_machine(int sockfd, http_t *http_request)
                     // parse last-element of START-LINE, or field-value
                     char *tmp;
                     if(state>HEADER){
-                        // header fields
-                        // printf("[Field-value] %s\n", get_http_state(state));
-                        // fwrite(readbuf+(buf_idx-parse_len+1), sizeof(char), parse_len-1, stdout);
-                        // puts("\n");
-
+                        // header field-values
                         tmp=malloc((parse_len-1)*sizeof(char));
                         snprintf(tmp, parse_len-1, "%s", readbuf+1+(buf_idx-parse_len));
-                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, NULL);
+                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, ", Parsed len: ", itoa(parse_len-1), ", Strlen: ", itoa(strlen(tmp)), NULL);
 
                     } else {
                         // (last-element) start-line
-                        //printf("[Start line] %s\n", get_http_state(state));
-                        //fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
-                        //puts("\n");
-                        
                         tmp=malloc((parse_len)*sizeof(char));
                         snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, NULL);
+                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, ", Parsed len: ", itoa(parse_len), ", Strlen: ", itoa(strlen(tmp)), NULL);
                     }
                     free(tmp);
                     parse_len=0;
@@ -109,38 +102,32 @@ int http_state_machine(int sockfd, http_t *http_request)
                 pstate=next_parse_state(pstate, LF);
                 state=next_http_state(state, RES);
                 if(pstate==NEXT && state!=MSG_BODY){
+                    // enter MSG_BODY
+                    syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
                     state=MSG_BODY;
-
                 } else if(pstate==NEXT && state==MSG_BODY) {
                     printf("Parsing process has been done.\n");
                     flag=0;
                 }
                 break;
             case ':':
-                // for parsing field-name & value
+                // for parsing field-name
                 if(state==HEADER && parse_len>0){
                     state=next_http_state(state, RES);
                     //fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
-                    //puts("\n");
-
-                    char *tmp=malloc((parse_len-1)*sizeof(char));
-                    snprintf(tmp, parse_len-1, "%s", readbuf+1+(buf_idx-parse_len));
-                    syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp, NULL);
-                    free(tmp);
+                    insert_new_header_field_name(http_h_status_check, buf_idx, parse_len);
                     parse_len=0;
                 }
             case ' ':
-                // parse only when in start-line state 
+                // parse only when in "start-line" state; 
                 if(state>=START_LINE && state<=REASON_OR_RESOURCE && parse_len>0){
                     // always RES
                     state=next_http_state(state, RES);
-                    //printf("[Start line] %s\n", get_http_state(state));
                     //fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
-                    //puts("\n");
                     
                     char *tmp=malloc((parse_len)*sizeof(char));
                     snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                    syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp, NULL);
+                    syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp, ", Parsed len: ", itoa(parse_len), ", Strlen: ", itoa(strlen(tmp)), NULL);
                     free(tmp);
                     parse_len=0;
                     break;

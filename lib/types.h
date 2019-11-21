@@ -11,11 +11,11 @@ typedef unsigned short      u16;
 typedef unsigned int        u32;
 typedef unsigned long long  u64;
 
-/* TODO: error code enum */
+/* TODO: error code enum (each func need to follow) */
 typedef enum {
     ERR_NONE=0,                     // success
     ERR_ILLEGAL_CHAR,               // parse illegal char
-    ERR_SOMETHING
+    ERR_UNDEFINED
 } error_code;
 
 /* request/response enum */
