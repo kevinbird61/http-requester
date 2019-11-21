@@ -44,10 +44,9 @@ int http_interpret(const char *filename, http_t *http_packet);
 // create http_header_status_obj
 http_header_status_t *create_http_header_status(char *readbuf);
 // insert & check
-int insert_new_header_field_name(http_header_status_t *status, u32 idx, u16 offset);
+int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offset);
 int check_header_field_name(http_header_status_t *status, char *field_name);
-char *decode_header_field_name(int header_codename);
-int insert_new_header_field_value(u32 idx, u16 offset);
+int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 offset);
 
 /** http_helper.c:
  * - encap/decap those mapping code (with prefix `get_*`/`encap_*`)

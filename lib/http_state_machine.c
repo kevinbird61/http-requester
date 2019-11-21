@@ -75,26 +75,27 @@ int http_state_machine(int sockfd, http_t *http_request)
 
         // read byte, check the byte 
         switch(bytebybyte){
+            case 0:
+                parse_len=0;
+                break;
             case '\r':
                 pstate=next_parse_state(pstate, CR);
                 state=next_http_state(state, RES);
                 // printf("Type: %d\n", state);
-                if(state<MSG_BODY && parse_len>0){
+                if(state<MSG_BODY && parse_len>1){
                     // parse last-element of START-LINE, or field-value
-                    char *tmp;
-                    if(state>HEADER){
+                    
+                    if(state>HEADER && state<MSG_BODY){
                         // header field-values
-                        tmp=malloc((parse_len-1)*sizeof(char));
-                        snprintf(tmp, parse_len-1, "%s", readbuf+1+(buf_idx-parse_len));
-                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, ", Parsed len: ", itoa(parse_len-1), ", Strlen: ", itoa(strlen(tmp)), NULL);
-
+                        insert_new_header_field_value(http_h_status_check, buf_idx, parse_len);
                     } else {
                         // (last-element) start-line
+                        char *tmp;
                         tmp=malloc((parse_len)*sizeof(char));
                         snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
                         syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, ", Parsed len: ", itoa(parse_len), ", Strlen: ", itoa(strlen(tmp)), NULL);
+                        free(tmp);
                     }
-                    free(tmp);
                     parse_len=0;
                 }
                 break;
@@ -109,6 +110,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                     printf("Parsing process has been done.\n");
                     flag=0;
                 }
+                parse_len=0;
                 break;
             case ':':
                 // for parsing field-name

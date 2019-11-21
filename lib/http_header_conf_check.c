@@ -59,34 +59,6 @@
  *      - using/following enum error code defined in `types.h`
  */
 
-typedef enum {
-    CACHE_CTRL=0,
-    EXPIRES,
-    LAST_MOD,
-    ETAG,
-    CONN,
-    KEEPALIVE,
-    ACCEPT,
-    ACCEPT_CHAR,
-    ACCEPT_ENCODING,
-    ACCEPT_LANG,
-    COOKIE,
-    SET_COOKIE,
-    CONTENT_LEN,
-    CONTENT_TYPE,
-    CONTENT_ENCODING,
-    CONTENT_LANG,
-    CONTENT_LOC,
-    HOST,
-    USER_AGENT,
-    ALLOW,
-    SERVER,
-    TRANSFER_ENCODING,
-    TE,
-    TRAILER,
-    DATE
-} header_name_t;
-
 const char *get_header_name_by_idx [] = {
     [CACHE_CTRL]="Cache-Control",
     [EXPIRES]="Expires",
@@ -112,7 +84,9 @@ const char *get_header_name_by_idx [] = {
     [TRANSFER_ENCODING]="Transfer-Encoding",
     [TE]="TE",
     [TRAILER]="Trailer",
-    [DATE]="Date"
+    [DATE]="Date",
+    [VARY]="Vary",
+    [HEADER_NAME_MAXIMUM]=NULL
 };
 
 // create
@@ -126,26 +100,46 @@ http_header_status_t *create_http_header_status(char *readbuf)
     return http_header_status;
 }
 
-int insert_new_header_field_name(http_header_status_t *status, u32 idx, u16 offset)
+int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offset)
 {
     // search input field-name is supported or not
-    // char *tmp=malloc((offset-1)*sizeof(char));
-    // snprintf(tmp, offset-1, "%s", status->buff+1+(idx-offset));
-    int check_header=check_header_field_name(status, status->buff+1+(idx-offset));
-    if(check_header>0){
-        syslog("DEBUG", __func__, "[Field-name] Found `", decode_header_field_name(check_header), "`", NULL);
+    int check_header=check_header_field_name(status, status->buff+(idx-offset));
+    // FIXME: store the enum or |=<dirty_bit>
+    status->curr_bit=check_header;
+    
+    if(check_header>=0){
+        syslog("DEBUG", __func__, "[Field-name: ", get_header_name_by_idx[check_header], "]", NULL);
     } else {
-        char *tmp=malloc((offset-1)*sizeof(char));
-        snprintf(tmp, offset-1, "%s", status->buff+1+(idx-offset));
+        /* if not found, then alloc the memory to print */
+        char *tmp=malloc((offset)*sizeof(char));
+        snprintf(tmp, offset, "%s", status->buff+(idx-offset));
         syslog("DEBUG", __func__, "[Field-name] Not support `", tmp, "` currently", NULL);
         free(tmp);
+        
+        return ERR_NOT_SUPPORT;
     }
-    // flag the bit and record current idx (for field-value insert)
+
+    return ERR_NONE;
 }
 
-int insert_new_header_field_value(u32 idx, u16 offset)
+int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 offset)
 {
+    // [debug] fetch field-value
+    char *tmp=malloc((offset)*sizeof(char));
+    snprintf(tmp, offset, "%s", status->buff+(idx-offset));
+    syslog("DEBUG", __func__,"[Field-value: ", tmp, "]", NULL);
+    free(tmp);
 
+    // using curr_bit to store field-value
+    if(status->curr_bit>=0){
+        status->field_value[status->curr_bit].idx=idx;
+        status->field_value[status->curr_bit].offset=offset;
+    } else {
+        // if field-name not support, then just discard this field
+        return ERR_NOT_SUPPORT;
+    }
+
+    return ERR_NONE;
 }
 
 // insert & check
@@ -153,9 +147,13 @@ int check_header_field_name(http_header_status_t *status, char *field_name)
 {
     /* FIXME: using dictionary to optimize searching */
     // if found, return enum code 
+    // also set the bit to record current idx (for field-value insert)
     if(!strncasecmp(field_name, "Date", sizeof("Date")-1)){
         status->date_dirty=1;
         return DATE;
+    } else if(!strncasecmp(field_name, "Vary", sizeof("Vary")-1)){
+        status->vary_dirty=1;
+        return VARY;
     } else if(!strncasecmp(field_name, "Host", sizeof("Host")-1)){
         status->host_dirty=1;
         return HOST;
@@ -213,9 +211,6 @@ int check_header_field_name(http_header_status_t *status, char *field_name)
     } else if(!strncasecmp(field_name, "Set-Cookie", 10)) {
         status->set_cookie_dirty=1;
         return SET_COOKIE;
-    } else if(!strncasecmp(field_name, "Accept", 6)) {
-        status->accept_dirty=1;
-        return ACCEPT;
     } else if(!strncasecmp(field_name, "Accept-Charset", sizeof("Accept-Charset")-1)) {
         status->accept_charset_dirty=1;
         return ACCEPT_CHAR;
@@ -225,67 +220,11 @@ int check_header_field_name(http_header_status_t *status, char *field_name)
     } else if(!strncasecmp(field_name, "Accept-Language", sizeof("Accept-Language")-1)) {
         status->accept_language_dirty=1;
         return ACCEPT_LANG;
+    } else if(!strncasecmp(field_name, "Accept", strlen(field_name))) { // prevent "Accept-*" matching
+        status->accept_dirty=1;
+        return ACCEPT;
     } else {
         // not found, just by pass (send 0)
         return -1;
-    }
-}
-
-char *decode_header_field_name(int header_codename)
-{
-    switch(header_codename)
-    {
-        case CACHE_CTRL:
-            return "Cache-Control";
-        case EXPIRES:
-            return "Expires";
-        case LAST_MOD:
-            return "Last-Modified";
-        case ETAG:
-            return "Etag";
-        case CONN:
-            return "Connection";
-        case KEEPALIVE:
-            return "Keep-Alive";
-        case ACCEPT:
-            return "Accept";
-        case ACCEPT_CHAR:
-            return "Accept-Charset";
-        case ACCEPT_ENCODING:
-            return "Accept-Encoding";
-        case ACCEPT_LANG:
-            return "Accept-Language";
-        case COOKIE:
-            return "Cookie";
-        case SET_COOKIE:
-            return "Set-Cookie";
-        case CONTENT_LEN:
-            return "Content-Length";
-        case CONTENT_TYPE:
-            return "Content-Type";
-        case CONTENT_ENCODING:
-            return "Content-Encoding";
-        case CONTENT_LANG:
-            return "Content-Language";
-        case CONTENT_LOC:
-            return "Content-Location";
-        case HOST:
-            return "Host";
-        case USER_AGENT:
-            return "User-Agent";
-        case ALLOW:
-            return "Allow";
-        case SERVER:
-            return "Server";
-        case TRANSFER_ENCODING:
-            return "Transfer-Encoding";
-        case TE:
-            return "TE";
-        case TRAILER:
-            return "Trailer";
-        case DATE:
-            return "Date";
-        default:
-            return NULL;
     }
 }

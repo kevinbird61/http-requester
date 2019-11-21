@@ -15,6 +15,7 @@ typedef unsigned long long  u64;
 typedef enum {
     ERR_NONE=0,                     // success
     ERR_ILLEGAL_CHAR,               // parse illegal char
+    ERR_NOT_SUPPORT,
     ERR_UNDEFINED
 } error_code;
 
@@ -111,6 +112,36 @@ typedef enum {
     NEXT
 } parse_state;
 
+typedef enum {
+    CACHE_CTRL=0,
+    EXPIRES,
+    LAST_MOD,
+    ETAG,
+    CONN,
+    KEEPALIVE,
+    ACCEPT,
+    ACCEPT_CHAR,
+    ACCEPT_ENCODING,
+    ACCEPT_LANG,
+    COOKIE,
+    SET_COOKIE,
+    CONTENT_LEN,
+    CONTENT_TYPE,
+    CONTENT_ENCODING,
+    CONTENT_LANG,
+    CONTENT_LOC,
+    HOST,
+    USER_AGENT,
+    ALLOW,
+    SERVER,
+    TRANSFER_ENCODING,
+    TE,
+    TRAILER,
+    DATE,
+    VARY,
+    HEADER_NAME_MAXIMUM
+} header_name_t;
+
 /* using linked-list to store the header fields */
 typedef struct _http_header_t {
     u8                      *field_name;
@@ -147,9 +178,9 @@ typedef struct _http_t {
 }__attribute__((packed)) http_t;
 
 struct offset_t {
-    u16 idx;    // record the starting index(address) of the buffer
+    u32 idx;    // record the starting index(address) of the buffer
     u16 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
-}__attribute__((packed)); // 4 bytes
+}__attribute__((packed)); // 4+4 bytes
 
 typedef struct _http_header_status_t {
     // dirty bit (record existence), using 32 bits to store
@@ -161,13 +192,14 @@ typedef struct _http_header_status_t {
         te_dirty: 1,
         trailer_dirty: 1,
         date_dirty: 1,
+        vary_dirty: 1,
         cache_control_dirty: 1,
         expires_dirty: 1,
         last_modified_dirty: 1,
         etag_dirty: 1,
         connection_dirty: 1,
         keepalive_dirty: 1,
-        spare: 2,
+        spare: 1,
         accept_dirty: 1,
         accept_charset_dirty: 1,
         accept_encoding_dirty: 1,
@@ -181,17 +213,9 @@ typedef struct _http_header_status_t {
         content_language_dirty: 1,
         content_location_dirty: 1,
         spare3: 3;
-    u32 curr_bit; // record current bit (to let caller know which header is processing)
+    int curr_bit; // record current bit (to let caller know which header is processing)
     // store idx & offset of each header field
-    struct offset_t host, user_agent, allow, server, date;
-    struct offset_t cache_control, expires, last_modified, etag, connection, keepalive;
-    struct offset_t accept, accept_charset, accept_encoding, accept_language, cookie, set_cookie; /* FIXME: cookie & set_cookie could be multiple */
-    struct offset_t content_type, content_encoding, content_language, content_location;
-    // using union to save conflict part
-    union {
-        struct offset_t transfer_encoding, te;
-        struct offset_t content_length;
-    };
+    struct offset_t field_value[HEADER_NAME_MAXIMUM];
     /** store buffer ptr (start from http message header) 
      * - assign the actual buffer ptr to here when call create func
     */
