@@ -87,6 +87,33 @@ typedef enum {
     DATE
 } header_name_t;
 
+const char *get_header_name_by_idx [] = {
+    [CACHE_CTRL]="Cache-Control",
+    [EXPIRES]="Expires",
+    [LAST_MOD]="Last-Modified",
+    [ETAG]="ETag",
+    [CONN]="Connection",
+    [KEEPALIVE]="Keep-Alive",
+    [ACCEPT]="Accept",
+    [ACCEPT_CHAR]="Accept-Charset",
+    [ACCEPT_ENCODING]="Accept-Encoding",
+    [ACCEPT_LANG]="Accept-Language",
+    [COOKIE]="Cookie",
+    [SET_COOKIE]="Set-Cookie",
+    [CONTENT_LEN]="Content-Length",
+    [CONTENT_TYPE]="Content-Type",
+    [CONTENT_ENCODING]="Content-Encoding",
+    [CONTENT_LANG]="Content-Language",
+    [CONTENT_LOC]="Content-Location",
+    [HOST]="Host",
+    [USER_AGENT]="User-Agent",
+    [ALLOW]="Allow",
+    [SERVER]="Server",
+    [TRANSFER_ENCODING]="Transfer-Encoding",
+    [TE]="TE",
+    [TRAILER]="Trailer",
+    [DATE]="Date"
+};
 
 // create
 http_header_status_t *create_http_header_status(char *readbuf)
