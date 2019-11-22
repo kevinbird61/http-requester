@@ -108,6 +108,8 @@ int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offs
     status->curr_bit=check_header;
     
     if(check_header>=0){
+        // TODO: check the current header with existed header. (check conformance here)
+
         syslog("DEBUG", __func__, "[Field-name: ", get_header_name_by_idx[check_header], "]", NULL);
     } else {
         /* if not found, then alloc the memory to print */
@@ -132,7 +134,7 @@ int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 off
 
     // using curr_bit to store field-value
     if(status->curr_bit>=0){
-        status->field_value[status->curr_bit].idx=idx;
+        status->field_value[status->curr_bit].idx=(idx-offset);
         status->field_value[status->curr_bit].offset=offset;
     } else {
         // if field-name not support, then just discard this field

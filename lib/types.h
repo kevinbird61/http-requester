@@ -97,6 +97,8 @@ typedef enum {
     FIELD_VALUE,
     // msg body
     MSG_BODY,
+    // chunk
+    CHUNKED,
     // terminate successfully
     END,
     // terminate with error 

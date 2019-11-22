@@ -51,12 +51,14 @@ int http_state_machine(int sockfd, http_t *http_request)
     parse_state pstate=NON;
     // http_header_status_t - conformance check
     http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
+    u8 use_content_length=0, use_chunked=0;
+    u32 content_length=0, chunked_size=0, chunked_idx=0;
     // scenario 1: byte-by-byte reading
     while(flag){
         if(!recv(sockfd, &bytebybyte, 1, 0)){
             break;
         }
-        /* record */
+        /* record into buffer */
         readbuf[buf_idx]=bytebybyte;
         buf_idx++;
         parse_len++;
@@ -73,42 +75,99 @@ int http_state_machine(int sockfd, http_t *http_request)
             //syslog("DEBUG", __func__, "REALLOC readbuf size. Current buf_size: ", itoa(buf_size), NULL);
         }
 
+        // check if header using content-length
+        if(use_content_length){
+            if(!(--content_length)){ 
+                printf("Parsing process has been done.\n");
+                break; 
+            }
+        }
+
+        if(use_chunked){
+            if(chunked_size==0){
+                printf("END, idx: %d\n", buf_idx-1);
+                printf("Parsing process has been done.\n");
+                break;
+            } else if(!(--chunked_size)){ 
+                printf("Finish chunk, idx: %d\n", buf_idx-1);
+                parse_len=0;
+                chunked_idx=buf_idx-1;
+                use_chunked=0;
+                state=MSG_BODY;
+            }
+
+            /* Parsing other chunk features here */
+
+            continue;
+        }
+
         // read byte, check the byte 
         switch(bytebybyte){
-            case 0:
+            /*case 0:
                 parse_len=0;
-                break;
+                break;*/
             case '\r':
                 pstate=next_parse_state(pstate, CR);
                 state=next_http_state(state, RES);
-                // printf("Type: %d\n", state);
+                // dealing with message header part
                 if(state<MSG_BODY && parse_len>1){
                     // parse last-element of START-LINE, or field-value
-                    
                     if(state>HEADER && state<MSG_BODY){
                         // header field-values
                         insert_new_header_field_value(http_h_status_check, buf_idx, parse_len);
                     } else {
-                        // (last-element) start-line
+                        /** (last-element) start-line
+                         * - Response: Reason phrase
+                         */
                         char *tmp;
                         tmp=malloc((parse_len)*sizeof(char));
                         snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                        syslog("DEBUG", __func__, " [ ", tmp, " ] ", NULL);
+                        syslog("DEBUG", __func__, " [ Reason Phrase: ", tmp, " ] ", NULL);
                         free(tmp);
                     }
                     parse_len=0;
-                }
+                } else if(state>=MSG_BODY){
+                    // check if it is `chunked`
+                    // FIXME: need to using strtok to parse all possible value
+                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[TRANSFER_ENCODING].idx), http_h_status_check->field_value[TRANSFER_ENCODING].offset), "chunked", 7)){
+                        char *tmp=calloc(parse_len+2, sizeof(char));
+                        sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
+                        // fprintf(stdout, "%s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
+                        // printf("isdigit: %d\n", isdigit(atoi(tmp)));
+                        if(isdigit(atoi(tmp))){
+                            chunked_size=atoi(tmp);
+                            printf("Chunk size: %d\n", chunked_size);
+                            use_chunked=1;
+                        } else if(parse_len==2){
+                            // Case - chunked size=0 
+                            // FIXME: is this right condition?
+                            chunked_size=atoi(tmp);
+                            printf("Chunk size: %d\n", chunked_size);
+                            use_chunked=1;
+                        }
+                    }
+                } 
                 break;
             case '\n':
                 pstate=next_parse_state(pstate, LF);
                 state=next_http_state(state, RES);
-                if(pstate==NEXT && state!=MSG_BODY){
+                if(pstate==NEXT && state<MSG_BODY){
                     // enter MSG_BODY
                     syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
                     state=MSG_BODY;
+                    // check current using Transfer-Encoding or Content-Length
+                    if(http_h_status_check->content_length_dirty){
+                        use_content_length=1;
+                        content_length=atoi(readbuf+http_h_status_check->field_value[CONTENT_LEN].idx);
+                    } else if(http_h_status_check->transfer_encoding_dirty){
+                        // need to parse under chunked size=0
+                        state=CHUNKED;
+                    }
                 } else if(pstate==NEXT && state==MSG_BODY) {
-                    printf("Parsing process has been done.\n");
-                    flag=0;
+                    // printf("Parsing process has been done.\n");
+                    // flag=0;
+                } else if(state==CHUNKED){
+                    printf("Nextline: idx: %d\n", buf_idx);
                 }
                 parse_len=0;
                 break;
@@ -117,6 +176,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                 if(state==HEADER && parse_len>0){
                     state=next_http_state(state, RES);
                     //fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
+                    /* check the return value, if return error, then terminate the parsing process */
                     insert_new_header_field_name(http_h_status_check, buf_idx, parse_len);
                     parse_len=0;
                 }
@@ -131,18 +191,20 @@ int http_state_machine(int sockfd, http_t *http_request)
                     {
                         case VER:
                             // printf("%d\n", encap_http_version(readbuf+(buf_idx-parse_len)));
-                            if((ret=encap_http_version(readbuf+(buf_idx-parse_len))) > 0){
-                                syslog("DEBUG", __func__, " [ ", get_http_version(ret), " ] ", NULL);
-                            } else { // not support
-                                // char *tmp=malloc((parse_len)*sizeof(char));
-                                // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                                // free(tmp);
+                            if((ret=encap_http_version(readbuf+(buf_idx-parse_len))) > 1){ // current only support HTTP/1.1
+                                syslog("DEBUG", __func__, " [ Version: ", get_http_version(ret), " ] ", NULL);
+                            } else { // if not support, just terminate
+                                char *tmp=malloc((parse_len)*sizeof(char));
+                                snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
+                                syslog("DEBUG", __func__, " [ Not support: ", tmp, " ] ", NULL);
+                                free(tmp);
+                                flag=0;
                             }
                             break;
                         case CODE_OR_TOKEN:
                             // printf("%d\n", encap_http_status_code(atoi(readbuf+(buf_idx-parse_len))));
                             if((ret=encap_http_status_code(atoi(readbuf+(buf_idx-parse_len)))) > 0){
-                                syslog("DEBUG", __func__, " [ ", get_http_status_code(ret), " ] ", NULL);
+                                syslog("DEBUG", __func__, " [ Status code: ", get_http_status_code(ret), " ] ", NULL);
                             } else { // not support
                                 // char *tmp=malloc((parse_len)*sizeof(char));
                                 // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
@@ -237,7 +299,13 @@ http_state next_http_state(http_state cur_state, http_msg_type type)
         case FIELD_VALUE:
             return HEADER;
         case MSG_BODY:
-            return MSG_BODY;
+            if(type==CHUNKED){
+                return CHUNKED;
+            } else {
+                return MSG_BODY;
+            }
+        case CHUNKED:
+            return CHUNKED;
     }
 }
 
