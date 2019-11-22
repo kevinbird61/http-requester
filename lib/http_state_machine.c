@@ -93,7 +93,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                         char *tmp;
                         tmp=malloc((parse_len)*sizeof(char));
                         snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                        syslog("DEBUG", __func__, "Parsing state ", get_http_state(state), ", Parsed value: ", tmp, ", Parsed len: ", itoa(parse_len), ", Strlen: ", itoa(strlen(tmp)), NULL);
+                        syslog("DEBUG", __func__, " [ ", tmp, " ] ", NULL);
                         free(tmp);
                     }
                     parse_len=0;
@@ -126,11 +126,32 @@ int http_state_machine(int sockfd, http_t *http_request)
                     // always RES
                     state=next_http_state(state, RES);
                     //fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
-                    
-                    char *tmp=malloc((parse_len)*sizeof(char));
-                    snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                    syslog("DEBUG", __func__, "Parsing state: ", get_http_state(state), ". Parsed string:", tmp, ", Parsed len: ", itoa(parse_len), ", Strlen: ", itoa(strlen(tmp)), NULL);
-                    free(tmp);
+                    int ret=0;
+                    switch (state)
+                    {
+                        case VER:
+                            // printf("%d\n", encap_http_version(readbuf+(buf_idx-parse_len)));
+                            if((ret=encap_http_version(readbuf+(buf_idx-parse_len))) > 0){
+                                syslog("DEBUG", __func__, " [ ", get_http_version(ret), " ] ", NULL);
+                            } else { // not support
+                                // char *tmp=malloc((parse_len)*sizeof(char));
+                                // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
+                                // free(tmp);
+                            }
+                            break;
+                        case CODE_OR_TOKEN:
+                            // printf("%d\n", encap_http_status_code(atoi(readbuf+(buf_idx-parse_len))));
+                            if((ret=encap_http_status_code(atoi(readbuf+(buf_idx-parse_len)))) > 0){
+                                syslog("DEBUG", __func__, " [ ", get_http_status_code(ret), " ] ", NULL);
+                            } else { // not support
+                                // char *tmp=malloc((parse_len)*sizeof(char));
+                                // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
+                                // free(tmp);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                     parse_len=0;
                     break;
                 }
