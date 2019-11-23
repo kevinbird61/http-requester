@@ -99,6 +99,7 @@ typedef enum {
     MSG_BODY,
     // chunk
     CHUNKED,
+    NEXT_CHUNKED,
     // terminate successfully
     END,
     // terminate with error 

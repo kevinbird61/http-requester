@@ -5,10 +5,8 @@
 
 #include "http.h"
 
-/* helper function */
-char *get_http_state(http_state state);
+/* calculate next http parsing state */
 http_state next_http_state(http_state cur_state, char ch);
-parse_state next_parse_state(parse_state cur_pstate, parse_state nxt_pstate);
 
 int http_state_machine(int sockfd, http_t *http_request)
 {
@@ -52,13 +50,22 @@ int http_state_machine(int sockfd, http_t *http_request)
     // http_header_status_t - conformance check
     http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
     u8 use_content_length=0, use_chunked=0;
-    u32 content_length=0, chunked_size=0, chunked_idx=0;
+    u32 content_length=0, chunked_size=0;
     // scenario 1: byte-by-byte reading
     while(flag){
+        /** Put some checking mechanism to terminate parsing 
+         * state machine before recipient send FIN back (timeout).
+         */
+        if(use_chunked && chunked_size==0){
+            // printf("END, idx: %d\n", buf_idx-1);
+            printf("[Transfer-Encoding: Chunked] Parsing process has been done.\n");
+            break;
+        } 
+
+        /* recv byte by byte */
         if(!recv(sockfd, &bytebybyte, 1, 0)){
             break;
         }
-        /* record into buffer */
         readbuf[buf_idx]=bytebybyte;
         buf_idx++;
         parse_len++;
@@ -86,20 +93,16 @@ int http_state_machine(int sockfd, http_t *http_request)
 
         // check if header using transfer-encoding 
         if(use_chunked){
-            if(chunked_size==0){
-                printf("END, idx: %d\n", buf_idx-1);
-                printf("[TE]Parsing process has been done.\n");
-                break;
-            } else if(!(--chunked_size)){ 
+            if(!(--chunked_size)){ 
                 printf("Finish chunk, idx: %d\n", buf_idx-1);
                 parse_len=0;
-                chunked_idx=buf_idx-1;
                 use_chunked=0;
-                state=MSG_BODY;
+                // state=FIELD_NAME;
+                state=NEXT_CHUNKED;
+            } else {
+                /* Parsing other chunk features here */
+                continue;
             }
-
-            /* Parsing other chunk features here */
-            continue;
         }
 
         // read byte, check the byte 
@@ -123,32 +126,12 @@ int http_state_machine(int sockfd, http_t *http_request)
                     }
                     state=next_http_state(state, '\r');
                     parse_len=0;
-                } else if(state>=MSG_BODY){
-                    // check if it is `chunked`
-                    // FIXME: need to using strtok to parse all possible value
-                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[TRANSFER_ENCODING].idx), http_h_status_check->field_value[TRANSFER_ENCODING].offset), "chunked", 7)){
-                        char *tmp=calloc(parse_len+2, sizeof(char));
-                        sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
-                        // fprintf(stdout, "%s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
-                        // printf("isdigit: %d\n", isdigit(atoi(tmp)));
-                        if(isdigit(atoi(tmp))){
-                            chunked_size=atoi(tmp);
-                            printf("Chunk size: %d\n", chunked_size);
-                            use_chunked=1;
-                        } else if(parse_len==2){
-                            // Case - chunked size=0 
-                            // FIXME: is this right condition?
-                            chunked_size=atoi(tmp);
-                            printf("Chunk size: %d\n", chunked_size);
-                            use_chunked=1;
-                        }
-                    }
                 } 
                 break;
             case '\n':
                 if(state==HEADER){
                     state=next_http_state(state, '\n');
-                } else if(state==FIELD_NAME) {
+                } else if(state==FIELD_NAME && !use_chunked) {
                     state=MSG_BODY;
                     syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
                     // check current using Transfer-Encoding or Content-Length
@@ -162,6 +145,33 @@ int http_state_machine(int sockfd, http_t *http_request)
                     } else if(http_h_status_check->transfer_encoding_dirty){
                         // need to parse under chunked size=0
                         state=CHUNKED;
+                    }
+                } else if(state==CHUNKED || state==NEXT_CHUNKED){
+                    // check if it is `chunked`
+                    //fprintf(stdout, "Debug, Chunked size: %s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
+                    // FIXME: need to using strtok to parse all possible value
+                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[TRANSFER_ENCODING].idx), http_h_status_check->field_value[TRANSFER_ENCODING].offset), "chunked", 7)){
+                        char *tmp=calloc(parse_len, sizeof(char));
+                        sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
+                        
+                        // fprintf(stdout, "%s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
+                        // printf("isdigit: %d\n", isdigit(atoi(tmp)));
+                        if((atoi(tmp))>0){
+                            // printf("%s, %s\n", tmp, strndup(readbuf+(buf_idx-parse_len), parse_len));
+                            chunked_size=atoi(tmp);
+                            printf("[Get Chunk] Chunk size: %d\n", chunked_size);
+                            syslog("DEBUG", __func__, "Get Chunk, size=", tmp, NULL);
+                            state=CHUNKED;
+                            use_chunked=1;
+                        } else if(parse_len==2){
+                            // Case - chunked size=0 
+                            // FIXME: is this right condition?
+                            chunked_size=atoi(tmp);
+                            printf("[Last Chunk] Chunk size: %d\n", chunked_size);
+                            syslog("DEBUG", __func__, "Last Chunk, size=", tmp, NULL);
+                            use_chunked=1;
+                        }
+                        free(tmp);
                     }
                 }
                 parse_len=0;
@@ -220,11 +230,6 @@ int http_state_machine(int sockfd, http_t *http_request)
         }
     }
 
-    /* malloc would encounter malloc error. (msg_body may have 40K~50K) */
-    // printf("[Header]\n");
-    // fwrite(readbuf, sizeof(char), buf_idx, stdout);
-    // printf("%s\n", readbuf);
-
     // printf("[MSG_BODY]\n");
     // fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
     // printf("Sizeof reabuf: %ld\n", strlen(readbuf));
@@ -235,32 +240,6 @@ int http_state_machine(int sockfd, http_t *http_request)
     close(sockfd);
 
     return 0;
-}
-
-char *get_http_state(http_state state)
-{
-    switch(state){
-        case START_LINE:
-            return "Start-line (Init state)";
-        case VER:
-            return "HTTP version";
-        case CODE_OR_TOKEN:
-            return "Status code or Method token";
-        case REASON_OR_RESOURCE:
-            return "REASON phrase or Target resource";
-        case HEADER:
-            return "Header section";
-        case FIELD_NAME:
-            return "Field-name";
-        case FIELD_VALUE:
-            return "Field-value";
-        case MSG_BODY:
-            return "Message-body";
-        case END:
-            return "End of parsing process";
-        case ABORT:
-            return "Failure";
-    }
 }
 
 http_state next_http_state(http_state cur_state, char ch)
@@ -320,21 +299,5 @@ http_state next_http_state(http_state cur_state, char ch)
             return MSG_BODY;
         case CHUNKED:
             return CHUNKED;
-    }
-}
-
-parse_state next_parse_state(parse_state cur_pstate, parse_state nxt_pstate)
-{
-    if(cur_pstate==NON){
-        return nxt_pstate;
-    } else if(cur_pstate==CR && nxt_pstate==LF){
-        return CRLF;
-    } else if(cur_pstate==CRLF && nxt_pstate==CR){
-        return CRLF;
-    } else if(cur_pstate==CRLF && nxt_pstate==LF){
-        return NEXT;
-    } else {
-        // all turn to next state
-        return nxt_pstate;
     }
 }
