@@ -7,7 +7,7 @@
 
 /* helper function */
 char *get_http_state(http_state state);
-http_state next_http_state(http_state cur_state, http_msg_type type);
+http_state next_http_state(http_state cur_state, char ch);
 parse_state next_parse_state(parse_state cur_pstate, parse_state nxt_pstate);
 
 int http_state_machine(int sockfd, http_t *http_request)
@@ -47,7 +47,7 @@ int http_state_machine(int sockfd, http_t *http_request)
         exit(1);
     }
     http_msg_type msg_state=UNDEFINED;
-    http_state state=START_LINE;
+    http_state state=VER; // start with version
     parse_state pstate=NON;
     // http_header_status_t - conformance check
     http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
@@ -77,16 +77,18 @@ int http_state_machine(int sockfd, http_t *http_request)
 
         // check if header using content-length
         if(use_content_length){
+            // --content_length;
             if(!(--content_length)){ 
-                printf("Parsing process has been done.\n");
+                printf("[CL] Parsing process has been done.\n");
                 break; 
             }
         }
 
+        // check if header using transfer-encoding 
         if(use_chunked){
             if(chunked_size==0){
                 printf("END, idx: %d\n", buf_idx-1);
-                printf("Parsing process has been done.\n");
+                printf("[TE]Parsing process has been done.\n");
                 break;
             } else if(!(--chunked_size)){ 
                 printf("Finish chunk, idx: %d\n", buf_idx-1);
@@ -97,18 +99,12 @@ int http_state_machine(int sockfd, http_t *http_request)
             }
 
             /* Parsing other chunk features here */
-
             continue;
         }
 
         // read byte, check the byte 
         switch(bytebybyte){
-            /*case 0:
-                parse_len=0;
-                break;*/
             case '\r':
-                pstate=next_parse_state(pstate, CR);
-                state=next_http_state(state, RES);
                 // dealing with message header part
                 if(state<MSG_BODY && parse_len>1){
                     // parse last-element of START-LINE, or field-value
@@ -125,6 +121,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                         syslog("DEBUG", __func__, " [ Reason Phrase: ", tmp, " ] ", NULL);
                         free(tmp);
                     }
+                    state=next_http_state(state, '\r');
                     parse_len=0;
                 } else if(state>=MSG_BODY){
                     // check if it is `chunked`
@@ -149,42 +146,39 @@ int http_state_machine(int sockfd, http_t *http_request)
                 } 
                 break;
             case '\n':
-                pstate=next_parse_state(pstate, LF);
-                state=next_http_state(state, RES);
-                if(pstate==NEXT && state<MSG_BODY){
-                    // enter MSG_BODY
-                    syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
+                if(state==HEADER){
+                    state=next_http_state(state, '\n');
+                } else if(state==FIELD_NAME) {
                     state=MSG_BODY;
+                    syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
                     // check current using Transfer-Encoding or Content-Length
                     if(http_h_status_check->content_length_dirty){
                         use_content_length=1;
                         content_length=atoi(readbuf+http_h_status_check->field_value[CONTENT_LEN].idx);
+                        printf("Get content length= %d\n", content_length);
+                        if(content_length==0){
+                            flag=0;
+                        }
                     } else if(http_h_status_check->transfer_encoding_dirty){
                         // need to parse under chunked size=0
                         state=CHUNKED;
                     }
-                } else if(pstate==NEXT && state==MSG_BODY) {
-                    // printf("Parsing process has been done.\n");
-                    // flag=0;
-                } else if(state==CHUNKED){
-                    printf("Nextline: idx: %d\n", buf_idx);
                 }
                 parse_len=0;
                 break;
             case ':':
                 // for parsing field-name
-                if(state==HEADER && parse_len>0){
+                if(state==FIELD_NAME && parse_len>0){
                     state=next_http_state(state, RES);
                     //fwrite(readbuf+1+(buf_idx-parse_len), sizeof(char), parse_len-2, stdout);
                     /* check the return value, if return error, then terminate the parsing process */
                     insert_new_header_field_name(http_h_status_check, buf_idx, parse_len);
                     parse_len=0;
                 }
+                state=next_http_state(state, ':');
             case ' ':
                 // parse only when in "start-line" state; 
-                if(state>=START_LINE && state<=REASON_OR_RESOURCE && parse_len>0){
-                    // always RES
-                    state=next_http_state(state, RES);
+                if(state>START_LINE && state<REASON_OR_RESOURCE && parse_len>0){
                     //fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
                     int ret=0;
                     switch (state)
@@ -200,6 +194,7 @@ int http_state_machine(int sockfd, http_t *http_request)
                                 free(tmp);
                                 flag=0;
                             }
+                            parse_len=0;
                             break;
                         case CODE_OR_TOKEN:
                             // printf("%d\n", encap_http_status_code(atoi(readbuf+(buf_idx-parse_len))));
@@ -210,11 +205,13 @@ int http_state_machine(int sockfd, http_t *http_request)
                                 // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
                                 // free(tmp);
                             }
+                            parse_len=0;
                             break;
                         default:
                             break;
                     }
-                    parse_len=0;
+                    // change the state
+                    state=next_http_state(state, ' ');
                     break;
                 }
             default:
@@ -266,44 +263,61 @@ char *get_http_state(http_state state)
     }
 }
 
-http_state next_http_state(http_state cur_state, http_msg_type type)
+http_state next_http_state(http_state cur_state, char ch)
 {
+    // current only use in Response
     switch(cur_state)
     {
         // start-line
         case START_LINE:
-            if(type==REQ){
-                return CODE_OR_TOKEN;
-            } else {
-                return VER;
-            }
+            return VER;
         case VER:
-            if(type==REQ){
-                return HEADER;
-            } else {
-                return CODE_OR_TOKEN;
+            switch(ch){
+                case ' ':
+                    return CODE_OR_TOKEN;
+                default:
+                    return VER;
             }
         case CODE_OR_TOKEN:
-            return REASON_OR_RESOURCE;
+            switch(ch){
+                case ' ':
+                    return REASON_OR_RESOURCE;
+                default:
+                    return CODE_OR_TOKEN;
+            }
         case REASON_OR_RESOURCE:
-            if(type==REQ){
-                return VER;
-            } else {
-                return HEADER;
+            switch(ch){
+                case ' ':
+                    return REASON_OR_RESOURCE;
+                case '\r':
+                    return HEADER;
             }
         // header
         case HEADER:
-            return FIELD_NAME;
-        case FIELD_NAME:
-            return FIELD_VALUE;
-        case FIELD_VALUE:
-            return HEADER;
-        case MSG_BODY:
-            if(type==CHUNKED){
-                return CHUNKED;
-            } else {
-                return MSG_BODY;
+            switch(ch){
+                case '\n':
+                    return FIELD_NAME;
+                default:
+                    return HEADER;
             }
+        case FIELD_NAME:
+            switch(ch){
+                case ':':
+                    return FIELD_VALUE;
+                case '\r':
+                    return MSG_BODY;
+                default:
+                    return FIELD_NAME;
+            }
+        case FIELD_VALUE:
+            switch(ch){
+                case '\r':
+                    return HEADER;
+                default:
+                    return FIELD_VALUE;
+            }
+        case MSG_BODY:
+            return MSG_BODY;
         case CHUNKED:
             return CHUNKED;
     }

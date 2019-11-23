@@ -125,6 +125,8 @@ int main(int argc, char *argv[])
     printf("%-50s: %s\n", "Method: ", method);
     printf("================================================================================\n");
 
+    /* start our program here */
+
     return 0;
 }
 

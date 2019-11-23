@@ -141,6 +141,7 @@ typedef enum {
     TRAILER,
     DATE,
     VARY,
+    LOCATION,
     HEADER_NAME_MAXIMUM
 } header_name_t;
 
@@ -201,7 +202,7 @@ typedef struct _http_header_status_t {
         etag_dirty: 1,
         connection_dirty: 1,
         keepalive_dirty: 1,
-        spare: 1,
+        location_dirty: 1,
         accept_dirty: 1,
         accept_charset_dirty: 1,
         accept_encoding_dirty: 1,

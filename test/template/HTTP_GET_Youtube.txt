@@ -1,0 +1,6 @@
+GET / HTTP/1.1
+Host: youtube.com
+User-Agent: http-requester
+Connection: keep-alive
+Accept: *
+

@@ -86,6 +86,7 @@ const char *get_header_name_by_idx [] = {
     [TRAILER]="Trailer",
     [DATE]="Date",
     [VARY]="Vary",
+    [LOCATION]="Location",
     [HEADER_NAME_MAXIMUM]=NULL
 };
 
@@ -156,7 +157,10 @@ int check_header_field_name(http_header_status_t *status, char *field_name)
     } else if(!strncasecmp(field_name, "Vary", sizeof("Vary")-1)){
         status->vary_dirty=1;
         return VARY;
-    } else if(!strncasecmp(field_name, "Host", sizeof("Host")-1)){
+    } else if(!strncasecmp(field_name, "Location", sizeof("Location")-1)){
+        status->location_dirty=1;
+        return LOCATION;
+    }  else if(!strncasecmp(field_name, "Host", sizeof("Host")-1)){
         status->host_dirty=1;
         return HOST;
     } else if(!strncasecmp(field_name, "User-Agent", sizeof("User-Agent")-1)){
