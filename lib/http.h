@@ -19,7 +19,7 @@
  *      - log everything.
  * - after finish the request, log the response and close the socket, free the memory.
  */
-int http_state_machine(int sockfd, http_t *http_request);
+int http_state_machine(int sockfd, http_t *http_request, int reuse);
 
 /* http_request.c: 
  * - send out the request, and store the return data on which rawdata points to.

@@ -201,7 +201,12 @@ int main(int argc, char *argv[])
         http_t *http_request_obj=malloc(sizeof(http_t));
         http_parser(http_request, http_request_obj);
 
-        http_state_machine(sockfd, http_request_obj);
+        // current only support multi-connections (not concurrent)
+        while(conn){
+            http_t *req;
+            memcpy(req, http_request_obj, sizeof(http_t));
+            http_state_machine(sockfd, req, conn--);
+        }
     }
 
     return 0;

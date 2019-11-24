@@ -8,7 +8,7 @@
 /* calculate next http parsing state */
 http_state next_http_state(http_state cur_state, char ch);
 
-int http_state_machine(int sockfd, http_t *http_request)
+int http_state_machine(int sockfd, http_t *http_request, int reuse)
 {
     // 1. check the conformance of http_request
     
@@ -237,7 +237,9 @@ int http_state_machine(int sockfd, http_t *http_request)
     free(readbuf);
 
     // 4. finish, log the response and close the connection.
-    close(sockfd);
+    if(!reuse){
+        close(sockfd);
+    }
 
     return 0;
 }
