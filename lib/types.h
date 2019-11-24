@@ -14,7 +14,9 @@ typedef unsigned long long  u64;
 /* TODO: error code enum (each func need to follow) */
 typedef enum {
     ERR_NONE=0,                     // success
+    ERR_INVALID,
     ERR_ILLEGAL_CHAR,               // parse illegal char
+    ERR_MEMORY,        
     ERR_NOT_SUPPORT,
     ERR_UNDEFINED
 } error_code;
@@ -75,8 +77,8 @@ typedef enum {
 
 /* version enum */
 typedef enum {
-    ONE_ZERO=1,
-    ONE_ONE
+    HTTP_1_0=1,
+    HTTP_1_1
 } http_version_map;
 
 /* TODO: method token enum */

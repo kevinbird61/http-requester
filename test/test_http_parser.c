@@ -14,7 +14,7 @@ int main(void)
     http_get_request->req.req_target=req_target;
     http_get_request->target=target_ip;
     http_get_request->port=atoi(port);
-    http_get_request->version=ONE_ONE;
+    http_get_request->version=HTTP_1_1;
     http_get_request->headers=malloc(sizeof(http_header_t));
     http_get_request->headers->field_name="Host";
     http_get_request->headers->field_value=target_ip;

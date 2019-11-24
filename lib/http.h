@@ -26,6 +26,22 @@ int http_state_machine(int sockfd, http_t *http_request);
  */
 int http_request(int sockfd, http_t *http_request, char *rawdata);
 
+/** http_construct.c
+ *  - construct http request/response header
+ *      - request
+ *          - int http_req_create_start_line(char *rawdata, char *method, char *target, u8 http_version);
+ *              rawdata: output 
+ *              method: method token
+ *              target: resource target
+ *              http_version: using enum `http_version_map`
+ *          - int http_req_ins_header(char *rawdata, char *field_name, char *field_value);
+ *          - int http_req_finish(char *rawdata);
+ *              Append CRLF to the end
+ */
+int http_req_create_start_line(char **rawdata, char *method, char *target, u8 http_version);
+int http_req_ins_header(char **rawdata, char *field_name, char *field_value);
+int http_req_finish(char **rawdata);
+
 /* http_parser.c: 
  * - parsing the rawdata, and fill them into data structure (response).
  */

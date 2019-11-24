@@ -3,6 +3,8 @@
 #include "conn.h"
 #include "http.h"
 
+#define AGENT   "http-requester-c"
+
 void print_manual();
 
 int main(int argc, char *argv[])
@@ -110,6 +112,13 @@ int main(int argc, char *argv[])
     } else {
         // use template
     }
+    if(!(flags)&0x10){
+        // port check 
+        if((port)>65535 || (port)<0){
+            fprintf(stderr, "Invalid port-number %d (Valid range: 0~65535)\n", port);
+            exit(1);
+        }
+    }
     if(!(flags&0x20)){
         method="GET";
     } else {
@@ -125,7 +134,75 @@ int main(int argc, char *argv[])
     printf("%-50s: %s\n", "Method: ", method);
     printf("================================================================================\n");
 
-    /* start our program here */
+    /** step by step construct our http request header from user input:
+     *  - parsing url first, if template file is available, 
+     *      then url will override the fields in template file.
+     *      - URL format: [http:]//<HOST, maximum length not larger than 255>[:port-num]/[pathname]
+     *  - forge http header
+     *  - create socket and use http_state_machine to send request
+     *  
+     */
+
+    // using template
+    if(filename!=NULL){
+        printf("Not support yet!\n");
+        exit(1);
+    } else if(url!=NULL){
+        // use url only
+        char *host, *path;
+        /** 1. check URL's protocol 
+         *      - http
+         */
+        if(!strncasecmp(url, "http:", 5)){
+            // start from "http://<URL>"
+            url=strndup(url+7, strlen(url)-7); // "http://" = 7 bytes   
+        } 
+        // Now URL = <HOST>/<Pathname>
+        /** FIXME: Do we need to perform parsing [:PORT] 
+         *      between processing <Host> and <Path> ?
+         */
+        // perform same parsing 
+        int ori_len=strlen(url);
+        char *ori_url, *host_delim="/";
+        ori_url=strdup(url);
+        // get host
+        host=strtok(url, host_delim);
+        // printf("Host: %s\n", host);
+        // check host length limitation, refs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames
+        if(strlen(host)>=253){
+            printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen(host));
+            exit(1);
+        }
+        // get path
+        path=strndup(ori_url+strlen(host), ori_len-strlen(host));
+        // when user forget to add / at the end of URL
+        if(strlen(path)==0){
+            path="/";
+        }
+
+        /* 2. forge http request header */
+        char *http_request;
+        // start-line
+        http_req_create_start_line(&http_request, method, path, HTTP_1_1);
+        // header fields
+        http_req_ins_header(&http_request, "Host", host);
+        http_req_ins_header(&http_request, "Connection", "keep-alive");
+        http_req_ins_header(&http_request, "User-Agent", AGENT);
+        // finish
+        http_req_finish(&http_request);
+        printf("HTTP request:\n%s\n", http_request);
+        
+        /* send request */
+        int sockfd=create_tcp_conn(host, itoa(port));
+        if(sockfd<0){
+            // FIXME: add syslog
+            exit(1);
+        }
+        http_t *http_request_obj=malloc(sizeof(http_t));
+        http_parser(http_request, http_request_obj);
+
+        http_state_machine(sockfd, http_request_obj);
+    }
 
     return 0;
 }
