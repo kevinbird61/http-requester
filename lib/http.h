@@ -19,7 +19,8 @@
  *      - log everything.
  * - after finish the request, log the response and close the socket, free the memory.
  */
-int http_state_machine(int sockfd, void **http_request, int reuse, int raw_or_obj);
+int http_state_machine(int sockfd, void **http_request, int reuse, int raw_or_obj); // send next request when previous recv is finished
+// int http_rcv_state_machine(int sockfd, void **http_request, int raw_or_obj); // only recv, for parallel 
 
 /* http_request.c: 
  * - send out the request, and store the return data on which rawdata points to.
