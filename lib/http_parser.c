@@ -22,9 +22,9 @@ int http_recast(http_t *http_packet, char **rawdata)
     int size_start_line=0;
     if(http_packet->type==REQ || http_packet->type==UNDEFINED){
         // REQUEST/UNDEFINED
-        char *method=get_http_method_token(http_packet->req.method_token),
+        char *method=get_http_method_token_by_idx[http_packet->req.method_token],
             *req_target=http_packet->req.req_target,
-            *http_ver=get_http_version(http_packet->version);
+            *http_ver=get_http_version_by_idx[http_packet->version];
         // check req size (+9: other SP & HTTP)
         size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+4;
         syslog("DEBUG", __func__, "Recasting a HTTP request. Start-line: ", method, " ", req_target, " ", http_ver, NULL);
@@ -37,9 +37,9 @@ int http_recast(http_t *http_packet, char **rawdata)
         sprintf(*rawdata, "%s %s %s\r\n", method, req_target, http_ver);
 
     } else if(http_packet->type==RES) {
-        char *status=get_http_status_code(http_packet->res.status_code),
+        char *status=get_http_status_code_by_idx[http_packet->res.status_code],
             *rea_phrase=http_packet->res.rea_phrase,
-            *http_ver=get_http_version(http_packet->version);
+            *http_ver=get_http_version_by_idx[http_packet->version];
         // check req size (+9: other SP & HTTP)
         size_start_line=strlen(status)+strlen(rea_phrase)+strlen(http_ver)+4;
         syslog("DEBUG", __func__, "Recasting a HTTP response. Start-line: ", http_ver, " ", status, " ", rea_phrase, NULL);

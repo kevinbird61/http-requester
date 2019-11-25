@@ -19,7 +19,7 @@
  *      - log everything.
  * - after finish the request, log the response and close the socket, free the memory.
  */
-int http_state_machine(int sockfd, void *http_request, int reuse, int raw_or_obj);
+int http_state_machine(int sockfd, void **http_request, int reuse, int raw_or_obj);
 
 /* http_request.c: 
  * - send out the request, and store the return data on which rawdata points to.
@@ -67,12 +67,13 @@ int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 off
 /** http_helper.c:
  * - encap/decap those mapping code (with prefix `get_*`/`encap_*`)
  */
-char *get_http_version(http_version_map http_version);
 int encap_http_version(char *version);
-char *get_http_method_token(method_token_map method_token);
 int encap_http_method_token(char *method);
-char *get_http_status_code(status_code_map status_code);
 int encap_http_status_code(int http_status_code);
+extern char *get_http_version_by_idx[];
+extern char *get_http_method_token_by_idx[];
+extern char *get_http_status_code_by_idx[];
+extern char *get_http_reason_phrase_by_idx[];
 
 /** http_debug.c:
  * - good for debugging our code

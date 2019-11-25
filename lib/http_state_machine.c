@@ -8,20 +8,20 @@
 /* calculate next http parsing state */
 http_state next_http_state(http_state cur_state, char ch);
 
-int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
+int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
 {
     // 1. check the conformance of http_request
     
     // 2. send the request (similar with http_request())
     char *req=NULL;
     if(!raw){
-        http_recast(http_request, &req);
+        http_recast((http_t *)*http_request, &req);
         char *reqlen=itoa(strlen(req));
         int sendbytes=send(sockfd, req, strlen(req), 0);
         char *sent=(char*)itoa(sendbytes);
         syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent, NULL);
     } else {
-        req=(char *)http_request;
+        req=(char *)*http_request;
         int sendbytes=send(sockfd, req, strlen(req), 0);
         syslog("DEBUG", __func__, "Using raw HTTP request. Request length: ", itoa(strlen(req)), "; Sent bytes: ", itoa(sendbytes), NULL);
     }
@@ -48,9 +48,10 @@ int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
         syslog("ERROR", __func__, "MALLOC error when alloc to *readbuf. Current buf_size: ", itoa(buf_size), NULL);
         exit(1);
     }
-    http_msg_type msg_state=UNDEFINED;
-    http_state state=VER; // start with version
-    parse_state pstate=NON;
+    u8 state=VER; // start with version
+    u8 status_code=0;
+    u8 http_ver=0;
+
     // http_header_status_t - conformance check
     http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
     u8 use_content_length=0, use_chunked=0;
@@ -138,7 +139,68 @@ int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
                 } else if(state==FIELD_NAME && !use_chunked) {
                     state=MSG_BODY;
                     syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
-                    // check current using Transfer-Encoding or Content-Length
+                    /** Version -
+                     * - Not support HTTP/0.9, /2.0, /3.0 (e.g. http_ver==0)
+                     */
+                    if(!http_ver) {
+                        // syslog - not support
+                        exit(1);
+                    }
+
+                    /** Status Code - 
+                     * - Skip 1xx 
+                     * - if 2xx, check:
+                     *      - 200: keep processing
+                     *      - ...
+                     * - if 3xx, then we need to check header fields:
+                     *      - 301: check `Location` field, if exist, return redirect_request error code;
+                     *          if not exist, then we need to terminate this connection.
+                     *      - 302: use effective request URI for future requests 
+                     *          (also using `Location` to perform redirect)
+                     *      - ... 
+                     * 
+                     * - if 4xx or 5xx, then connection can be terminated; (FIXME: Can we terminate directly?)
+                     * 
+                     */
+                    if(status_code<_200_OK){
+                        // 1xx
+                        syslog("NOT SUPPORT", __func__, "Response from server :", get_http_status_code_by_idx[status_code], ", ",get_http_reason_phrase_by_idx[status_code], NULL);
+                        // TODO:
+                    } else if(status_code>=_200_OK && status_code<_300_MULTI_CHOICES){
+                        // 2xx
+                        syslog("SUCCESSFUL", __func__, "Response from server :", get_http_status_code_by_idx[status_code], ", ",get_http_reason_phrase_by_idx[status_code], NULL);
+                        // keep processing 
+                    } else if(status_code>=_300_MULTI_CHOICES && status_code<_400_BAD_REQUEST){
+                        switch(status_code){
+                            case _301_MOVED_PERMANENTLY:
+                            case _302_FOUND:
+                                // search `Location` field-value
+                                printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[LOCATION].idx), http_h_status_check->field_value[LOCATION].offset));
+                                // close the connection
+                                close(sockfd);
+                                // redirect to new target (new conn + modified request)
+                                // reuse http_request ptr (to store Location)
+                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[LOCATION].idx), http_h_status_check->field_value[LOCATION].offset-2); // -2: delete CRLF
+                                return ERR_REDIRECT;
+                                // exit(1);
+                            default:
+                                // not support, keep processing
+                                break;
+                        }
+                    } else if(status_code>=_400_BAD_REQUEST && status_code<=_505_HTTP_VER_NOT_SUPPORTED){
+                        printf("Connection is terminated by %s's failure ...\n", status_code<_500_INTERNAL_SERV_ERR?"client":"server");
+                        printf("Response from server: %s, %s\n", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
+                        // syslog 
+                        syslog("CONNECTION ABORT", __func__, "Response from server :", get_http_status_code_by_idx[status_code], ", ",get_http_reason_phrase_by_idx[status_code], NULL);
+                        // terminate, we don't need the parse the rest of data
+                        close(sockfd);
+                        // FIXME: return error code instead terminate directly
+                        exit(1);
+                    }
+
+                    /** Transfer coding/Message body info - 
+                     * check current using Transfer-Encoding or Content-Length
+                     */
                     if(http_h_status_check->content_length_dirty){
                         use_content_length=1;
                         content_length=atoi(readbuf+http_h_status_check->field_value[CONTENT_LEN].idx);
@@ -150,6 +212,11 @@ int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
                         // need to parse under chunked size=0
                         state=CHUNKED;
                     }
+
+                    /**
+                     * 
+                     */
+
                 } else if(state==CHUNKED || state==NEXT_CHUNKED){
                     // check if it is `chunked`
                     //fprintf(stdout, "Debug, Chunked size: %s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
@@ -200,7 +267,8 @@ int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
                         case VER:
                             // printf("%d\n", encap_http_version(readbuf+(buf_idx-parse_len)));
                             if((ret=encap_http_version(readbuf+(buf_idx-parse_len))) > 1){ // current only support HTTP/1.1
-                                syslog("DEBUG", __func__, " [ Version: ", get_http_version(ret), " ] ", NULL);
+                                syslog("DEBUG", __func__, " [ Version: ", get_http_version_by_idx[ret], " ] ", NULL);
+                                http_ver=ret;
                             } else { // if not support, just terminate
                                 char *tmp=malloc((parse_len)*sizeof(char));
                                 snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
@@ -213,7 +281,8 @@ int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
                         case CODE_OR_TOKEN:
                             // printf("%d\n", encap_http_status_code(atoi(readbuf+(buf_idx-parse_len))));
                             if((ret=encap_http_status_code(atoi(readbuf+(buf_idx-parse_len)))) > 0){
-                                syslog("DEBUG", __func__, " [ Status code: ", get_http_status_code(ret), " ] ", NULL);
+                                status_code=ret;
+                                syslog("DEBUG", __func__, " [ Status code: ", get_http_status_code_by_idx[ret], " ] ", NULL);
                             } else { // not support
                                 // char *tmp=malloc((parse_len)*sizeof(char));
                                 // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
@@ -230,7 +299,7 @@ int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
                 }
             default:
                 // append to readbuf
-                pstate=NON;
+                break;
         }
     }
 

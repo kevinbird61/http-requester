@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
     // using http state machine to process
-    http_state_machine(sockfd, http_req, 0, 0);
+    http_state_machine(sockfd, (void**)&http_req, 0, 0);
 
     // close(sockfd);
     return 0;

@@ -15,9 +15,12 @@ typedef unsigned long long  u64;
 typedef enum {
     ERR_NONE=0,                     // success
     ERR_INVALID,
+    ERR_INVALID_HOST_LEN,           // invalid host length (parse url)
+    ERR_USE_SSL_PORT,               // change to SSL port - 443 (parse url)
     ERR_ILLEGAL_CHAR,               // parse illegal char
     ERR_MEMORY,        
     ERR_NOT_SUPPORT,
+    ERR_REDIRECT,                   // redirect (http_state_machine)
     ERR_UNDEFINED
 } error_code;
 
@@ -72,18 +75,21 @@ typedef enum {
     _502_BAD_GW,
     _503_SERVICE_UNAVAILABLE,
     _504_GW_TIMEOUT,
-    _505_HTTP_VER_NOT_SUPPORTED
+    _505_HTTP_VER_NOT_SUPPORTED,
+    STATUS_CODE_MAXIMUM
 } status_code_map;
 
 /* version enum */
 typedef enum {
     HTTP_1_0=1,
-    HTTP_1_1
+    HTTP_1_1,
+    VERSION_MAXIMUM
 } http_version_map;
 
 /* TODO: method token enum */
 typedef enum {
-    GET=1
+    GET=1,
+    METHOD_TOKEN_MAXIMUM
 } method_token_map;
 
 // http parsing state
@@ -108,15 +114,7 @@ typedef enum {
     ABORT
 } http_state;
 
-// character
-typedef enum {
-    NON,
-    CR,
-    LF,
-    CRLF,
-    NEXT
-} parse_state;
-
+// header field-names
 typedef enum {
     CACHE_CTRL=0,
     EXPIRES,

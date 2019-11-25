@@ -2,12 +2,12 @@
 
 int http_req_create_start_line(char **rawdata, char *method, char *target, u8 http_version)
 {
-    int h_len=strlen(method)+strlen(get_http_version(http_version))+strlen(target)+4; // + 2 SP + CRLF
-    *rawdata=malloc(h_len);
+    int h_len=strlen(method)+strlen(get_http_version_by_idx[http_version])+strlen(target)+4; // + 2 SP + CRLF
+    *rawdata=calloc(h_len, sizeof(char));
     if(*rawdata==NULL){
         return ERR_MEMORY;
     }
-    sprintf(*rawdata, "%s %s %s\r\n", method, target, get_http_version(http_version));
+    sprintf(*rawdata, "%s %s %s\r\n", method, target, get_http_version_by_idx[http_version]);
 
     return ERR_NONE;
 }

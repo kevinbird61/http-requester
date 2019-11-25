@@ -5,6 +5,9 @@
 
 #define AGENT   "http-requester-c"
 
+// parse url, and use the result to fill host & path
+int parse_url(char *url, char **host, char **path);
+// print usage
 void print_manual();
 
 int main(int argc, char *argv[])
@@ -150,34 +153,16 @@ int main(int argc, char *argv[])
     } else if(url!=NULL){
         // use url only
         char *host, *path;
-        /** 1. check URL's protocol 
-         *      - http
-         */
-        if(!strncasecmp(url, "http:", 5)){
-            // start from "http://<URL>"
-            url=strndup(url+7, strlen(url)-7); // "http://" = 7 bytes   
-        } 
-        // Now URL = <HOST>/<Pathname>
-        /** FIXME: Do we need to perform parsing [:PORT] 
-         *      between processing <Host> and <Path> ?
-         */
-        // perform same parsing 
-        int ori_len=strlen(url);
-        char *ori_url, *host_delim="/";
-        ori_url=strdup(url);
-        // get host
-        host=strtok(url, host_delim);
-        // printf("Host: %s\n", host);
-        // check host length limitation, refs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames
-        if(strlen(host)>=253){
-            printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen(host));
-            exit(1);
-        }
-        // get path
-        path=strndup(ori_url+strlen(host), ori_len-strlen(host));
-        // when user forget to add / at the end of URL
-        if(strlen(path)==0){
-            path="/";
+        int ret=parse_url(url, &host, &path);
+        switch(ret){
+            case ERR_NONE:
+                break;
+            case ERR_USE_SSL_PORT:
+                port=443;
+                break;
+            case ERR_INVALID_HOST_LEN:
+            default:
+                exit(1);
         }
 
         /* 2. forge http request header */
@@ -205,11 +190,85 @@ int main(int argc, char *argv[])
         while(conn){
             // http_t *req;
             // memcpy(req, http_request_obj, sizeof(http_t));
-            http_state_machine(sockfd, http_request, --conn, 1);
+            int ret=http_state_machine(sockfd, (void**)&http_request, --conn, 1);
+            char *loc;
+            switch(ret){
+                case ERR_REDIRECT: /* handle redirection */
+                    // Modified http request, and send the request again
+                    loc=(char*)http_request;
+                    // need to parse again 
+                    ret=parse_url(loc, &host, &path);
+                    switch(ret){
+                        case ERR_NONE:
+                            break;
+                        case ERR_USE_SSL_PORT:
+                            port=443;
+                            break;
+                        case ERR_INVALID_HOST_LEN:
+                        default:
+                            exit(1);
+                    }
+                    // create new conn
+                    sockfd=create_tcp_conn(host, itoa(port));
+                    if(sockfd<0){
+                        exit(1);
+                    }
+                    // construct new http request
+                    http_req_create_start_line(&http_request, method, path, HTTP_1_1);
+                    http_req_ins_header(&http_request, "Host", host);
+                    http_req_ins_header(&http_request, "Connection", "keep-alive");
+                    http_req_ins_header(&http_request, "User-Agent", AGENT);
+                    http_req_finish(&http_request);
+                    printf("New HTTP request:\n%s\n", http_request);
+                    conn++; // refuel
+                    // exit(1);
+                default:
+                    break;
+            }
         }
     }
 
     return 0;
+}
+
+int parse_url(char *url, char **host, char **path)
+{
+    /** 1. check URL's protocol 
+     *      - http
+     */
+    int ret=ERR_NONE;
+    if(!strncasecmp(url, "http:", 5)){
+        // start from "http://<URL>"
+        url=strndup(url+7, strlen(url)-7); // "http://" = 7 bytes   
+    } else if(!strncasecmp(url, "https:", 6)){
+        url=strndup(url+8, strlen(url)-8); // "https://" = 8 bytes 
+        // need to change port!, using return value to do the trick
+        ret=ERR_USE_SSL_PORT;
+    }
+    // Now URL = <HOST>/<Pathname>
+    /** FIXME: Do we need to perform parsing [:PORT] 
+     *      between processing <Host> and <Path> ?
+     */
+    // perform same parsing 
+    int ori_len=strlen(url);
+    char *ori_url, *host_delim="/";
+    ori_url=strdup(url);
+    // get host
+    *host=strtok(url, host_delim);
+    // printf("Host: %s\n", host);
+    // check host length limitation, refs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames
+    if(strlen(*host)>=253){
+        printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen(*host));
+        // exit(1);
+        return ERR_INVALID_HOST_LEN;
+    }
+    // get path
+    *path=strndup(ori_url+strlen(*host), ori_len-strlen(*host));
+    // when user forget to add / at the end of URL
+    if(strlen(*path)==0){
+        *path="/";
+    }
+    return ret;
 }
 
 void print_manual()

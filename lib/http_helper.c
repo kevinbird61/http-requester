@@ -1,18 +1,99 @@
 #include "http.h"
 
-char *get_http_version(http_version_map http_version)
-{
-    switch(http_version)
-    {
-        case HTTP_1_0:
-            return "HTTP/1.0";
-        case HTTP_1_1:
-            return "HTTP/1.1";
-        default:
-            // default using 1.1 
-            return "HTTP/1.1";
-    }
-}
+char *get_http_method_token_by_idx[]={
+    [0]=NULL,
+    [GET]="GET",
+    [METHOD_TOKEN_MAXIMUM]=NULL
+};
+
+char *get_http_version_by_idx[]={
+    [0]="HTTP/1.1",
+    [HTTP_1_0]="HTTP/1.0",
+    [HTTP_1_1]="HTTP/1.1",
+    [VERSION_MAXIMUM]=NULL
+};
+
+char *get_http_status_code_by_idx[]={
+    [0]=NULL,
+    [_100_CONTINUE]="100",
+    [_101_SWITCHING_PROTO]="101",
+    [_200_OK]="200",
+    [_201_CREATED]="201",
+    [_202_ACCEPTED]="202",
+    [_203_NON_AUTH_INFO]="203",
+    [_204_NO_CONTENT]="204",
+    [_205_RESET_CONTENT]="205",
+    [_300_MULTI_CHOICES]="300",
+    [_301_MOVED_PERMANENTLY]="301",
+    [_302_FOUND]="302",
+    [_303_SEE_OTHER]="303",
+    [_305_USE_PROXY]="305",
+    [_306_UNUSED]="306",
+    [_307_TEMP_REDIRECT]="307",
+    [_400_BAD_REQUEST]="400",
+    [_402_PAYMENT_REQUIRED]="402",
+    [_403_FORBIDDEN]="403",
+    [_404_NOT_FOUND]="404",
+    [_405_METHOD_NOT_ALLOWED]="405",
+    [_406_NOT_ACCEPTABLE]="406",
+    [_408_REQUEST_TIMEOUT]="408",
+    [_409_CONFLICT]="409",
+    [_410_GONE]="410",
+    [_411_LENGTH_REQUIRED]="411",
+    [_413_PAYLOAD_TOO_LARGE]="413",
+    [_414_URI_TOO_LONG]="414",
+    [_415_UNSUPPORTED_MEDIA_TYPE]="415",
+    [_417_EXPECTATION_FAILED]="417",
+    [_426_UPGRADE_REQUIRED]="426",
+    [_500_INTERNAL_SERV_ERR]="500",
+    [_501_NOT_IMPL]="501",
+    [_502_BAD_GW]="502",
+    [_503_SERVICE_UNAVAILABLE]="503",
+    [_504_GW_TIMEOUT]="504",
+    [_505_HTTP_VER_NOT_SUPPORTED]="505",
+    [STATUS_CODE_MAXIMUM]=NULL
+};
+
+char *get_http_reason_phrase_by_idx[]={
+    [0]=NULL,
+    [_100_CONTINUE]="Continue",
+    [_101_SWITCHING_PROTO]="Switching Protocols",
+    [_200_OK]="OK",
+    [_201_CREATED]="Created",
+    [_202_ACCEPTED]="Accepted",
+    [_203_NON_AUTH_INFO]="Non-Authoritative Information",
+    [_204_NO_CONTENT]="No Content",
+    [_205_RESET_CONTENT]="Reset Content",
+    [_300_MULTI_CHOICES]="Multiple Choices",
+    [_301_MOVED_PERMANENTLY]="Moved Permanently",
+    [_302_FOUND]="Found",
+    [_303_SEE_OTHER]="See Other",
+    [_305_USE_PROXY]="Use Proxy",
+    [_306_UNUSED]="(Unused)",
+    [_307_TEMP_REDIRECT]="Temporary Redirect",
+    [_400_BAD_REQUEST]="Bad Request",
+    [_402_PAYMENT_REQUIRED]="Payment Required",
+    [_403_FORBIDDEN]="Forbidden",
+    [_404_NOT_FOUND]="Not Found",
+    [_405_METHOD_NOT_ALLOWED]="Method Not Allowed",
+    [_406_NOT_ACCEPTABLE]="Not Acceptable",
+    [_408_REQUEST_TIMEOUT]="Request Timeout",
+    [_409_CONFLICT]="Conflict",
+    [_410_GONE]="Gone",
+    [_411_LENGTH_REQUIRED]="Length Required",
+    [_413_PAYLOAD_TOO_LARGE]="Payload Too Large",
+    [_414_URI_TOO_LONG]="URI Too Long",
+    [_415_UNSUPPORTED_MEDIA_TYPE]="Unsupported Media Type",
+    [_417_EXPECTATION_FAILED]="Expectation Failed",
+    [_426_UPGRADE_REQUIRED]="Upgrade Required",
+    [_500_INTERNAL_SERV_ERR]="Internal Server Error",
+    [_501_NOT_IMPL]="Not Implemented",
+    [_502_BAD_GW]="Bad Gateway",
+    [_503_SERVICE_UNAVAILABLE]="Service Unavailable",
+    [_504_GW_TIMEOUT]="Gateway Timeout",
+    [_505_HTTP_VER_NOT_SUPPORTED]="HTTP Version Not Supported",
+    [STATUS_CODE_MAXIMUM]=NULL
+};
 
 int encap_http_version(char *version)
 {
@@ -25,105 +106,12 @@ int encap_http_version(char *version)
     }
 }
 
-char *get_http_method_token(method_token_map method_token)
-{
-    switch(method_token)
-    {
-        case GET: 
-            return "GET";
-        default:
-            return NULL;
-    }
-}
-
 int encap_http_method_token(char *method)
 {
     if(!strncmp(method, "GET", 3)){
         return GET;
     } else {
         return 0;
-    }
-}
-
-char *get_http_status_code(status_code_map status_code)
-{
-    /* TODO: support more status code */
-    switch(status_code)
-    {
-        case _100_CONTINUE:
-            return "100";
-        case _101_SWITCHING_PROTO:
-            return "101";
-        case _200_OK:
-            return "200";
-        case _201_CREATED:
-            return "201";
-        case _202_ACCEPTED:
-            return "202";
-        case _203_NON_AUTH_INFO:
-            return "203";
-        case _204_NO_CONTENT:
-            return "204";
-        case _205_RESET_CONTENT:
-            return "205";
-        case _300_MULTI_CHOICES:
-            return "300";
-        case _301_MOVED_PERMANENTLY:
-            return "301";
-        case _302_FOUND:
-            return "302";
-        case _303_SEE_OTHER:
-            return "303";
-        case _305_USE_PROXY:
-            return "305";
-        case _306_UNUSED:
-            return "306";
-        case _307_TEMP_REDIRECT:
-            return "307";
-        case _400_BAD_REQUEST:
-            return "400";
-        case _402_PAYMENT_REQUIRED:
-            return "402";
-        case _403_FORBIDDEN:
-            return "403";
-        case _404_NOT_FOUND:
-            return "404";
-        case _405_METHOD_NOT_ALLOWED:
-            return "405";
-        case _406_NOT_ACCEPTABLE:
-            return "406";
-        case _408_REQUEST_TIMEOUT:
-            return "408";
-        case _409_CONFLICT:
-            return "409";
-        case _410_GONE:
-            return "410";
-        case _411_LENGTH_REQUIRED:
-            return "411";
-        case _413_PAYLOAD_TOO_LARGE:
-            return "413";
-        case _414_URI_TOO_LONG:
-            return "414";
-        case _415_UNSUPPORTED_MEDIA_TYPE:
-            return "415";
-        case _417_EXPECTATION_FAILED:
-            return "417";
-        case _426_UPGRADE_REQUIRED:
-            return "426";
-        case _500_INTERNAL_SERV_ERR:
-            return "500";
-        case _501_NOT_IMPL:
-            return "501";
-        case _502_BAD_GW:
-            return "502";
-        case _503_SERVICE_UNAVAILABLE:
-            return "503";
-        case _504_GW_TIMEOUT:
-            return "504";
-        case _505_HTTP_VER_NOT_SUPPORTED:
-            return "505";
-        default:
-            return NULL;
     }
 }
 
