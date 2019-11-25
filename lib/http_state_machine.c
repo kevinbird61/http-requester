@@ -8,19 +8,23 @@
 /* calculate next http parsing state */
 http_state next_http_state(http_state cur_state, char ch);
 
-int http_state_machine(int sockfd, http_t *http_request, int reuse)
+int http_state_machine(int sockfd, void *http_request, int reuse, int raw)
 {
     // 1. check the conformance of http_request
     
     // 2. send the request (similar with http_request())
     char *req=NULL;
-    http_recast(http_request, &req);
-    // logging
-    char *reqlen=itoa(strlen(req));
-    int sendbytes=send(sockfd, req, strlen(req), 0);
-    char *sent=(char*)itoa(sendbytes);
-
-    syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent, NULL);
+    if(!raw){
+        http_recast(http_request, &req);
+        char *reqlen=itoa(strlen(req));
+        int sendbytes=send(sockfd, req, strlen(req), 0);
+        char *sent=(char*)itoa(sendbytes);
+        syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent, NULL);
+    } else {
+        req=(char *)http_request;
+        int sendbytes=send(sockfd, req, strlen(req), 0);
+        syslog("DEBUG", __func__, "Using raw HTTP request. Request length: ", itoa(strlen(req)), "; Sent bytes: ", itoa(sendbytes), NULL);
+    }
 
     // 3. recv and parse, until enter finish/abort state (state machine part)
     // - remember: if response status code is 302, we need to send a new redirect request.

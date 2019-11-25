@@ -18,10 +18,11 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
 {
     /* FIXME: How to reduce system call? */
     va_list ap;
-    int alloc_size=64*(1+((strlen(action_type)+strlen(func_name)+25)/64));    // 25= 6(bracket) + 19(getdate)
-    char *loginfo=malloc(alloc_size*sizeof(char)), *str;
-    memset(loginfo, 0x0, alloc_size*sizeof(char));
-
+    int alloc_size=64*(1+((strlen(action_type)+strlen(func_name)+38)/64));    // 38 = 6(bracket) + 32(getdate)
+    char *loginfo=calloc(alloc_size, sizeof(char)), *str;
+    if(loginfo==NULL){
+        exit(1);
+    }
     sprintf(loginfo, "[%s][%s][%s]", getdate(), action_type, func_name);
 
     str=info_args;
