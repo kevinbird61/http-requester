@@ -166,6 +166,7 @@ enum {
     RES_CONTENT_DISPOSITION,
     RES_CONTENT_ENCODING,
     RES_CONTENT_LANG,
+    RES_CONTENT_LEN,
     RES_CONTENT_LOC,
     RES_CONTENT_MD5,
     RES_CONTENT_RANGE,
@@ -195,38 +196,6 @@ enum {
     RES_WWW_AUTH,
     RES_HEADER_NAME_MAXIMUM // last one
 };
-
-// response header field-names
-typedef enum {
-    CACHE_CTRL=0,
-    EXPIRES,
-    LAST_MOD,
-    ETAG,
-    CONN,
-    KEEPALIVE,
-    ACCEPT,
-    ACCEPT_CHAR,
-    ACCEPT_ENCODING,
-    ACCEPT_LANG,
-    COOKIE,
-    SET_COOKIE,
-    CONTENT_LEN,
-    CONTENT_TYPE,
-    CONTENT_ENCODING,
-    CONTENT_LANG,
-    CONTENT_LOC,
-    HOST,
-    USER_AGENT,
-    ALLOW,
-    SERVER,
-    TRANSFER_ENCODING,
-    TE,
-    TRAILER,
-    DATE,
-    VARY,
-    LOCATION,
-    RES_HEADER_NAME_MAXIMUM
-} res_header_name_t;
 
 /* using linked-list to store the header fields */
 typedef struct _http_header_t {
@@ -270,37 +239,53 @@ struct offset_t {
 
 // response header
 typedef struct _http_res_header_status_t {
-    // dirty bit (record existence), using 32 bits to store
-    u32 host_dirty: 1,
-        user_agent_dirty: 1,
-        allow_dirty: 1,
-        server_dirty: 1,
-        transfer_encoding_dirty: 1,
-        te_dirty: 1,
-        trailer_dirty: 1,
-        date_dirty: 1,
-        vary_dirty: 1,
-        cache_control_dirty: 1,
-        expires_dirty: 1,
-        last_modified_dirty: 1,
-        etag_dirty: 1,
-        connection_dirty: 1,
-        keepalive_dirty: 1,
-        location_dirty: 1,
-        accept_dirty: 1,
-        accept_charset_dirty: 1,
-        accept_encoding_dirty: 1,
-        accept_language_dirty: 1,
-        cookie_dirty: 1,
-        set_cookie_dirty: 1,
-        spare2: 2,
-        content_length_dirty: 1,
-        content_type_dirty: 1,
-        content_encoding_dirty: 1,
-        content_language_dirty: 1,
-        content_location_dirty: 1,
-        spare3: 3;
-    int curr_bit; // record current bit (to let caller know which header is processing)
+    // dirty bit (record existence)
+    // using u64
+    union {
+        u64 dirty_bit_align;
+        u64 access_ctrl_allow_origin_dirty:1,
+            acc_patch_dirty:1,
+            acc_range_dirty:1,
+            age_dirty:1,
+            allow_dirty:1,
+            cache_ctrl_dirty:1,
+            conn_dirty:1,
+            content_disposition_dirty:1,    
+            content_encoding_dirty:1,
+            content_lang_dirty:1,
+            content_len_dirty:1,
+            content_loc_dirty:1,
+            content_md5_dirty:1,
+            content_range_dirty:1,
+            content_type_dirty:1,
+            date_dirty:1,
+            etag_dirty:1,                   
+            expires_dirty:1,
+            last_mod_dirty:1,
+            link_dirty:1,
+            loc_dirty:1,
+            p3p_dirty:1,
+            pragma_dirty:1,
+            proxy_auth_dirty:1,
+            public_key_pins_dirty:1,        
+            refresh_dirty:1,
+            retry_after_dirty:1,
+            server_dirty:1,
+            set_cookie_dirty:1,
+            status_dirty:1,
+            strict_transport_security_dirty:1,
+            trailer_dirty:1,
+            transfer_encoding_dirty:1,      
+            upgrade_dirty:1,
+            vary_dirty:1,
+            via_dirty:1,
+            warning_dirty:1,
+            www_auth_dirty:1,
+            spare:2,                        
+            spare2:24;
+    };
+    
+    u64 curr_bit; // record current bit (to let caller know which header is processing)
     // store idx & offset of each header field
     struct offset_t field_value[RES_HEADER_NAME_MAXIMUM];
     /** store buffer ptr (start from http message header) 

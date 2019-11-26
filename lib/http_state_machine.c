@@ -167,12 +167,12 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                             case _301_MOVED_PERMANENTLY:
                             case _302_FOUND:
                                 // search `Location` field-value
-                                printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[LOCATION].idx), http_h_status_check->field_value[LOCATION].offset));
+                                printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[RES_CONTENT_LOC].idx), http_h_status_check->field_value[RES_CONTENT_LOC].offset));
                                 // close the connection
                                 close(sockfd);
                                 // redirect to new target (new conn + modified request)
                                 // reuse http_request ptr (to store Location)
-                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[LOCATION].idx), http_h_status_check->field_value[LOCATION].offset-2); // -2: delete CRLF
+                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[RES_CONTENT_LOC].idx), http_h_status_check->field_value[RES_CONTENT_LOC].offset-2); // -2: delete CRLF
                                 return ERR_REDIRECT;
                                 // exit(1);
                             default:
@@ -193,9 +193,9 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                     /** Transfer coding/Message body info - 
                      * check current using Transfer-Encoding or Content-Length
                      */
-                    if(http_h_status_check->content_length_dirty){
+                    if(http_h_status_check->content_len_dirty){
                         use_content_length=1;
-                        content_length=atoi(readbuf+http_h_status_check->field_value[CONTENT_LEN].idx);
+                        content_length=atoi(readbuf+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
                         printf("Get content length= %d\n", content_length);
                         if(content_length==0){
                             flag=0;
@@ -213,7 +213,7 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                     // check if it is `chunked`
                     //fprintf(stdout, "Debug, Chunked size: %s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
                     // FIXME: need to using strtok to parse all possible value
-                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[TRANSFER_ENCODING].idx), http_h_status_check->field_value[TRANSFER_ENCODING].offset), "chunked", 7)){
+                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx), http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset), "chunked", 7)){
                         char *tmp=calloc(parse_len, sizeof(char));
                         sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
                         
