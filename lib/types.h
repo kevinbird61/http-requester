@@ -155,7 +155,7 @@ typedef enum {
 } req_header_name_t;
 
 // "new" response header field-names
-enum {
+typedef enum {
     RES_ACCESS_CTRL_ALLOW_ORIGIN=1,
     RES_ACC_PATCH,
     RES_ACC_RANGES,
@@ -163,6 +163,7 @@ enum {
     RES_ALLOW,
     RES_CACHE_CTRL,
     RES_CONN,
+    RES_KEEPALIVE,
     RES_CONTENT_DISPOSITION,
     RES_CONTENT_ENCODING,
     RES_CONTENT_LANG,
@@ -195,7 +196,7 @@ enum {
     RES_WARNING,
     RES_WWW_AUTH,
     RES_HEADER_NAME_MAXIMUM // last one
-};
+} res_header_name_t;
 
 /* using linked-list to store the header fields */
 typedef struct _http_header_t {
@@ -234,13 +235,53 @@ typedef struct _http_t {
 
 struct offset_t {
     u32 idx;    // record the starting index(address) of the buffer
-    u16 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
+    u32 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
 }__attribute__((packed)); // 4+4 bytes
+
+// request header (send request)
+typedef struct _http_req_header_status_t {
+    // dirty bit (record existence), using u64
+    union {
+        u32 dirty_bit_align;
+        u32 acc_dirty:1,
+            acc_charset_dirty:1,
+            acc_encoding_dirty:1,
+            acc_lang_dirty:1,
+            acc_date_dirty:1,
+            auth_dirty:1,
+            cache_ctrl_dirty:1,
+            conn_dirty:1, // 8 
+            cookie_dirty:1,
+            content_len_dirty:1,
+            content_md5_dirty:1,
+            content_type_dirty:1,
+            date_dirty:1,
+            expect_dirty:1,
+            from_dirty:1,
+            host_dirty:1, // 8
+            if_match_dirty:1,
+            if_mod_since_dirty:1,
+            if_none_match_dirty:1,
+            if_range_dirty:1,
+            if_unmod_since_dirty:1,
+            max_forwards_dirty:1,
+            origin_dirty:1,
+            pragma_dirty:1, // 8
+            proxy_auth_dirty:1,
+            range_dirty:1,
+            referer_dirty:1,
+            te_dirty:1,
+            user_agent_dirty:1,
+            upgrade_dirty:1,
+            via_dirty:1,
+            warning_dirty:1; // 8
+    };
+    u8 **field_value;
+} __attribute__((aligned(64))) http_req_header_status_t;
 
 // response header
 typedef struct _http_res_header_status_t {
-    // dirty bit (record existence)
-    // using u64
+    // dirty bit (record existence), using u64
     union {
         u64 dirty_bit_align;
         u64 access_ctrl_allow_origin_dirty:1,
@@ -250,6 +291,7 @@ typedef struct _http_res_header_status_t {
             allow_dirty:1,
             cache_ctrl_dirty:1,
             conn_dirty:1,
+            keep_alive_dirty:1,
             content_disposition_dirty:1,    
             content_encoding_dirty:1,
             content_lang_dirty:1,
@@ -281,7 +323,7 @@ typedef struct _http_res_header_status_t {
             via_dirty:1,
             warning_dirty:1,
             www_auth_dirty:1,
-            spare:2,                        
+            spare:1,                        
             spare2:24;
     };
     
@@ -292,7 +334,7 @@ typedef struct _http_res_header_status_t {
      * - assign the actual buffer ptr to here when call create func
     */
     u8 *buff;
-} __attribute__((aligned(64))) http_header_status_t;    // align with 64
+} __attribute__((aligned(64))) http_res_header_status_t;    // align with 64
 
 
 #endif

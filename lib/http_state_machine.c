@@ -38,7 +38,7 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
     }
 
     // maintain parsing status 
-    http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
+    http_res_header_status_t *http_h_status_check=create_http_header_status(readbuf);
     u8 state=VER; // start with version
     u8 status_code=0;
     u8 http_ver=0;
@@ -167,12 +167,12 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                             case _301_MOVED_PERMANENTLY:
                             case _302_FOUND:
                                 // search `Location` field-value
-                                printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[RES_CONTENT_LOC].idx), http_h_status_check->field_value[RES_CONTENT_LOC].offset));
+                                printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
                                 // close the connection
                                 close(sockfd);
                                 // redirect to new target (new conn + modified request)
                                 // reuse http_request ptr (to store Location)
-                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[RES_CONTENT_LOC].idx), http_h_status_check->field_value[RES_CONTENT_LOC].offset-2); // -2: delete CRLF
+                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset-2); // -2: delete CRLF
                                 return ERR_REDIRECT;
                                 // exit(1);
                             default:
@@ -193,14 +193,14 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                     /** Transfer coding/Message body info - 
                      * check current using Transfer-Encoding or Content-Length
                      */
-                    if(http_h_status_check->content_len_dirty){
+                    if(http_h_status_check->dirty_bit_align&(1<<(RES_CONTENT_LEN-1))){
                         use_content_length=1;
                         content_length=atoi(readbuf+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
                         printf("Get content length= %d\n", content_length);
                         if(content_length==0){
                             flag=0;
                         }
-                    } else if(http_h_status_check->transfer_encoding_dirty){
+                    } else if(http_h_status_check->dirty_bit_align&( ((u64)1)<<(RES_TRANSFER_ENCODING-1) )){
                         // need to parse under chunked size=0
                         state=CHUNKED;
                     }

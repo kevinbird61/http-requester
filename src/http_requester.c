@@ -3,6 +3,7 @@
 #include "conn.h"
 #include "http.h"
 
+#define NUM_PARAMS          (7)
 #define AGENT               "http-requester-c"
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
@@ -45,15 +46,23 @@ int main(int argc, char *argv[])
      * - `-p`, --port:      Specify target port number
      * - `-m`, --method:    Specify method token
      */
-    struct option options[]={
-        {"url", required_argument, NULL, 'u'},
-        {"port", required_argument, NULL, 'p'},
-        {"conc", required_argument, NULL, 'c'},
-        {"conn", required_argument, NULL, 'n'},
-        {"file", required_argument, NULL, 'f'},
-        {"method", required_argument, NULL, 'm'},
-        {0, 0, 0, 0}
+    struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={ // number need to be changed if you want to add new options
+        [0]={"url", required_argument, NULL, 'u'},
+        [1]={"port", required_argument, NULL, 'p'},
+        [2]={"conc", required_argument, NULL, 'c'},
+        [3]={"conn", required_argument, NULL, 'n'},
+        [4]={"file", required_argument, NULL, 'f'},
+        [5]={"method", required_argument, NULL, 'm'},
+        /* request headers (using itoa(REQ_*) as option name) */    
+        [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
     };
+    /* add request headers */
+    for(int i=1; i<(REQ_HEADER_NAME_MAXIMUM); i++){
+        options[(NUM_PARAMS-2)+i].name=itoa(i);
+        options[(NUM_PARAMS-2)+i].has_arg=required_argument;
+        options[(NUM_PARAMS-2)+i].flag=NULL;
+        options[(NUM_PARAMS-2)+i].val=0;
+    }
 
     u8      flags=0; // enum, represent user specified parameters.
     u32     port=DEFAULT_PORT;
@@ -62,6 +71,12 @@ int main(int argc, char *argv[])
     char    *filename=NULL;
     char    *url=NULL;
     char    *method=NULL;
+    // alloc
+    http_req_header_status_t *http_req=calloc(1, sizeof(http_req_header_status_t));
+    http_req->field_value=calloc(REQ_HEADER_NAME_MAXIMUM, sizeof(u8 *));
+    for(int i=0;i<REQ_HEADER_NAME_MAXIMUM;i++){
+        http_req->field_value[i]=calloc(255, sizeof(char));
+    }
 
     while(1){
         int this_option_optind=optind?optind:1;
@@ -73,6 +88,13 @@ int main(int argc, char *argv[])
         switch(c){
             case 0:
                 /* only has long option goes here (other) */
+                /*printf("[%s: ", get_req_header_name_by_idx[ atoi(options[option_index].name) ] );
+                if (optarg)
+                    printf("%s]", optarg);
+                printf("\n");*/
+                // store into http_req
+                http_req->dirty_bit_align|=( ((u32)1) <<(atoi(options[option_index].name)-1) );
+                http_req->field_value[atoi(options[option_index].name)]=optarg;
                 break;
             case 'c':   // concurrent connections
                 conc=atoi(optarg);
@@ -190,12 +212,23 @@ int main(int argc, char *argv[])
         // start-line
         http_req_create_start_line(&http_request, method, path, HTTP_1_1);
         // header fields
-        http_req_ins_header(&http_request, "Host", host);
-        http_req_ins_header(&http_request, "Connection", "keep-alive");
-        http_req_ins_header(&http_request, "User-Agent", AGENT);
+        http_req->field_value[REQ_HOST]=host;
+        http_req->field_value[REQ_CONN]="keep-alive";
+        http_req->field_value[REQ_USER_AGENT]=AGENT;
+        http_req->dirty_bit_align=http_req->dirty_bit_align|(1<<(REQ_HOST-1))|(1<<(REQ_CONN-1))|(1<<(REQ_USER_AGENT-1));
+        
+        for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
+            if(http_req->dirty_bit_align& (1<<(i-1)) ){
+                //puts(http_req->field_value[i]);
+                http_req_ins_header(&http_request, get_req_header_name_by_idx[i], http_req->field_value[i]);
+            }
+        }
+
         // finish
         http_req_finish(&http_request);
-        printf("HTTP request:\n%s\n", http_request);
+        printf("HTTP request:*******************************************************************\n");
+        printf("%s\n", http_request);
+        printf("================================================================================\n");
         
         /* send request */
         int sockfd=create_tcp_conn(host, itoa(port));
@@ -250,7 +283,8 @@ int main(int argc, char *argv[])
                     printf("%-50s: %d\n", "Port number: ", port);
                     printf("%-50s: %s\n", "Method: ", method);
                     printf("********************************************************************************\n");
-                    printf("New HTTP request:\n%s\n", http_request);
+                    printf("New HTTP request:***************************************************************\n");
+                    printf("%s\n", http_request);
                     printf("================================================================================\n");
                     conn++; // refuel
                     // exit(1);
@@ -305,16 +339,20 @@ int parse_url(char *url, char **host, char **path)
 
 void print_manual()
 {
-    printf("*********************************************************\n");
+    printf("********************************************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
     printf("\n");
     printf("Usage: [sudo] ./http_requester.exe\n");
     printf("\t-h: Print this helper function.\n");
-    printf("\t-c, --conc NUM: Specify number of concurrent connections.\n");
-    printf("\t-n, --conn NUM: Specify number of total connections.\n");
-    printf("\t-f, --file FILE: Specify input file with HTTP request header template (use to setup those HTTP connections)\n");
-    printf("\t-u, --url URL: Specify URL (if --file & --url both exist, url will override the duplicated part in template file)\n");
-    printf("\t-p, --port PORT: Specify target port number\n");
-    printf("\t-m, --method METHOD: Specify method token\n");
-    printf("*********************************************************\n");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of concurrent connections");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of total connections");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
+    printf("\t-%-2c, --%-7s %-7s: Specify method token.\n", 'm', "method", "METHOD");
+    printf("[Customized Request Header]-----------------------------------------------------\n");
+    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
+        printf("\t--%-2d VALUE: Request header field-value of `%s`\n", i, get_req_header_name_by_idx[i]);
+    }
+    printf("********************************************************************************\n");
 }

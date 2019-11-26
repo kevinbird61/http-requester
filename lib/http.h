@@ -59,12 +59,12 @@ int http_interpret(const char *filename, http_t *http_packet);
  * - autocorrect/strip the useless or error part
  */
 // create http_header_status_obj
-http_header_status_t *create_http_header_status(char *readbuf);
+http_res_header_status_t *create_http_header_status(char *readbuf);
 // insert & check if there have any conflict
-int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offset);
-int check_header_field_name(http_header_status_t *status, char *field_name);
-int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 offset);
-extern char *get_res_header_name_by_idx[];
+int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 offset);
+int check_req_header_field_name(http_res_header_status_t *status, char *field_name);
+int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32 offset);
+
 
 /** http_helper.c:
  * - encap/decap those mapping code (with prefix `get_*`/`encap_*`)
@@ -76,6 +76,9 @@ extern char *get_http_version_by_idx[];
 extern char *get_http_method_token_by_idx[];
 extern char *get_http_status_code_by_idx[];
 extern char *get_http_reason_phrase_by_idx[];
+
+extern char *get_req_header_name_by_idx[];
+extern char *get_res_header_name_by_idx[];
 
 /** http_debug.c:
  * - good for debugging our code
