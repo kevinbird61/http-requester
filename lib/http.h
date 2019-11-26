@@ -54,13 +54,13 @@ int http_recast(http_t *http_packet, char **rawdata);
  */
 int http_interpret(const char *filename, http_t *http_packet);
 
-/** http_header_conf_check.c: 
+/** http_header_status.c: 
  * - check whether the syntax/grammar is conformable with HTTP/1.1 or not.
  * - autocorrect/strip the useless or error part
  */
 // create http_header_status_obj
 http_header_status_t *create_http_header_status(char *readbuf);
-// insert & check
+// insert & check if there have any conflict
 int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offset);
 int check_header_field_name(http_header_status_t *status, char *field_name);
 int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 offset);

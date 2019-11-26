@@ -28,20 +28,8 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
 
     // 3. recv and parse, until enter finish/abort state (state machine part)
     // - remember: if response status code is 302, we need to send a new redirect request.
-    // - TODO: need to create a new socket to send redirect request?
-    //  non-blocking
-    /*
-    struct timeval tv;
-    fd_set readfds;
-    // set timeout to 1.5 sec (wait next received.)
-    tv.tv_sec=1;
-    tv.tv_usec=500000;
-    FD_ZERO(&readfds);
-    FD_SET(sockfd, &readfds);
-    select(sockfd, &readfds, NULL, NULL, &tv);
-    */
-
-    int buf_size=64, chunk=64, buf_idx=0, parse_len=0, flag=1;
+    u8 flag=1;
+    int buf_size=64, chunk=64, buf_idx=0, parse_len=0;
     char bytebybyte, *bufbybuf;
     char *readbuf=calloc(buf_size, sizeof(char)); // pre-allocated 32 bytes
     if(readbuf==NULL){
@@ -66,14 +54,15 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
             printf("[Transfer-Encoding: Chunked] Parsing process has been done.\n");
             break;
         } 
-
         /* recv byte by byte */
         if(!recv(sockfd, &bytebybyte, 1, 0)){
             break;
         }
+        // store legal char
         readbuf[buf_idx]=bytebybyte;
         buf_idx++;
         parse_len++;
+        
         // check size, if not enough, then realloc
         if(buf_idx==buf_size){
             buf_size+=chunk; 
@@ -144,6 +133,8 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                      */
                     if(!http_ver) {
                         // syslog - not support
+                        syslog("NOT SUPPORT", __func__, "Only support HTTP/1.0 and /1.1 now.", NULL);
+                        fprintf(stderr, "Only support HTTP/1.0 and /1.1 now.");
                         exit(1);
                     }
 
@@ -303,10 +294,8 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
         }
     }
 
-    // printf("[MSG_BODY]\n");
-    // fwrite(readbuf+(buf_idx-parse_len), sizeof(char), parse_len, stdout);
-    // printf("Sizeof reabuf: %ld\n", strlen(readbuf));
-    syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes.", NULL);
+    // syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes; Illegal char (not in 0~127): ", itoa(invalid_cnt), NULL);
+    syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes", NULL);
     free(readbuf);
 
     // 4. finish, log the response and close the connection.

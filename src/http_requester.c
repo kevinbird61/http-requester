@@ -3,7 +3,27 @@
 #include "conn.h"
 #include "http.h"
 
-#define AGENT   "http-requester-c"
+#define AGENT               "http-requester-c"
+#define DEFAULT_PORT        (80)
+#define DEFAULT_SSL_PORT    (443)
+
+/* user parameters:
+ * - using flags to determine using default or user specified value:
+ *      0x01: conc
+ *      0x02: conn
+ *      0x04: file (if this bit is set, then disable url and method)
+ *      0x08: url
+ *      0x10: port
+ *      0x20: method
+ */
+enum {
+    SPE_CONC=0x01,
+    SPE_CONN=0x02,
+    SPE_FILE=0x04,
+    SPE_URL=0x08,
+    SPE_PORT=0x10,
+    SPE_METHOD=0x20
+};
 
 // parse url, and use the result to fill host & path
 int parse_url(char *url, char **host, char **path);
@@ -35,17 +55,8 @@ int main(int argc, char *argv[])
         {0, 0, 0, 0}
     };
 
-    /* user parameters:
-     * - using flags to determine using default or user specified value:
-     *      0x01: conc
-     *      0x02: conn
-     *      0x04: file (if this bit is set, then disable url and method)
-     *      0x08: url
-     *      0x10: port
-     *      0x20: method
-     */
-    u8      flags=0;
-    u16     port=80;
+    u8      flags=0; // enum, represent user specified parameters.
+    u32     port=DEFAULT_PORT;
     u32     conc=0;
     u32     conn=0;
     char    *filename=NULL;
@@ -65,27 +76,27 @@ int main(int argc, char *argv[])
                 break;
             case 'c':   // concurrent connections
                 conc=atoi(optarg);
-                flags|=0x01;
+                flags|=SPE_CONC;
                 break;
             case 'n':   // total connections
                 conn=atoi(optarg);
-                flags|=0x02;
+                flags|=SPE_CONN;
                 break;
             case 'f':   // using template file
                 filename=optarg;
-                flags|=0x04;
+                flags|=SPE_FILE;
                 break;
             case 'u':   // url
                 url=optarg;
-                flags|=0x08;
+                flags|=SPE_URL;
                 break;
             case 'p':   // port
                 port=atoi(optarg);
-                flags|=0x10;
+                flags|=SPE_PORT;
                 break;
             case 'm':   // method
                 method=optarg;
-                flags|=0x20;
+                flags|=SPE_METHOD;
                 break;
             case 'h':
             default:
@@ -95,17 +106,17 @@ int main(int argc, char *argv[])
     }
 
     // print the system parameters 
-    if(!(flags&0x01)){
+    if(!(flags&SPE_CONC)){
         conc=1;
     } 
-    if(!(flags&0x02)){
+    if(!(flags&SPE_CONN)){
         conn=2;
     }
-    if(!(flags&0x04)){
+    if(!(flags&SPE_FILE)){
         // use url & method
         filename=NULL;
         // check url
-        if(!(flags&0x08)){
+        if(!(flags&SPE_URL)){
             // if not specified URL, then print help info and exit
             fprintf(stderr, "You need to specify `template file` or `url`.\n");
             print_manual();
@@ -114,15 +125,19 @@ int main(int argc, char *argv[])
         // if not specify port, then using 80 as default
     } else {
         // use template
+        // also need to check URL
     }
-    if(!(flags)&0x10){
-        // port check 
-        if((port)>65535 || (port)<0){
+    if(!(flags&SPE_PORT)){
+        // if not specified, use port 80
+        port=DEFAULT_PORT;
+    } else {
+        // specified port, check it
+        if( (port>65535) || (port<0) ){
             fprintf(stderr, "Invalid port-number %d (Valid range: 0~65535)\n", port);
             exit(1);
         }
     }
-    if(!(flags&0x20)){
+    if(!(flags&SPE_METHOD)){
         method="GET";
     } else {
         // TODO: check the method is legal or not
@@ -156,9 +171,14 @@ int main(int argc, char *argv[])
         int ret=parse_url(url, &host, &path);
         switch(ret){
             case ERR_NONE:
+                if(!(flags&SPE_PORT)){ // user hasn't specifed port-num
+                    port=DEFAULT_PORT;
+                }
                 break;
             case ERR_USE_SSL_PORT:
-                port=443;
+                if(!(flags&SPE_PORT)){ // user hasn't specifed port-num
+                    port=DEFAULT_SSL_PORT;
+                }
                 break;
             case ERR_INVALID_HOST_LEN:
             default:
@@ -200,9 +220,15 @@ int main(int argc, char *argv[])
                     ret=parse_url(loc, &host, &path);
                     switch(ret){
                         case ERR_NONE:
+                            if(!(flags&SPE_PORT)){ // user hasn't specifed port-num
+                                port=DEFAULT_PORT;
+                            }
                             break;
                         case ERR_USE_SSL_PORT:
-                            port=443;
+                            if(!(flags&SPE_PORT)){ // user hasn't specifed port-num
+                                puts("Using default SSL Port");
+                                port=DEFAULT_SSL_PORT;
+                            }
                             break;
                         case ERR_INVALID_HOST_LEN:
                         default:
@@ -219,7 +245,13 @@ int main(int argc, char *argv[])
                     http_req_ins_header(&http_request, "Connection", "keep-alive");
                     http_req_ins_header(&http_request, "User-Agent", AGENT);
                     http_req_finish(&http_request);
+                    printf("================================================================================\n");
+                    printf("%-50s: %s\n", "Target URL: ", url==NULL?"None":url);
+                    printf("%-50s: %d\n", "Port number: ", port);
+                    printf("%-50s: %s\n", "Method: ", method);
+                    printf("********************************************************************************\n");
                     printf("New HTTP request:\n%s\n", http_request);
+                    printf("================================================================================\n");
                     conn++; // refuel
                     // exit(1);
                 default:
