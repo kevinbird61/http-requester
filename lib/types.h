@@ -13,14 +13,17 @@ typedef unsigned long long  u64;
 
 /* TODO: error code enum (each func need to follow) */
 typedef enum {
+    /* normal or success */
     ERR_NONE=0,                     // success
+    ERR_USE_SSL_PORT,               // change to SSL port - 443 (parse url)
+    ERR_REDIRECT,                   // redirect (http_state_machine)
+    /* invalid or illegal */
     ERR_INVALID,
     ERR_INVALID_HOST_LEN,           // invalid host length (parse url)
-    ERR_USE_SSL_PORT,               // change to SSL port - 443 (parse url)
     ERR_ILLEGAL_CHAR,               // parse illegal char
-    ERR_MEMORY,        
-    ERR_NOT_SUPPORT,
-    ERR_REDIRECT,                   // redirect (http_state_machine)
+    ERR_MEMORY,                     // memory-related error
+    ERR_NOT_SUPPORT,                // not support
+    /* undefined */
     ERR_UNDEFINED
 } error_code;
 
@@ -114,7 +117,86 @@ typedef enum {
     ABORT
 } http_state;
 
-// header field-names
+// request header fields-names
+typedef enum {
+    REQ_ACC=1,
+    REQ_ACC_CHAR,
+    REQ_ACC_ENCODING,
+    REQ_ACC_LANG,
+    REQ_ACC_DATE,
+    REQ_AUTH,
+    REQ_CACHE_CTRL,
+    REQ_CONN,
+    REQ_COOKIE,
+    REQ_CONTENT_LEN,
+    REQ_CONTENT_MD5,
+    REQ_CONTENT_TYPE,
+    REQ_DATE,
+    REQ_EXPECT,
+    REQ_FROM,
+    REQ_HOST,
+    REQ_IF_MATCH,
+    REQ_IF_MOD_SINCE,
+    REQ_IF_NONE_MATCH,
+    REQ_IF_RANGE,
+    REQ_IF_UNMOD_SINCE,
+    REQ_MAX_FORWARDS,
+    REQ_ORIGIN,
+    REQ_PRAGMA,
+    REQ_PROXY_AUTH,
+    REQ_RANGE,
+    REQ_REFERER,
+    REQ_TE,
+    REQ_USER_AGENT,
+    REQ_UPGRADE,
+    REQ_VIA,
+    REQ_WARNING,
+    REQ_HEADER_NAME_MAXIMUM // last one
+} req_header_name_t;
+
+// "new" response header field-names
+enum {
+    RES_ACCESS_CTRL_ALLOW_ORIGIN=1,
+    RES_ACC_PATCH,
+    RES_ACC_RANGES,
+    RES_AGE,
+    RES_ALLOW,
+    RES_CACHE_CTRL,
+    RES_CONN,
+    RES_CONTENT_DISPOSITION,
+    RES_CONTENT_ENCODING,
+    RES_CONTENT_LANG,
+    RES_CONTENT_LOC,
+    RES_CONTENT_MD5,
+    RES_CONTENT_RANGE,
+    RES_CONTENT_TYPE,
+    RES_DATE,
+    RES_ETAG,
+    RES_EXPIRES,
+    RES_LAST_MOD,
+    RES_LINK,
+    RES_LOC,
+    RES_P3P, 
+    RES_PRAGMA,
+    RES_PROXY_AUTH,
+    RES_PUBLIC_KEY_PINS,
+    RES_REFRESH,
+    RES_RETRY_AFTER,
+    RES_SERVER,
+    RES_SET_COOKIE,
+    RES_STATUS,
+    RES_STRICT_TRANSPORT_SECURITY,
+    RES_TRAILER,
+    RES_TRANSFER_ENCODING,
+    RES_UPGRADE,
+    RES_VARY,
+    RES_VIA,
+    RES_WARNING,
+    RES_WWW_AUTH,
+    RES_HEADER_NAME_MAXIMUM // last one
+};
+
+// response header field-names
 typedef enum {
     CACHE_CTRL=0,
     EXPIRES,
@@ -143,8 +225,8 @@ typedef enum {
     DATE,
     VARY,
     LOCATION,
-    HEADER_NAME_MAXIMUM
-} header_name_t;
+    RES_HEADER_NAME_MAXIMUM
+} res_header_name_t;
 
 /* using linked-list to store the header fields */
 typedef struct _http_header_t {
@@ -186,7 +268,8 @@ struct offset_t {
     u16 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
 }__attribute__((packed)); // 4+4 bytes
 
-typedef struct _http_header_status_t {
+// response header
+typedef struct _http_res_header_status_t {
     // dirty bit (record existence), using 32 bits to store
     u32 host_dirty: 1,
         user_agent_dirty: 1,
@@ -219,7 +302,7 @@ typedef struct _http_header_status_t {
         spare3: 3;
     int curr_bit; // record current bit (to let caller know which header is processing)
     // store idx & offset of each header field
-    struct offset_t field_value[HEADER_NAME_MAXIMUM];
+    struct offset_t field_value[RES_HEADER_NAME_MAXIMUM];
     /** store buffer ptr (start from http message header) 
      * - assign the actual buffer ptr to here when call create func
     */

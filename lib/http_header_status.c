@@ -59,7 +59,7 @@
  *      - using/following enum error code defined in `types.h`
  */
 
-const char *get_header_name_by_idx [] = {
+char *get_res_header_name_by_idx [] = {
     [CACHE_CTRL]="Cache-Control",
     [EXPIRES]="Expires",
     [LAST_MOD]="Last-Modified",
@@ -87,7 +87,7 @@ const char *get_header_name_by_idx [] = {
     [DATE]="Date",
     [VARY]="Vary",
     [LOCATION]="Location",
-    [HEADER_NAME_MAXIMUM]=NULL
+    [RES_HEADER_NAME_MAXIMUM]=NULL
 };
 
 // create
@@ -111,7 +111,7 @@ int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offs
     if(check_header>=0){
         // TODO: check the current header with existed header. (check conformance here)
 
-        syslog("DEBUG", __func__, "[Field-name: ", get_header_name_by_idx[check_header], "]", NULL);
+        syslog("DEBUG", __func__, "[Field-name: ", get_res_header_name_by_idx[check_header], "]", NULL);
     } else {
         /* if not found, then alloc the memory to print */
         char *tmp=malloc((offset)*sizeof(char));
@@ -148,7 +148,8 @@ int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 off
 // insert & check
 int check_header_field_name(http_header_status_t *status, char *field_name)
 {
-    /* FIXME: using dictionary to optimize searching */
+    /** FIXME: using dictionary/hash table to optimize searching 
+    */ 
     // if found, return enum code 
     // also set the bit to record current idx (for field-value insert)
     if(!strncasecmp(field_name, "Date", sizeof("Date")-1)){

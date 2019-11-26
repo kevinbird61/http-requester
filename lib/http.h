@@ -64,6 +64,7 @@ http_header_status_t *create_http_header_status(char *readbuf);
 int insert_new_header_field_name(http_header_status_t *status, u32 idx, u32 offset);
 int check_header_field_name(http_header_status_t *status, char *field_name);
 int insert_new_header_field_value(http_header_status_t *status, u32 idx, u32 offset);
+extern char *get_res_header_name_by_idx[];
 
 /** http_helper.c:
  * - encap/decap those mapping code (with prefix `get_*`/`encap_*`)

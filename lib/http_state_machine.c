@@ -36,14 +36,15 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
         syslog("ERROR", __func__, "MALLOC error when alloc to *readbuf. Current buf_size: ", itoa(buf_size), NULL);
         exit(1);
     }
+
+    // maintain parsing status 
+    http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
     u8 state=VER; // start with version
     u8 status_code=0;
     u8 http_ver=0;
-
-    // http_header_status_t - conformance check
-    http_header_status_t *http_h_status_check=create_http_header_status(readbuf);
     u8 use_content_length=0, use_chunked=0;
     u32 content_length=0, chunked_size=0;
+
     // scenario 1: byte-by-byte reading
     while(flag){
         /** Put some checking mechanism to terminate parsing 
