@@ -55,7 +55,7 @@ int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32
     char *tmp=malloc((offset)*sizeof(char));
     snprintf(tmp, offset, "%s", status->buff+(idx-offset));
     syslog("DEBUG", __func__, "[Field-name: ", get_res_header_name_by_idx[status->curr_bit], "]", NULL);
-    syslog("DEBUG", __func__,"[Field-value: ", tmp, "]", NULL);
+    syslog("DEBUG", __func__, "[Field-value: ", tmp, "]", NULL);
     free(tmp);
 
     // using curr_bit to store field-value
@@ -79,7 +79,7 @@ int check_req_header_field_name(http_res_header_status_t *status, char *field_na
     // also set the bit to record current idx (for field-value insert)
     for(int i=1;i<RES_HEADER_NAME_MAXIMUM;i++){
         if(!strncasecmp(field_name, get_res_header_name_by_idx[i], strlen(get_res_header_name_by_idx[i]))){
-            status->dirty_bit_align|=( ((u64)1) <<(i-1));
+            status->dirty_bit_align|=( ((u64)1)<<(i-1) );
             return i;
         }
     }

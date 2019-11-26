@@ -326,15 +326,15 @@ typedef struct _http_res_header_status_t {
             spare:1,                        
             spare2:24;
     };
-    
-    u64 curr_bit; // record current bit (to let caller know which header is processing)
+    // record current bit (to let caller know which header is processing)
+    u64 curr_bit; 
     // store idx & offset of each header field
     struct offset_t field_value[RES_HEADER_NAME_MAXIMUM];
     /** store buffer ptr (start from http message header) 
      * - assign the actual buffer ptr to here when call create func
     */
     u8 *buff;
-} __attribute__((aligned(64))) http_res_header_status_t;    // align with 64
+} http_res_header_status_t;    // align with 64
 
 
 #endif

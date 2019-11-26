@@ -202,6 +202,7 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                         }
                     } else if(http_h_status_check->dirty_bit_align&( ((u64)1)<<(RES_TRANSFER_ENCODING-1) )){
                         // need to parse under chunked size=0
+                        printf("%d\n", http_h_status_check->transfer_encoding_dirty);
                         state=CHUNKED;
                     }
 
