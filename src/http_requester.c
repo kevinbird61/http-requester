@@ -72,11 +72,8 @@ int main(int argc, char *argv[])
     char    *url=NULL;
     char    *method=NULL;
     // alloc
-    http_req_header_status_t *http_req=calloc(1, sizeof(http_req_header_status_t));
-    http_req->field_value=calloc(REQ_HEADER_NAME_MAXIMUM, sizeof(u8 *));
-    for(int i=0;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        http_req->field_value[i]=calloc(255, sizeof(char));
-    }
+    http_req_header_status_t *http_req;
+    http_req_obj_create(&http_req);
 
     while(1){
         int this_option_optind=optind?optind:1;
@@ -93,8 +90,7 @@ int main(int argc, char *argv[])
                     printf("%s]", optarg);
                 printf("\n");*/
                 // store into http_req
-                http_req->dirty_bit_align|=( ((u32)1) <<(atoi(options[option_index].name)-1) );
-                http_req->field_value[atoi(options[option_index].name)]=optarg;
+                http_req_obj_ins_header_by_idx(&http_req, atoi(options[option_index].name), optarg);
                 break;
             case 'c':   // concurrent connections
                 conc=atoi(optarg);
@@ -212,11 +208,10 @@ int main(int argc, char *argv[])
         // start-line
         http_req_create_start_line(&http_request, method, path, HTTP_1_1);
         // header fields
-        http_req->field_value[REQ_HOST]=host;
-        http_req->field_value[REQ_CONN]="keep-alive";
-        http_req->field_value[REQ_USER_AGENT]=AGENT;
-        http_req->dirty_bit_align=http_req->dirty_bit_align|(1<<(REQ_HOST-1))|(1<<(REQ_CONN-1))|(1<<(REQ_USER_AGENT-1));
-        
+        http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, host);
+        http_req_obj_ins_header_by_idx(&http_req, REQ_CONN, "keep-alive");
+        http_req_obj_ins_header_by_idx(&http_req, REQ_USER_AGENT, AGENT);
+
         for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
             if(http_req->dirty_bit_align& (1<<(i-1)) ){
                 //puts(http_req->field_value[i]);
@@ -272,11 +267,16 @@ int main(int argc, char *argv[])
                     if(sockfd<0){
                         exit(1);
                     }
-                    // construct new http request
+                    // change attributes in http_req
+                    http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, host);
+                    // construct new http request from modified http_req
                     http_req_create_start_line(&http_request, method, path, HTTP_1_1);
-                    http_req_ins_header(&http_request, "Host", host);
-                    http_req_ins_header(&http_request, "Connection", "keep-alive");
-                    http_req_ins_header(&http_request, "User-Agent", AGENT);
+                    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
+                        if(http_req->dirty_bit_align& (1<<(i-1)) ){
+                            //puts(http_req->field_value[i]);
+                            http_req_ins_header(&http_request, get_req_header_name_by_idx[i], http_req->field_value[i]);
+                        }
+                    }
                     http_req_finish(&http_request);
                     printf("================================================================================\n");
                     printf("%-50s: %s\n", "Target URL: ", url==NULL?"None":url);
