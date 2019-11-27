@@ -22,10 +22,12 @@ http_req_obj_ins_header_by_idx(
     u8 field_name_idx, char *field_value)
 {
     /** TODO: if there have any further operations when some headers have been inserted, 
-     *  we need to add those operations here
+     *  we need to add those operations here. (e.g. `TE` also must to append its value 
+     *  into `Connection` field.)
      */
     if(field_name_idx>0 && field_name_idx<REQ_HEADER_NAME_MAXIMUM){ // check idx range is valid or not
         (*this)->dirty_bit_align|=((u64)1<<(field_name_idx-1)); // -1 (align, because idx=0 is NULL)
+        /* TODO: need to check the available length for string */
         (*this)->field_value[field_name_idx]=field_value;
     } else {
         fprintf(stderr, "Invalid field idx range\n");
@@ -35,7 +37,10 @@ http_req_obj_ins_header_by_idx(
 }
 
 /******************************************** req rawdata ********************************************/
-int http_req_create_start_line(char **rawdata, char *method, char *target, u8 http_version)
+int 
+http_req_create_start_line(
+    char **rawdata, char *method, 
+    char *target, u8 http_version)
 {
     int h_len=strlen(method)+strlen(get_http_version_by_idx[http_version])+strlen(target)+4; // + 2 SP + CRLF
     *rawdata=calloc(h_len, sizeof(char));
@@ -47,7 +52,8 @@ int http_req_create_start_line(char **rawdata, char *method, char *target, u8 ht
     return ERR_NONE;
 }
 
-int http_req_ins_header(char **rawdata, char *field_name, char *field_value)
+int 
+http_req_ins_header(char **rawdata, char *field_name, char *field_value)
 {
     if(*rawdata==NULL){
         // you need to call http_req_create_start_line first
@@ -63,7 +69,8 @@ int http_req_ins_header(char **rawdata, char *field_name, char *field_value)
     return ERR_NONE;
 }
 
-int http_req_finish(char **rawdata)
+int 
+http_req_finish(char **rawdata)
 {
     int h_len=2; // CRLF
     *rawdata=realloc(*rawdata, strlen(*rawdata)+h_len);

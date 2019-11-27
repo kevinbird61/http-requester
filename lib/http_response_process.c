@@ -16,7 +16,8 @@
  *      - using/following enum error code defined in `types.h`
  */
 // create
-http_res_header_status_t *create_http_header_status(char *readbuf)
+http_res_header_status_t *
+create_http_header_status(char *readbuf)
 {
     http_res_header_status_t *http_header_status=malloc(sizeof(http_res_header_status_t));
     memset(http_header_status, 0x00, sizeof(http_res_header_status_t));
@@ -26,7 +27,10 @@ http_res_header_status_t *create_http_header_status(char *readbuf)
     return http_header_status;
 }
 
-int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 offset)
+int 
+insert_new_header_field_name(
+    http_res_header_status_t *status, 
+    u32 idx, u32 offset)
 {
     // search input field-name is supported or not
     int check_header=check_req_header_field_name(status, status->buff+(idx-offset));
@@ -41,7 +45,10 @@ int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 
     return ERR_NONE;
 }
 
-int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32 offset)
+int 
+insert_new_header_field_value(
+    http_res_header_status_t *status, 
+    u32 idx, u32 offset)
 {
     // using curr_bit to store field-value
     if(status->curr_bit>0){
@@ -59,7 +66,10 @@ int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32
 }
 
 // insert & check
-int check_req_header_field_name(http_res_header_status_t *status, char *field_name)
+int 
+check_req_header_field_name(
+    http_res_header_status_t *status, 
+    char *field_name)
 {
     /** FIXME: using dictionary/hash table to optimize searching 
     */ 

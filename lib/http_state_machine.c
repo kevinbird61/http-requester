@@ -8,13 +8,20 @@
 /* calculate next http parsing state */
 http_state next_http_state(http_state cur_state, char ch);
 
-int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
+int 
+http_state_machine(
+    int sockfd, 
+    void **http_request, 
+    int reuse, 
+    int raw)
 {
-    // 1. check the conformance of http_request
-    
-    // 2. send the request (similar with http_request())
+    /** check conformance when construct http request header. */
+    /** send the request (similar with http_request()) */
     char *req=NULL;
     if(!raw){
+        /** FIXME: functions which relate to `http_t` need to be fixed
+         *  with error of memory access.
+         */
         http_recast((http_t *)*http_request, &req);
         char *reqlen=itoa(strlen(req));
         int sendbytes=send(sockfd, req, strlen(req), 0);
@@ -26,8 +33,13 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
         syslog("DEBUG", __func__, "Using raw HTTP request. Request length: ", itoa(strlen(req)), "; Sent bytes: ", itoa(sendbytes), NULL);
     }
 
-    // 3. recv and parse, until enter finish/abort state (state machine part)
-    // - remember: if response status code is 302, we need to send a new redirect request.
+    /** stats and vars:
+     * - flag:          control the end of state machine.
+     * - buf_size:      initial size of RX buffer
+     * - chunk:         when RX buffer size is full, allocate a new buffer sized `chunk` to Rx
+     * - buf_idx:       points to the latest index, increase when store a new char into RX buffer.
+     * - parse_len:     record the length of current meaningful data
+     */
     u8 flag=1;
     int buf_size=64, chunk=64, buf_idx=0, parse_len=0;
     char bytebybyte, *bufbybuf;
@@ -311,9 +323,10 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
     return 0;
 }
 
-http_state next_http_state(http_state cur_state, char ch)
+// current only use in Response
+http_state 
+next_http_state(http_state cur_state, char ch)
 {
-    // current only use in Response
     switch(cur_state)
     {
         // start-line
