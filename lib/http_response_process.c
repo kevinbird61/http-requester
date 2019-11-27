@@ -30,43 +30,31 @@ int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 
 {
     // search input field-name is supported or not
     int check_header=check_req_header_field_name(status, status->buff+(idx-offset));
-    // FIXME: store the enum or |=<dirty_bit>
+    // store the enum
     status->curr_bit=check_header;
     
-    if(check_header>=0){
-        // TODO: check the current header with existed header. (check conformance here)
-        // syslog("DEBUG", __func__, "[Field-name: ", get_res_header_name_by_idx[check_header], "]", NULL);
-    } else {
+    if(!(check_header>0)){
         /* if not found, then alloc the memory to print */
-        char *tmp=malloc((offset)*sizeof(char));
-        snprintf(tmp, offset, "%s", status->buff+(idx-offset));
-        syslog("DEBUG", __func__, "[Field-name] Not support `", tmp, "` currently", NULL);
-        free(tmp);
-        
+        syslog("DEBUG", __func__, "[Field-name] Not support `", strndup(status->buff+(idx-offset), offset-1), "` currently", NULL);
         return ERR_NOT_SUPPORT;
     }
-
     return ERR_NONE;
 }
 
 int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32 offset)
 {
-    // [debug] fetch field-value
-    char *tmp=malloc((offset)*sizeof(char));
-    snprintf(tmp, offset, "%s", status->buff+(idx-offset));
-    syslog("DEBUG", __func__, "[Field-name: ", get_res_header_name_by_idx[status->curr_bit], "]", NULL);
-    syslog("DEBUG", __func__, "[Field-value: ", tmp, "]", NULL);
-    free(tmp);
-
     // using curr_bit to store field-value
     if(status->curr_bit>0){
+        /** TODO: check the current header with existed header. (check conformance here)
+         */
+        syslog("DEBUG", __func__, "[Field-name: ", get_res_header_name_by_idx[status->curr_bit], "]", NULL);
+        syslog("DEBUG", __func__, "[Field-value: ", strndup(status->buff+(idx-offset), offset-1), "]", NULL);
         status->field_value[status->curr_bit].idx=(idx-offset);
-        status->field_value[status->curr_bit].offset=offset;
+        status->field_value[status->curr_bit].offset=offset-2;
     } else {
         // if field-name not support, then just discard this field
         return ERR_NOT_SUPPORT;
     }
-
     return ERR_NONE;
 }
 
@@ -79,8 +67,10 @@ int check_req_header_field_name(http_res_header_status_t *status, char *field_na
     // also set the bit to record current idx (for field-value insert)
     for(int i=1;i<RES_HEADER_NAME_MAXIMUM;i++){
         if(!strncasecmp(field_name, get_res_header_name_by_idx[i], strlen(get_res_header_name_by_idx[i]))){
+            // currently alignment with 64 bit, so shifting offset is 64
             status->dirty_bit_align|=( ((u64)1)<<(i-1) );
             return i;
         }
     }
+    return 0;
 }

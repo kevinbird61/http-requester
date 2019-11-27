@@ -168,11 +168,12 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                             case _302_FOUND:
                                 // search `Location` field-value
                                 printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
+                                syslog("REDIRECT", __func__, "Redirect to `Location`: ", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset), ", Close the connection." , NULL);
                                 // close the connection
                                 close(sockfd);
                                 // redirect to new target (new conn + modified request)
                                 // reuse http_request ptr (to store Location)
-                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset-2); // -2: delete CRLF
+                                *http_request=strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset); // -2: delete CRLF
                                 return ERR_REDIRECT;
                                 // exit(1);
                             default:
@@ -193,16 +194,18 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                     /** Transfer coding/Message body info - 
                      * check current using Transfer-Encoding or Content-Length
                      */
-                    if(http_h_status_check->dirty_bit_align&(1<<(RES_CONTENT_LEN-1))){
+                    // if(http_h_status_check->dirty_bit_align&(1<<(RES_CONTENT_LEN-1))){
+                    if(http_h_status_check->content_len_dirty){
+                        // printf("%d\n", http_h_status_check->content_len_dirty);
                         use_content_length=1;
                         content_length=atoi(readbuf+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
                         printf("Get content length= %d\n", content_length);
                         if(content_length==0){
                             flag=0;
                         }
-                    } else if(http_h_status_check->dirty_bit_align&( ((u64)1)<<(RES_TRANSFER_ENCODING-1) )){
+                    } else if(http_h_status_check->transfer_encoding_dirty){
                         // need to parse under chunked size=0
-                        printf("%d\n", http_h_status_check->transfer_encoding_dirty);
+                        // printf("%d, %d\n", http_h_status_check->transfer_encoding_dirty, http_h_status_check->spare2);
                         state=CHUNKED;
                     }
 
@@ -295,7 +298,7 @@ int http_state_machine(int sockfd, void **http_request, int reuse, int raw)
                 break;
         }
     }
-
+        
     // syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes; Illegal char (not in 0~127): ", itoa(invalid_cnt), NULL);
     syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes", NULL);
     free(readbuf);

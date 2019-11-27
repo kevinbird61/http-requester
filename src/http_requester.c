@@ -58,10 +58,13 @@ int main(int argc, char *argv[])
     };
     /* add request headers */
     for(int i=1; i<(REQ_HEADER_NAME_MAXIMUM); i++){
-        options[(NUM_PARAMS-2)+i].name=itoa(i);
-        options[(NUM_PARAMS-2)+i].has_arg=required_argument;
-        options[(NUM_PARAMS-2)+i].flag=NULL;
-        options[(NUM_PARAMS-2)+i].val=0;
+        // forbidden
+        if( (i!=REQ_HOST) ){
+            options[(NUM_PARAMS-2)+i].name=itoa(i);
+            options[(NUM_PARAMS-2)+i].has_arg=required_argument;
+            options[(NUM_PARAMS-2)+i].flag=NULL;
+            options[(NUM_PARAMS-2)+i].val=0;
+        }
     }
 
     u8      flags=0; // enum, represent user specified parameters.
@@ -84,12 +87,10 @@ int main(int argc, char *argv[])
 
         switch(c){
             case 0:
-                /* only has long option goes here (other) */
-                /*printf("[%s: ", get_req_header_name_by_idx[ atoi(options[option_index].name) ] );
-                if (optarg)
-                    printf("%s]", optarg);
-                printf("\n");*/
-                // store into http_req
+                /* http request headers:
+                 *  atoi(options[option_index].name) = field-name enum
+                 *  optarg = field-value
+                 */
                 http_req_obj_ins_header_by_idx(&http_req, atoi(options[option_index].name), optarg);
                 break;
             case 'c':   // concurrent connections
@@ -254,7 +255,7 @@ int main(int argc, char *argv[])
                             break;
                         case ERR_USE_SSL_PORT:
                             if(!(flags&SPE_PORT)){ // user hasn't specifed port-num
-                                puts("Using default SSL Port");
+                                puts("***********************Using default SSL Port***********************");
                                 port=DEFAULT_SSL_PORT;
                             }
                             break;
@@ -352,7 +353,9 @@ void print_manual()
     printf("\t-%-2c, --%-7s %-7s: Specify method token.\n", 'm', "method", "METHOD");
     printf("[Customized Request Header]-----------------------------------------------------\n");
     for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        printf("\t--%-2d VALUE: Request header field-value of `%s`\n", i, get_req_header_name_by_idx[i]);
+        if( (i!=REQ_HOST) ){
+            printf("\t--%-2d VALUE: Request header field-value of `%s`\n", i, get_req_header_name_by_idx[i]);
+        }
     }
     printf("********************************************************************************\n");
 }

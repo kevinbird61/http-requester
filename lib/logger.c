@@ -50,6 +50,9 @@ int syslog(const char *action_type, const char *func_name, char *info_args, ...)
     }
     sprintf(loginfo, "%s\n", loginfo);
 
+    // print to stdout
+    // puts(loginfo);
+
     // write into logfile
     char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+1)*sizeof(char));
     sprintf(logfile, "%s%s%s", log_dir, log_filename, log_ext);

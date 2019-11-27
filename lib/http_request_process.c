@@ -21,8 +21,10 @@ http_req_obj_ins_header_by_idx(
     http_req_header_status_t **this, 
     u8 field_name_idx, char *field_value)
 {
-    // check idx range is valid or not
-    if(field_name_idx>0 && field_name_idx<REQ_HEADER_NAME_MAXIMUM){
+    /** TODO: if there have any further operations when some headers have been inserted, 
+     *  we need to add those operations here
+     */
+    if(field_name_idx>0 && field_name_idx<REQ_HEADER_NAME_MAXIMUM){ // check idx range is valid or not
         (*this)->dirty_bit_align|=((u64)1<<(field_name_idx-1)); // -1 (align, because idx=0 is NULL)
         (*this)->field_value[field_name_idx]=field_value;
     } else {
