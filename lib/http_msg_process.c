@@ -27,8 +27,8 @@ int http_recast(http_t *http_packet, char **rawdata)
             *http_ver=get_http_version_by_idx[http_packet->version];
         // check req size (+9: other SP & HTTP)
         size_start_line=strlen(method)+strlen(req_target)+strlen(http_ver)+4;
-        syslog("DEBUG", __func__, "Recasting a HTTP request. Start-line: ", method, " ", req_target, " ", http_ver, NULL);
-        // syslog_simple("DEBUG", __func__, "Recasting a HTTP request");
+        // syslog("DEBUG", __func__, "Recasting a HTTP request. Start-line: ", method, " ", req_target, " ", http_ver, NULL);
+        // // syslog_simple("DEBUG", __func__, "Recasting a HTTP request");
         if(limit<=size_start_line){
             limit=size_start_line;
             *rawdata=realloc(*rawdata, (limit)*sizeof(char));
@@ -42,8 +42,8 @@ int http_recast(http_t *http_packet, char **rawdata)
             *http_ver=get_http_version_by_idx[http_packet->version];
         // check req size (+9: other SP & HTTP)
         size_start_line=strlen(status)+strlen(rea_phrase)+strlen(http_ver)+4;
-        syslog("DEBUG", __func__, "Recasting a HTTP response. Start-line: ", http_ver, " ", status, " ", rea_phrase, NULL);
-        // syslog_simple("DEBUG", __func__, "Recasting a HTTP response");
+        // syslog("DEBUG", __func__, "Recasting a HTTP response. Start-line: ", http_ver, " ", status, " ", rea_phrase, NULL);
+        // // syslog_simple("DEBUG", __func__, "Recasting a HTTP response");
         if(limit<=size_start_line){
             limit=size_start_line;
             *rawdata=realloc(*rawdata, (limit)*sizeof(char));
@@ -61,7 +61,7 @@ int http_recast(http_t *http_packet, char **rawdata)
         // snprintf(buf, header_size, "%s: %s\r\n", http_request->headers->field_name, http_request->headers->field_value);
         sprintf(buf, "%s: %s\r\n", http_packet->headers->field_name, http_packet->headers->field_value);
         // printf("%s: %s\n", http_packet->headers->field_name, http_packet->headers->field_value);
-        syslog("DEBUG", __func__, http_packet->headers->field_name, ": ", http_packet->headers->field_value, NULL);
+        // syslog("DEBUG", __func__, http_packet->headers->field_name, ": ", http_packet->headers->field_value, NULL);
         // printf("Buf: %s\n", buf);
         // check size, if not enough, scale it
         if(limit<=(strlen(buf)+strlen(*rawdata))){

@@ -23,14 +23,12 @@ http_state_machine(
          *  with error of memory access.
          */
         http_recast((http_t *)*http_request, &req);
-        char *reqlen=itoa(strlen(req));
         int sendbytes=send(sockfd, req, strlen(req), 0);
-        char *sent=(char*)itoa(sendbytes);
-        syslog("DEBUG", __func__, "Finished HTTP Recasting. Request length: ", reqlen, "; Sent bytes: ", sent, NULL);
+        LOG(DEBUG, "Finished HTTP recasting. Request length: %d; Sent bytes: %d", strlen(req), sendbytes);
     } else {
         req=(char *)*http_request;
         int sendbytes=send(sockfd, req, strlen(req), 0);
-        syslog("DEBUG", __func__, "Using raw HTTP request. Request length: ", itoa(strlen(req)), "; Sent bytes: ", itoa(sendbytes), NULL);
+        LOG(DEBUG, "Using raw HTTP request header. Request length: %d; Sent bytes: %d", strlen(req), sendbytes);
     }
 
     /** stats and vars:
@@ -45,7 +43,7 @@ http_state_machine(
     char bytebybyte, *bufbybuf;
     char *readbuf=calloc(buf_size, sizeof(char)); // pre-allocated 32 bytes
     if(readbuf==NULL){
-        syslog("ERROR", __func__, "MALLOC error when alloc to *readbuf. Current buf_size: ", itoa(buf_size), NULL);
+        LOG(ERROR, "MALLOC error when alloc to *readbuf. Current buf_size: %d", buf_size);
         exit(1);
     }
 
@@ -82,11 +80,11 @@ http_state_machine(
             readbuf=realloc(readbuf, buf_size*sizeof(char));
             http_h_status_check->buff=readbuf;
             if(readbuf==NULL){
-                syslog("ERROR", __func__, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: ", itoa(buf_size), NULL);
+                LOG(ERROR, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: %d", buf_size);
                 exit(1);
             }
             // if you feel this message is too noisy, can comment this line or increase chunk size
-            //syslog("DEBUG", __func__, "REALLOC readbuf size. Current buf_size: ", itoa(buf_size), NULL);
+            // syslog("DEBUG", __func__, "REALLOC readbuf size. Current buf_size: ", itoa(buf_size), NULL);
         }
 
         // check if header using content-length
@@ -128,7 +126,7 @@ http_state_machine(
                         char *tmp;
                         tmp=malloc((parse_len)*sizeof(char));
                         snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                        syslog("DEBUG", __func__, " [ Reason Phrase: ", tmp, " ] ", NULL);
+                        LOG(INFO,  "[Reason Phrase: %s]", tmp);
                         free(tmp);
                     }
                     state=next_http_state(state, '\r');
@@ -140,13 +138,12 @@ http_state_machine(
                     state=next_http_state(state, '\n');
                 } else if(state==FIELD_NAME && !use_chunked) {
                     state=MSG_BODY;
-                    syslog("DEBUG", __func__, "Message header length: ", itoa(buf_idx));
+                    LOG(INFO,  "Message header length: %d", buf_idx);
                     /** Version -
                      * - Not support HTTP/0.9, /2.0, /3.0 (e.g. http_ver==0)
                      */
                     if(!http_ver) {
-                        // syslog - not support
-                        syslog("NOT SUPPORT", __func__, "Only support HTTP/1.0 and /1.1 now.", NULL);
+                        LOG(ERROR, "Only support HTTP/1.0 and /1.1 now.");
                         fprintf(stderr, "Only support HTTP/1.0 and /1.1 now.");
                         exit(1);
                     }
@@ -168,19 +165,19 @@ http_state_machine(
                      */
                     if(status_code<_200_OK){
                         // 1xx
-                        syslog("NOT SUPPORT", __func__, "Response from server :", get_http_status_code_by_idx[status_code], ", ",get_http_reason_phrase_by_idx[status_code], NULL);
+                        LOG(WARNING, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
                         // TODO:
                     } else if(status_code>=_200_OK && status_code<_300_MULTI_CHOICES){
                         // 2xx
-                        syslog("SUCCESSFUL", __func__, "Response from server :", get_http_status_code_by_idx[status_code], ", ",get_http_reason_phrase_by_idx[status_code], NULL);
+                        LOG(NORMAL, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
                         // keep processing 
                     } else if(status_code>=_300_MULTI_CHOICES && status_code<_400_BAD_REQUEST){
                         switch(status_code){
                             case _301_MOVED_PERMANENTLY:
                             case _302_FOUND:
                                 // search `Location` field-value
-                                printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
-                                syslog("REDIRECT", __func__, "Redirect to `Location`: ", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset), ", Close the connection." , NULL);
+                                printf("Redirect to `Location`: %s", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
+                                LOG(INFO, "Redirect to `Location`: %s, close the connection.", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
                                 // close the connection
                                 close(sockfd);
                                 // redirect to new target (new conn + modified request)
@@ -195,8 +192,7 @@ http_state_machine(
                     } else if(status_code>=_400_BAD_REQUEST && status_code<=_505_HTTP_VER_NOT_SUPPORTED){
                         printf("Connection is terminated by %s's failure ...\n", status_code<_500_INTERNAL_SERV_ERR?"client":"server");
                         printf("Response from server: %s, %s\n", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
-                        // syslog 
-                        syslog("CONNECTION ABORT", __func__, "Response from server :", get_http_status_code_by_idx[status_code], ", ",get_http_reason_phrase_by_idx[status_code], NULL);
+                        LOG(ERROR, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
                         // terminate, we don't need the parse the rest of data
                         close(sockfd);
                         // FIXME: return error code instead terminate directly
@@ -239,7 +235,7 @@ http_state_machine(
                             // printf("%s, %s\n", tmp, strndup(readbuf+(buf_idx-parse_len), parse_len));
                             chunked_size=atoi(tmp);
                             printf("[Get Chunk] Chunk size: %d\n", chunked_size);
-                            syslog("DEBUG", __func__, "Get Chunk, size=", tmp, NULL);
+                            LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
                             state=CHUNKED;
                             use_chunked=1;
                         } else if(parse_len==2){
@@ -247,7 +243,7 @@ http_state_machine(
                             // FIXME: is this right condition?
                             chunked_size=atoi(tmp);
                             printf("[Last Chunk] Chunk size: %d\n", chunked_size);
-                            syslog("DEBUG", __func__, "Last Chunk, size=", tmp, NULL);
+                            LOG(DEBUG, "Last Chunk, size = %d", chunked_size);
                             use_chunked=1;
                         }
                         free(tmp);
@@ -275,12 +271,12 @@ http_state_machine(
                         case VER:
                             // printf("%d\n", encap_http_version(readbuf+(buf_idx-parse_len)));
                             if((ret=encap_http_version(readbuf+(buf_idx-parse_len))) > 1){ // current only support HTTP/1.1
-                                syslog("DEBUG", __func__, " [ Version: ", get_http_version_by_idx[ret], " ] ", NULL);
+                                LOG(DEBUG, "[Version: %s]",  get_http_version_by_idx[ret]);
                                 http_ver=ret;
                             } else { // if not support, just terminate
                                 char *tmp=malloc((parse_len)*sizeof(char));
                                 snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                                syslog("DEBUG", __func__, " [ Not support: ", tmp, " ] ", NULL);
+                                LOG(ERROR, "[Version not support: %s]", tmp);
                                 free(tmp);
                                 flag=0;
                             }
@@ -290,7 +286,7 @@ http_state_machine(
                             // printf("%d\n", encap_http_status_code(atoi(readbuf+(buf_idx-parse_len))));
                             if((ret=encap_http_status_code(atoi(readbuf+(buf_idx-parse_len)))) > 0){
                                 status_code=ret;
-                                syslog("DEBUG", __func__, " [ Status code: ", get_http_status_code_by_idx[ret], " ] ", NULL);
+                                LOG(DEBUG, "[Status code: %s]", get_http_status_code_by_idx[ret]);
                             } else { // not support
                                 // char *tmp=malloc((parse_len)*sizeof(char));
                                 // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
@@ -310,9 +306,8 @@ http_state_machine(
                 break;
         }
     }
-        
-    // syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes; Illegal char (not in 0~127): ", itoa(invalid_cnt), NULL);
-    syslog("DEBUG", __func__, "Total received: ", itoa(buf_idx), " bytes", NULL);
+
+    LOG(INFO, "Total received: %d bytes", buf_idx);
     free(readbuf);
 
     // 4. finish, log the response and close the connection.
