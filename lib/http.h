@@ -19,8 +19,9 @@
  *      - log everything.
  * - after finish the request, log the response and close the socket, free the memory.
  */
-int http_state_machine(int sockfd, void **http_request, int reuse, int raw_or_obj); // send next request when previous recv is finished
-// int http_rcv_state_machine(int sockfd, void **http_request, int raw_or_obj); // only recv, for parallel 
+http_state next_http_state(http_state cur_state, char ch);                          // calculate next http parsing state 
+int http_state_machine(int sockfd, void **http_request, int reuse, int raw);        // send next request when previous recv is finished
+int http_rcv_state_machine(int sockfd, void **return_obj);                          // only recv, for parallel 
 
 /** http_request_process.c (http_req_header_status_t)
  *  - construct http request header object

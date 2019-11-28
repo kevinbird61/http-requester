@@ -39,7 +39,6 @@ insert_new_header_field_name(
     
     if(!(check_header>0)){
         /* if not found, then alloc the memory to print */
-        // syslog("DEBUG", __func__, "[Field-name] Not support `", strndup(status->buff+(idx-offset), offset-1), "` currently", NULL);
         LOG(ERROR, "[Field-name] Not support `%s` currently",  strndup(status->buff+(idx-offset), offset-1));
         return ERR_NOT_SUPPORT;
     }
