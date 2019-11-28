@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include "utils.h"
 
+// #define SYSLOG(action_idx, func, args...)  log_analyzer(action_idx, func, ##args);
+
 /** Record any activities from http-goon,
  * - design:
  *      - syslog: single thread / psyslog: multi threads
@@ -21,6 +23,7 @@ static char *log_dir="/tmp/";
 static char *log_filename="http_request";
 static char *log_ext=".log";
 
+int t1_logger(u8 action_idx, const char* func_name, char *info_args, ...);
 int logger(char *info_args, ...);
 int syslog(const char *action_type, const char *func_name, char *info_args, ...);
 int syslog_simple(const char *action_type, const char *func_name, char *info_arg);
