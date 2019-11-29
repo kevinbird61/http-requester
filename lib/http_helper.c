@@ -176,7 +176,9 @@ char *get_res_header_name_by_idx [] = {
     [RES_HEADER_NAME_MAXIMUM]=NULL
 };
 
-int encap_http_version(char *version)
+int 
+encap_http_version(
+    char *version)
 {
     if(!strncmp(version, "HTTP/1.0", 8)){
         return HTTP_1_0;
@@ -187,7 +189,9 @@ int encap_http_version(char *version)
     }
 }
 
-int encap_http_method_token(char *method)
+int 
+encap_http_method_token(
+    char *method)
 {
     if(!strncmp(method, "GET", 3)){
         return GET;
@@ -196,7 +200,9 @@ int encap_http_method_token(char *method)
     }
 }
 
-int encap_http_status_code(int http_status_code)
+int 
+encap_http_status_code(
+    int http_status_code)
 {
     switch(http_status_code)
     {

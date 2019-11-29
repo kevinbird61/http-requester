@@ -56,6 +56,7 @@ int main(int argc, char *argv[])
             
             /* FIXME: dealing with res */
             for(int i=0; i<args->conn; i++){
+                LOG(INFO, "[Pipelining (recv): %d/%d]\n", i+1, args->conn);
                 // each request need a parsing state machine to handle!
                 http_rcv_state_machine(sockfd, &res);
             }

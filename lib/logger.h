@@ -19,14 +19,7 @@
             userlog);                                   \
     } while(0)
 
-/** Record any activities from http-goon,
- * - design:
- *      - file location: `/tmp/http_requester_<thread-id>.log`
- *          - thread_id will be 0 if using single thread.
- * - format: 
- *      [@TIME][@LOG_LEVEL][FUNC] Description.
- */
-
+// log filename
 static char *log_dir="/tmp/";
 static char *log_filename="http_request";
 static char *log_ext=".log";
@@ -43,7 +36,15 @@ typedef enum _log_level {
 
 extern char *log_level_str[];
 
+/** Record any activities,
+ * - design:
+ *      - file location: `/tmp/http_requester_<thread-id>.log`
+ * - format: 
+ *      [@TIME][@LOG_LEVEL][FUNC] Description.
+ */
+// write the log
 int syslog(char *info_args, ...);
+// turn va_list into char array
 char *parse_valist(char *info_args, ...);
 
 #endif
