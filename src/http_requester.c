@@ -29,7 +29,7 @@ enum {
 // parse url, and use the result to fill host & path
 int parse_url(char *url, char **host, char **path);
 // print usage
-void print_manual();
+void print_manual(u8 detail);
 
 int main(int argc, char *argv[])
 {
@@ -60,7 +60,10 @@ int main(int argc, char *argv[])
     for(int i=1; i<(REQ_HEADER_NAME_MAXIMUM); i++){
         // forbidden
         if( (i!=REQ_HOST) ){
-            options[(NUM_PARAMS-2)+i].name=itoa(i);
+            // printf("%d: %s\n", (NUM_PARAMS-2)+i, get_req_header_name_by_idx[i]);
+            char *name=strdup(get_req_header_name_by_idx[i]);
+            to_lowercase(name);
+            options[(NUM_PARAMS-2)+i].name=name;
             options[(NUM_PARAMS-2)+i].has_arg=required_argument;
             options[(NUM_PARAMS-2)+i].flag=NULL;
             options[(NUM_PARAMS-2)+i].val=0;
@@ -81,8 +84,8 @@ int main(int argc, char *argv[])
     while(1){
         int this_option_optind=optind?optind:1;
         int option_index=0;
-
-        c=getopt_long(argc, argv, "hu:p:m:c:n:f:", options, &option_index);
+        char *field_name, *field_value;
+        c=getopt_long(argc, argv, ":hu:p:m:c:n:f:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -91,7 +94,9 @@ int main(int argc, char *argv[])
                  *  atoi(options[option_index].name) = field-name enum
                  *  optarg = field-value
                  */
-                http_req_obj_ins_header_by_idx(&http_req, atoi(options[option_index].name), optarg);
+                // puts(options[option_index].name);
+                // puts(optarg);
+                http_req_obj_ins_header_by_idx(&http_req, option_index-(NUM_PARAMS-2), optarg);
                 break;
             case 'c':   // concurrent connections
                 conc=atoi(optarg);
@@ -117,9 +122,42 @@ int main(int argc, char *argv[])
                 method=optarg;
                 flags|=SPE_METHOD;
                 break;
+            case '?':
+                /** unknown will go to here:
+                 *  - argv[this_option_optind]+2 : field-name, need to skip `--` (+2)
+                 *  - argv[this_option_optind+1] : field-value
+                 */
+                printf("Using ambiguous matching on `%s`.\n", argv[this_option_optind]+2);
+                
+                // printf("%d, %d, %d\n", get_req_header_name_enum_by_str(argv[this_option_optind]+2), argv[this_option_optind+1]!=NULL, get_req_header_name_enum_by_str(argv[this_option_optind+1]));
+                if(get_req_header_name_enum_by_str(argv[this_option_optind]+2)>0 
+                    && argv[this_option_optind+1]!=NULL){ 
+                    // also checking its value is valid & not another req header 
+                    if(get_req_header_name_enum_by_str(argv[this_option_optind+1]+2)==0){ 
+                        // puts(argv[this_option_optind]);
+                        // puts(argv[this_option_optind+1]);
+                        http_req_obj_ins_header_by_idx(&http_req, 
+                            get_req_header_name_enum_by_str(argv[this_option_optind]+2), 
+                            argv[this_option_optind+1]);
+                        break;
+                    } else {
+                        // print debug message
+                        fprintf(stderr, "You need to specify a value for header `%s`\n", argv[this_option_optind]);
+                    }
+                } else {
+                    // unknown options
+                    if(argv[this_option_optind+1]==NULL){
+                        fprintf(stderr, "You need to specify a value for header `%s`\n", argv[this_option_optind]);
+                    } else {
+                        fprintf(stderr, "[ERROR] Unknown option '%s'.\n", argv[this_option_optind]);
+                    }
+                }
+                fprintf(stderr, "Please using `-h` to learn more about support options.\n");
+                print_manual(0);
+                exit(1);
             case 'h':
             default:
-                print_manual();
+                print_manual(1);
                 exit(1);
         }
     }
@@ -138,7 +176,7 @@ int main(int argc, char *argv[])
         if(!(flags&SPE_URL)){
             // if not specified URL, then print help info and exit
             fprintf(stderr, "You need to specify `template file` or `url`.\n");
-            print_manual();
+            print_manual(0);
             exit(1);
         }
         // if not specify port, then using 80 as default
@@ -284,7 +322,12 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int parse_url(char *url, char **host, char **path)
+// parse user's URL
+int 
+parse_url(
+    char *url, 
+    char **host, 
+    char **path)
 {
     /** 1. check URL's protocol 
      *      - http
@@ -324,7 +367,10 @@ int parse_url(char *url, char **host, char **path)
     return ret;
 }
 
-void print_manual()
+// print out usage/helper page
+void 
+print_manual(
+    u8 detail)
 {
     printf("********************************************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
@@ -337,10 +383,14 @@ void print_manual()
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
     printf("\t-%-2c, --%-7s %-7s: Specify method token.\n", 'm', "method", "METHOD");
-    printf("[Customized Request Header]-----------------------------------------------------\n");
-    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        if( (i!=REQ_HOST) ){
-            printf("\t--%-2d VALUE: Request header field-value of `%s`\n", i, get_req_header_name_by_idx[i]);
+    if(detail){
+        printf("[Customized Request Header]-----------------------------------------------------\n");
+        for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
+            if( (i!=REQ_HOST) ){
+                char *name=strdup(get_req_header_name_by_idx[i]);
+                to_lowercase(name);
+                printf("--%-20s <VALUE> : Request header field-value of `%s`\n", name, get_req_header_name_by_idx[i]);
+            }
         }
     }
     printf("********************************************************************************\n");

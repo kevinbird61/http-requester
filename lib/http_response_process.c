@@ -33,7 +33,7 @@ insert_new_header_field_name(
     u32 idx, u32 offset)
 {
     // search input field-name is supported or not
-    int check_header=check_req_header_field_name(status, status->buff+(idx-offset));
+    int check_header=check_res_header_field_name(status, status->buff+(idx-offset));
     // store the enum
     status->curr_bit=check_header;
     
@@ -68,7 +68,7 @@ insert_new_header_field_value(
 
 // insert & check
 int 
-check_req_header_field_name(
+check_res_header_field_name(
     http_res_header_status_t *status, 
     char *field_name)
 {
@@ -78,7 +78,6 @@ check_req_header_field_name(
     // also set the bit to record current idx (for field-value insert)
     for(int i=1;i<RES_HEADER_NAME_MAXIMUM;i++){
         if(!strncasecmp(field_name, get_res_header_name_by_idx[i], strlen(get_res_header_name_by_idx[i]))){
-            // currently alignment with 64 bit, so shifting offset is 64
             status->dirty_bit_align|=( ((u64)1)<<(i-1) );
             return i;
         }

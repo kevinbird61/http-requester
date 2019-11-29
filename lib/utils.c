@@ -25,6 +25,15 @@ u8 *itoa(u64 number)
     return str;
 }
 
+u8 to_lowercase(u8 *str)
+{
+    for(int i=0; i<strlen(str); i++){
+        if((str[i]>=65 && str[i]<=90) || (str[i]>=97 && str[i]<=122)){
+            str[i]=(str[i]<=90? str[i]+32 : str[i]);
+        }
+    }
+}
+
 u64 gettime(void)
 {
     struct timezone tz;

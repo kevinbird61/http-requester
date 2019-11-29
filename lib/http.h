@@ -55,7 +55,7 @@ int http_req_finish(http_req_header_status_t *req, char **rawdata);
 http_res_header_status_t *create_http_header_status(char *readbuf);
 // insert & check if there have any conflict
 int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 offset);
-int check_req_header_field_name(http_res_header_status_t *status, char *field_name);
+int check_res_header_field_name(http_res_header_status_t *status, char *field_name);
 int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32 offset);
 
 /* http_request.c: 
@@ -81,6 +81,7 @@ int http_interpret(const char *filename, http_t *http_packet);
 int encap_http_version(char *version);
 int encap_http_method_token(char *method);
 int encap_http_status_code(int http_status_code);
+u8  get_req_header_name_enum_by_str(char *req_header_field_name);
 extern char *get_http_version_by_idx[];
 extern char *get_http_method_token_by_idx[];
 extern char *get_http_status_code_by_idx[];

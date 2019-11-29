@@ -19,6 +19,7 @@
 void *get_in_addr(struct sockaddr *sa);
 u8 get_digits(u64 input);
 u8 *itoa(u64 number);
+u8  to_lowercase(u8 *str);
 u64 gettime(void);
 u8 *getdate(void);
 
