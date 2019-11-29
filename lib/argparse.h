@@ -4,7 +4,7 @@
 #include <getopt.h>
 #include "http.h"
 
-#define NUM_PARAMS          (7)
+#define NUM_PARAMS          (10)
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 
@@ -34,6 +34,7 @@ enum {
 /* user input */
 typedef struct _parsed_args_t {
     u8                          flags;
+    u8                          enable_pipe;
     u32                         port;
     u32                         conc;
     u32                         conn;

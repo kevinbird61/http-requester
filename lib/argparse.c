@@ -8,6 +8,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [3]={"conn", required_argument, NULL, 'n'},
         [4]={"file", required_argument, NULL, 'f'},
         [5]={"method", required_argument, NULL, 'm'},
+        [6]={"pipe", no_argument, NULL, 'i'},
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -98,6 +99,10 @@ argparse(
             case 'm':   // method
                 (*this)->method=optarg;
                 (*this)->flags|=SPE_METHOD;
+                break;
+            case 'i':   // pipeline
+                printf("Enable HTTP pipelining.\n");
+                (*this)->enable_pipe=1;
                 break;
             case '?':
                 /** unknown will go to here:

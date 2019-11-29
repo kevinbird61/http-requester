@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, argv[1]);
     http_req_obj_ins_header_by_idx(&http_req, REQ_CONN, "keep-alive");
     http_req_obj_ins_header_by_idx(&http_req, REQ_USER_AGENT, "http-request-c");
-    http_req_finish(http_req, &http_request);
+    http_req_finish(&http_request, http_req);
 
     char *http_request2;
     // start-line
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, argv[1]);
     http_req_obj_ins_header_by_idx(&http_req, REQ_CONN, "keep-alive");
     http_req_obj_ins_header_by_idx(&http_req, REQ_USER_AGENT, "http-request-c");
-    http_req_finish(http_req, &http_request2);
+    http_req_finish(&http_request2, http_req);
 
     char *total_reqs;
     total_reqs=calloc(strlen(http_request2)+strlen(http_request)+8, 1);
