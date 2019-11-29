@@ -15,9 +15,10 @@ int main(int argc, char *argv[])
      *  - create socket and use http_state_machine to send request
      *  
      */
+    // using argparse to parse the user-input params
     parsed_args_t *args=create_argparse();
-    
-    if(argparse(&args, argc, argv)==USE_URL){
+    u8 ret=argparse(&args, argc, argv);
+    if(ret==USE_URL){
         /* 2. forge http request header */
         char *http_request;
         // start-line
