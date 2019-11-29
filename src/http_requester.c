@@ -264,12 +264,6 @@ int main(int argc, char *argv[])
                     http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, host);
                     // construct new http request from modified http_req
                     http_req_create_start_line(&http_request, method, path, HTTP_1_1);
-                    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-                        if(http_req->dirty_bit_align& (1<<(i-1)) ){
-                            //puts(http_req->field_value[i]);
-                            http_req_ins_header(&http_request, get_req_header_name_by_idx[i], http_req->field_value[i]);
-                        }
-                    }
                     http_req_finish(http_req, &http_request);
                     printf("================================================================================\n");
                     printf("%-50s: %s\n", "Target URL: ", url==NULL?"None":url);
