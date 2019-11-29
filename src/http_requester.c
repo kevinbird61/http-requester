@@ -212,16 +212,8 @@ int main(int argc, char *argv[])
         http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, host);
         http_req_obj_ins_header_by_idx(&http_req, REQ_CONN, "keep-alive");
         http_req_obj_ins_header_by_idx(&http_req, REQ_USER_AGENT, AGENT);
-
-        for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-            if(http_req->dirty_bit_align& (1<<(i-1)) ){
-                //puts(http_req->field_value[i]);
-                http_req_ins_header(&http_request, get_req_header_name_by_idx[i], http_req->field_value[i]);
-            }
-        }
-
         // finish
-        http_req_finish(&http_request);
+        http_req_finish(http_req, &http_request);
         printf("HTTP request:*******************************************************************\n");
         printf("%s\n", http_request);
         printf("================================================================================\n");
@@ -278,7 +270,7 @@ int main(int argc, char *argv[])
                             http_req_ins_header(&http_request, get_req_header_name_by_idx[i], http_req->field_value[i]);
                         }
                     }
-                    http_req_finish(&http_request);
+                    http_req_finish(http_req, &http_request);
                     printf("================================================================================\n");
                     printf("%-50s: %s\n", "Target URL: ", url==NULL?"None":url);
                     printf("%-50s: %d\n", "Port number: ", port);

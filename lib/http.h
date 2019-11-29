@@ -45,7 +45,7 @@ int http_req_obj_ins_header_by_idx(http_req_header_status_t **this, u8 field_nam
 // req rawdata
 int http_req_create_start_line(char **rawdata, char *method, char *target, u8 http_version);
 int http_req_ins_header(char **rawdata, char *field_name, char *field_value);
-int http_req_finish(char **rawdata);
+int http_req_finish(http_req_header_status_t *req, char **rawdata);
 
 /** http_response_process.c: (http_res_header_status_t)
  * - check whether the syntax/grammar is conformable with HTTP/1.1 or not.

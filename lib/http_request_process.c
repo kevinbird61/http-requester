@@ -70,8 +70,18 @@ http_req_ins_header(char **rawdata, char *field_name, char *field_value)
 }
 
 int 
-http_req_finish(char **rawdata)
+http_req_finish(
+    http_req_header_status_t *req,
+    char **rawdata)
 {
+    // check all the existing header fields, and then insert into rawdata
+    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
+        if(req->dirty_bit_align& (1<<(i-1)) ){
+            http_req_ins_header(rawdata, get_req_header_name_by_idx[i], req->field_value[i]);
+        }
+    }
+
+    // CRLF 
     int h_len=2; // CRLF
     *rawdata=realloc(*rawdata, strlen(*rawdata)+h_len);
     if(*rawdata==NULL){

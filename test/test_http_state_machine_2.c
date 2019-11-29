@@ -17,12 +17,7 @@ int main(int argc, char *argv[])
     http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, argv[1]);
     http_req_obj_ins_header_by_idx(&http_req, REQ_CONN, "keep-alive");
     http_req_obj_ins_header_by_idx(&http_req, REQ_USER_AGENT, "http-request-c");
-    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        if(http_req->dirty_bit_align& (1<<(i-1)) ){
-            http_req_ins_header(&http_request, get_req_header_name_by_idx[i], http_req->field_value[i]);
-        }
-    }
-    http_req_finish(&http_request);
+    http_req_finish(http_req, &http_request);
 
     char *http_request2;
     // start-line
@@ -31,12 +26,7 @@ int main(int argc, char *argv[])
     http_req_obj_ins_header_by_idx(&http_req, REQ_HOST, argv[1]);
     http_req_obj_ins_header_by_idx(&http_req, REQ_CONN, "keep-alive");
     http_req_obj_ins_header_by_idx(&http_req, REQ_USER_AGENT, "http-request-c");
-    for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        if(http_req->dirty_bit_align& (1<<(i-1)) ){
-            http_req_ins_header(&http_request2, get_req_header_name_by_idx[i], http_req->field_value[i]);
-        }
-    }
-    http_req_finish(&http_request2);
+    http_req_finish(http_req, &http_request2);
 
     char *total_reqs;
     total_reqs=calloc(strlen(http_request2)+strlen(http_request)+8, 1);
