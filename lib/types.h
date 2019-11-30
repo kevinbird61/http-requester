@@ -340,5 +340,19 @@ typedef struct _http_res_header_status_t {
     u8 *buff;
 } http_res_header_status_t;    // align with 64
 
+/* user input */
+typedef struct _parsed_args_t {
+    u8                          flags;
+    u8                          enable_pipe;
+    u32                         port;
+    u32                         conc;
+    u32                         conn;
+    char*                       filename;
+    char*                       url;
+    char*                       method;
+    char*                       host;
+    char*                       path;
+    http_req_header_status_t *  http_req;
+} parsed_args_t;
 
 #endif

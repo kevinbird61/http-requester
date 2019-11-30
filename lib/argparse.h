@@ -2,11 +2,13 @@
 #define __ARGPARSE__
 
 #include <getopt.h>
+#include "types.h"
 #include "http.h"
 
 #define NUM_PARAMS          (10)
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
+#define AGENT               "http-requester-c"
 
 /* user parameters:
  * - using flags to determine using default or user specified value:
@@ -30,21 +32,6 @@ enum {
     USE_URL=1,
     USE_TEMPLATE
 };
-
-/* user input */
-typedef struct _parsed_args_t {
-    u8                          flags;
-    u8                          enable_pipe;
-    u32                         port;
-    u32                         conc;
-    u32                         conn;
-    char*                       filename;
-    char*                       url;
-    char*                       method;
-    char*                       host;
-    char*                       path;
-    http_req_header_status_t *  http_req;
-} parsed_args_t;
 
 extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
 

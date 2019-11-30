@@ -3,8 +3,6 @@
 #include "conn.h"
 #include "http.h"
 
-#define AGENT               "http-requester-c"
-
 int main(int argc, char *argv[])
 {
     /** step by step construct our http request header from user input:
@@ -19,7 +17,7 @@ int main(int argc, char *argv[])
     parsed_args_t *args=create_argparse();
     u8 ret=argparse(&args, argc, argv);
     if(ret==USE_URL){
-        /* 2. forge http request header */
+        /* forge http request header */
         char *http_request;
         // start-line
         http_req_create_start_line(&http_request, args->method, args->path, HTTP_1_1);
@@ -54,62 +52,55 @@ int main(int argc, char *argv[])
             void *res;
             send(sockfd, total_reqs, strlen(total_reqs), 0);
             
-            /* FIXME: dealing with res */
+            /** FIXME: 
+             * - dealing with result object
+             * - if not using keep-alive, then we need to create a new socket for it
+             */
             for(int i=0; i<args->conn; i++){
-                LOG(INFO, "[Pipelining (recv): %d/%d]\n", i+1, args->conn);
+                LOG(INFO, "[Pipelining (recv): %d/%d]", i+1, args->conn);
                 // each request need a parsing state machine to handle!
-                http_rcv_state_machine(sockfd, &res);
+                int ret=http_rcv_state_machine(sockfd, &res);
+                ret=http_handle_state_machine_ret(ret, args, &sockfd, &res);
+                if(ret){ // send redirect (FIXME: if using pipeline with redirection, previous connection need to resend)
+                    char *redirect_req;
+                    http_req_create_start_line(&redirect_req, args->method, args->path, HTTP_1_1);
+                    http_req_finish(&redirect_req, args->http_req);
+                    printf("New HTTP request:***************************************************************\n");
+                    printf("%s\n", redirect_req);
+                    printf("================================================================================\n");
+                    i--; // refill (for redirection)
+                    free(total_reqs);
+                    total_reqs=malloc((args->conn-i)*(strlen(redirect_req)+4));
+                    sprintf(total_reqs, "%s\r\n", redirect_req);
+                    // copy 
+                    for(int j=1; j<(args->conn-i); j++){
+                        sprintf(total_reqs, "%s%s\r\n", total_reqs, redirect_req);
+                    }
+                    send(sockfd, total_reqs, strlen(total_reqs), 0);
+                }
             }
         } else {
             /** without pipelining
              */
+            void *res;
+            // total connection
             while(args->conn){
-                int ret=http_state_machine(sockfd, (void**)&http_request, --args->conn, 1);
-                char *loc;
-                switch(ret){
-                    case ERR_REDIRECT: /* handle redirection */
-                        // Modified http request, and send the request again
-                        loc=(char*)http_request;
-                        // need to parse again 
-                        ret=parse_url(loc, &args->host, &args->path);
-                        switch(ret){
-                            case ERR_NONE:
-                                if(!(args->flags&SPE_PORT)){ // user hasn't specifed port-num
-                                    args->port=DEFAULT_PORT;
-                                }
-                                break;
-                            case ERR_USE_SSL_PORT:
-                                if(!(args->flags&SPE_PORT)){ // user hasn't specifed port-num
-                                    puts("***********************Using default SSL Port***********************");
-                                    args->port=DEFAULT_SSL_PORT;
-                                }
-                                break;
-                            case ERR_INVALID_HOST_LEN:
-                            default:
-                                exit(1);
-                        }
-                        // create new conn
-                        sockfd=create_tcp_conn(args->host, itoa(args->port));
-                        if(sockfd<0){
-                            exit(1);
-                        }
-                        // change attributes in http_req
-                        http_req_obj_ins_header_by_idx(&args->http_req, REQ_HOST, args->host);
-                        // construct new http request from modified http_req
-                        http_req_create_start_line(&http_request, args->method, args->path, HTTP_1_1);
-                        http_req_finish(&http_request, args->http_req);
-                        printf("================================================================================\n");
-                        printf("%-50s: %s\n", "Target URL: ", (char*)args->url==NULL? "None": (char*)args->url);
-                        printf("%-50s: %d\n", "Port number: ", args->port);
-                        printf("%-50s: %s\n", "Method: ", args->method);
-                        printf("********************************************************************************\n");
-                        printf("New HTTP request:***************************************************************\n");
-                        printf("%s\n", http_request);
-                        printf("================================================================================\n");
-                        args->conn++; // refuel
-                        // exit(1);
-                    default:
-                        break;
+                // send request
+                send(sockfd, http_request, strlen(http_request), 0);
+                // parse once
+                int ret=http_rcv_state_machine(sockfd, &res);
+                // get the return value to perform furthor operations
+                ret=http_handle_state_machine_ret(ret, args, &sockfd, &res);
+                // reduce
+                args->conn--;
+                if(ret){ // send redirect
+                    http_request=NULL;
+                    http_req_create_start_line(&http_request, args->method, args->path, HTTP_1_1);
+                    http_req_finish(&http_request, args->http_req);
+                    printf("New HTTP request:***************************************************************\n");
+                    printf("%s\n", http_request);
+                    printf("================================================================================\n");
+                    args->conn++; // refill (for redirection)
                 }
             }
         }

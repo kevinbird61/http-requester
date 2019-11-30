@@ -13,7 +13,7 @@
 #define LOG(loglevel, format, args...)                  \
     do {                                                \
         char *userlog=parse_valist(format, ##args);     \
-        syslog("[%s][%-10s][%s] %s\n",                      \
+        syslog("[%s][%-10s][%s] %s\n",                  \
             getdate(), LOG_LEVEL_STR[loglevel],         \
             __func__,                                   \
             userlog);                                   \
@@ -23,6 +23,8 @@
 static char *log_dir="/tmp/";
 static char *log_filename="http_request";
 static char *log_ext=".log";
+// log level string
+extern char *log_level_str[];
 
 typedef enum _log_level {
     NORMAL=0,
@@ -33,8 +35,6 @@ typedef enum _log_level {
     ERROR,
     LOG_LEVEL_MAXIMUM
 } log_level;
-
-extern char *log_level_str[];
 
 /** Record any activities,
  * - design:

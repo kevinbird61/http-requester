@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "types.h"
 #include "conn.h"
+#include "argparse.h"
 
 /** http_state_machine.c
  * - check and send the request(s), if not pass the checking, function will return error code.
@@ -22,6 +23,7 @@
 http_state next_http_state(http_state cur_state, char ch);                          // calculate next http parsing state 
 int http_state_machine(int sockfd, void **http_request, int reuse, int raw);        // send next request when previous recv is finished
 int http_rcv_state_machine(int sockfd, void **return_obj);                          // only recv, for parallel 
+int http_handle_state_machine_ret(int ret, parsed_args_t *args, int *sockfd, void **return_obj);         // calling while (state machine's) return value is available
 
 /** http_request_process.c (http_req_header_status_t)
  *  - construct http request header object
