@@ -1,5 +1,18 @@
 #include "argparse.h"
 
+/* option we support:
+ * - `-h`:              Print helper function
+ * - `-c`, --conc:      Specify number of concurrent connections.
+ * - `-n`, --conn:      Specify number of total connections. 
+ *                      (So there will need to execute `conn/conc` times to finish all connections)
+ * - `-f`, --file:      Specify input file with HTTP request header template (use to setup those HTTP connections)
+ * - `-u`, --url:       Specify URL (if --file & --url both exist, url will override the duplicated part in template file)
+ * - `-p`, --port:      Specify target port number
+ * - `-m`, --method:    Specify method token
+ * - `--pipe`           Enable pipelining
+ * 
+ * (Other: HTTP request headers)
+ */
 // number need to be changed if you want to add new options
 struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={ 
         [0]={"url", required_argument, NULL, 'u'},
@@ -16,17 +29,6 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
 parsed_args_t *
 create_argparse()
 {
-    /* option we support:
-     * - `-h`:              Print helper function
-     * - `-c`, --conc:      Specify number of concurrent connections.
-     * - `-n`, --conn:      Specify number of total connections. 
-     *                      (So there will need to execute `conn/conc` times to finish all connections)
-     * - `-f`, --file:      Specify input file with HTTP request header template (use to setup those HTTP connections)
-     * - `-u`, --url:       Specify URL (if --file & --url both exist, url will override the duplicated part in template file)
-     * - `-p`, --port:      Specify target port number
-     * - `-m`, --method:    Specify method token
-     */
-    
     /* add request headers */
     for(int i=1; i<(REQ_HEADER_NAME_MAXIMUM); i++){
         // forbidden

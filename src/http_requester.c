@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
         http_req_create_start_line(&http_request, args->method, args->path, HTTP_1_1);
         // header fields
         http_req_obj_ins_header_by_idx(&args->http_req, REQ_HOST, args->host);
-        http_req_obj_ins_header_by_idx(&args->http_req, REQ_CONN, "keep-alive");
+        http_req_obj_ins_header_by_idx(&args->http_req, REQ_CONN, ((args->conn > 1)? "keep-alive": "close"));
         http_req_obj_ins_header_by_idx(&args->http_req, REQ_USER_AGENT, AGENT);
         // finish
         http_req_finish(&http_request, args->http_req);
@@ -42,13 +42,15 @@ int main(int argc, char *argv[])
         /* use pipeline or not */
         if(args->enable_pipe){
             // construct multiple request headers (together) 
-            char *total_reqs=malloc(args->conn*(strlen(http_request)+4));
+            /*char *total_reqs=malloc(args->conn*(strlen(http_request)+4));
             sprintf(total_reqs, "%s\r\n", http_request);
             // copy 
             for(int i=1; i<args->conn; i++){
                 sprintf(total_reqs, "%s%s\r\n", total_reqs, http_request);
-            }
+            }*/
+            char *total_reqs=copy_str_n_times(http_request, args->conn);
 
+            // return value
             void *res;
             send(sockfd, total_reqs, strlen(total_reqs), 0);
             
@@ -70,12 +72,8 @@ int main(int argc, char *argv[])
                     printf("================================================================================\n");
                     i--; // refill (for redirection)
                     free(total_reqs);
-                    total_reqs=malloc((args->conn-i)*(strlen(redirect_req)+4));
-                    sprintf(total_reqs, "%s\r\n", redirect_req);
-                    // copy 
-                    for(int j=1; j<(args->conn-i); j++){
-                        sprintf(total_reqs, "%s%s\r\n", total_reqs, redirect_req);
-                    }
+                    // need to resend the leftover part 
+                    total_reqs=copy_str_n_times(redirect_req, args->conn-i);
                     send(sockfd, total_reqs, strlen(total_reqs), 0);
                 }
             }
@@ -103,7 +101,10 @@ int main(int argc, char *argv[])
                     args->conn++; // refill (for redirection)
                 }
             }
-        }
+        } /* without pipelining */
+
+        // close sockfd 
+        close(sockfd);
     } /* USE_URL */
 
     return 0;

@@ -22,5 +22,6 @@ u8 *itoa(u64 number);
 u8  to_lowercase(u8 *str);
 u64 gettime(void);
 u8 *getdate(void);
+char *copy_str_n_times(char *ori, int n_times);
 
 #endif

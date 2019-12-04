@@ -1,6 +1,8 @@
 #include "utils.h"
 
-void *get_in_addr(struct sockaddr *sa)
+void *
+get_in_addr(
+    struct sockaddr *sa)
 {
     if(sa->sa_family==AF_INET){
         return &(((struct sockaddr_in*)sa)->sin_addr);
@@ -8,7 +10,9 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-u8 get_digits(u64 input)
+u8 
+get_digits(
+    u64 input)
 {
     int num_digits=0;
     while(input>0){
@@ -18,14 +22,18 @@ u8 get_digits(u64 input)
     return num_digits;
 }
 
-u8 *itoa(u64 number)
+u8 *
+itoa(
+    u64 number)
 {
     char *str=malloc((get_digits(number)+1)*sizeof(char));
     sprintf(str, "%lld", number);
     return str;
 }
 
-u8 to_lowercase(u8 *str)
+u8 
+to_lowercase(
+    u8 *str)
 {
     for(int i=0; i<strlen(str); i++){
         if((str[i]>=65 && str[i]<=90) || (str[i]>=97 && str[i]<=122)){
@@ -34,7 +42,8 @@ u8 to_lowercase(u8 *str)
     }
 }
 
-u64 gettime(void)
+u64 
+gettime(void)
 {
     struct timezone tz;
     struct timeval tvstart;
@@ -42,11 +51,25 @@ u64 gettime(void)
     return ((tvstart.tv_sec)*USEC)+(tvstart.tv_usec);
 }
 
-u8 *getdate(void)
+u8 *
+getdate(void)
 {
     char *date=malloc(32*sizeof(char));
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     sprintf(date, "%04d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1,tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     return date;
+}
+
+char *
+copy_str_n_times(
+    char *ori, 
+    int n_times)
+{
+    char *total=malloc(n_times*(strlen(ori)+4));
+    sprintf(total, "%s\r\n", ori);
+    for(int i=1;i<n_times;i++){
+        sprintf(total, "%s%s\r\n", total, ori);
+    }
+    return total;
 }
