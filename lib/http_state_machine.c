@@ -78,7 +78,7 @@ http_rcv_state_machine(
         // check if header using transfer-encoding 
         if(use_chunked){
             if(!(--chunked_size)){ 
-                printf("Finish chunk, idx: %d\n", buf_idx-1);
+                printf("Finish chunk, idx: %d (Parsed: %d)\n", buf_idx-1, parse_len);
                 parse_len=0;
                 use_chunked=0;
                 // state=FIELD_NAME;
@@ -200,22 +200,19 @@ http_rcv_state_machine(
                      * 
                      */
 
-                } else if(state==CHUNKED || state==NEXT_CHUNKED){
-                    // check if it is `chunked`
-                    //fprintf(stdout, "Debug, Chunked size: %s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
-                    // FIXME: need to using strtok to parse all possible value
+                } else if(state==CHUNKED){
+                    // check if it is `chunked` (If no extension)
+                    /** FIXME: need to using strtok to parse all possible value
+                     */
                     if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx), http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset), "chunked", 7)){
                         char *tmp=calloc(parse_len, sizeof(char));
                         sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
-                        
-                        // fprintf(stdout, "%s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
-                        // printf("isdigit: %d\n", isdigit(atoi(tmp)));
                         if((atoi(tmp))>0){
                             // printf("%s, %s\n", tmp, strndup(readbuf+(buf_idx-parse_len), parse_len));
                             chunked_size=atoi(tmp);
                             printf("[Get Chunk] Chunk size: %d\n", chunked_size);
                             LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
-                            state=CHUNKED;
+                            state=CHUNKED; // don't need to check extension 
                             use_chunked=1;
                         } else if(parse_len==2){
                             // Case - chunked size=0 
@@ -227,6 +224,16 @@ http_rcv_state_machine(
                         }
                         free(tmp);
                     }
+                } else if(state==NEXT_CHUNKED){
+                    // change the state to CHUNKED again to keep parsing next chunked
+                    state=CHUNKED;
+                } else if(state==CHUNKED_EXT){
+                    // chunk extension goes here
+                    printf("[Chunk-Ext] %s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
+                    state=CHUNKED;
+                    /** TODO: 
+                     *  store the data into response obj
+                    */
                 }
                 parse_len=0;
                 break;
@@ -279,7 +286,29 @@ http_rcv_state_machine(
                     // change the state
                     state=next_http_state(state, ' ');
                     break;
-                }
+                } else if(state==CHUNKED){
+                    // need to parse the chunk size here, and prepare to parse chunk extension
+                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx), http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset), "chunked", 7)){
+                        char *tmp=calloc(parse_len, sizeof(char));
+                        sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
+                        if((atoi(tmp))>0){
+                            // printf("%s, %s\n", tmp, strndup(readbuf+(buf_idx-parse_len), parse_len));
+                            chunked_size=atoi(tmp);
+                            printf("[Get Chunk] Chunk size: %d\n", chunked_size);
+                            LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
+                            state=CHUNKED_EXT;
+                            use_chunked=1;
+                        } else if(parse_len==2){
+                            // Case - chunked size=0 
+                            // FIXME: is this right condition?
+                            chunked_size=atoi(tmp);
+                            printf("[Last Chunk] Chunk size: %d\n", chunked_size);
+                            LOG(DEBUG, "Last Chunk, size = %d", chunked_size);
+                            use_chunked=1;
+                        }
+                        free(tmp);
+                    }
+                } /* CHUNKED (if extension is valid) */
             default:
                 // append to readbuf
                 break;
@@ -436,5 +465,7 @@ next_http_state(http_state cur_state, char ch)
             return MSG_BODY;
         case CHUNKED:
             return CHUNKED;
+        default:
+            return cur_state;
     }
 }

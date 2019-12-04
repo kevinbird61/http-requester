@@ -110,6 +110,8 @@ typedef enum {
     MSG_BODY,
     // chunk
     CHUNKED,
+    CHUNKED_EXT,
+    CHUNKED_DATA,
     NEXT_CHUNKED,
     // terminate successfully
     END,
@@ -334,6 +336,8 @@ typedef struct _http_res_header_status_t {
     u64 curr_bit; 
     // store idx & offset of each header field
     struct offset_t field_value[RES_HEADER_NAME_MAXIMUM];
+    // chunk extension goes here, format: `token = "...(ext)"` (process the result at the end)
+    struct offset_t *chunk_ext;
     /** store buffer ptr (start from http message header) 
      * - assign the actual buffer ptr to here when call create func
     */
