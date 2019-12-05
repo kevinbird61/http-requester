@@ -93,12 +93,44 @@ int create_tcp_keepalive_conn(const char *target, const char *port)
     freeaddrinfo(res);
 
     /* setup SO_KEEPALIVE */
-    int optval=1, optlen;
-    setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
-    getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, &optlen);
-    if(optval!=0){
-        puts("SO_KEEPALIVE enabled!");
+    int optval, optlen;
+    
+    if(getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, &optlen) < 0) {
+        perror("getsockopt()");
+        close(sockfd);
+        exit(EXIT_FAILURE);                     
     }
+    printf("SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
+    optval = 1;
+    optlen = sizeof(optval);
+    if(setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen))
+    {
+        perror("ERROR: setsocketopt(), SO_KEEPALIVE"); 
+        close(sockfd);
+        exit(0); 
+    }
+    printf("SO_KEEPALIVE set on socket\n");
+    
+    /*
+    int keepcnt=5;
+    int keepidle=10;
+    int keepitval=5;
+    if(setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &keepitval, sizeof(int)))
+    {
+        perror("ERROR: setsocketopt(), TCP_KEEPINTVL"); 
+        exit(0); 
+    }
+    if(setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(int)))
+    {
+        perror("ERROR: setsocketopt(), TCP_KEEPIDLE"); 
+        exit(0); 
+    }
+    if(setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(int)))
+    {
+        perror("ERROR: setsocketopt(), TCP_KEEPCNT"); 
+        exit(0); 
+    }*/
+
 
     return sockfd;
 }

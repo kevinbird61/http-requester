@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
+#include <netinet/tcp.h> // TCP_*
 
 /* create connections */
 #include "utils.h"
