@@ -13,6 +13,9 @@
 #define LOG(loglevel, format, args...)                  \
     do {                                                \
         char *userlog=parse_valist(format, ##args);     \
+        if(loglevel<LOGONLY){                           \
+            fprintf(stdout, "%s\n", userlog);           \
+        }                                               \
         syslog("[%s][%-10s][%s] %s\n",                  \
             getdate(), LOG_LEVEL_STR[loglevel],         \
             __func__,                                   \
@@ -33,6 +36,8 @@ typedef enum _log_level {
     WARNING,
     DANGER,
     ERROR,
+    LOGONLY,
+    /* reserved for log-only enum */
     LOG_LEVEL_MAXIMUM
 } log_level;
 

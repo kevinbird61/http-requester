@@ -116,6 +116,8 @@ http_rcv_state_machine(
                 if(state==HEADER){
                     state=next_http_state(state, '\n');
                 } else if(state==FIELD_NAME && !use_chunked) {
+                    /** Finished all headers, analyzing now */
+
                     state=MSG_BODY;
                     LOG(INFO,  "Message header length: %d", buf_idx);
                     /** Version -
@@ -197,7 +199,9 @@ http_rcv_state_machine(
                     }
 
                     /**
-                     * 
+                     * FIXME: need to check the connection state (close, or keep-alive)
+                     * - close: client side need to close the connection, and assume those sent pipelining requests have not been processed by server
+                     * - keep-alive: calculate the "max" and "timeout" value fron `Keep-Alive` header
                      */
 
                 } else if(state==CHUNKED){
@@ -224,9 +228,6 @@ http_rcv_state_machine(
                         }
                         free(tmp);
                     }
-                } else if(state==NEXT_CHUNKED){
-                    // change the state to CHUNKED again to keep parsing next chunked
-                    state=CHUNKED;
                 } else if(state==CHUNKED_EXT){
                     // chunk extension goes here
                     printf("[Chunk-Ext] %s\n", strndup(readbuf+(buf_idx-parse_len), parse_len));
@@ -234,7 +235,10 @@ http_rcv_state_machine(
                     /** TODO: 
                      *  store the data into response obj
                     */
-                }
+                } else if(state==NEXT_CHUNKED){
+                    // finish one chunk, then change the state to CHUNKED again to keep parsing next chunked
+                    state=CHUNKED;
+                } 
                 parse_len=0;
                 break;
             case ':':
@@ -297,14 +301,15 @@ http_rcv_state_machine(
                             printf("[Get Chunk] Chunk size: %d\n", chunked_size);
                             LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
                             state=CHUNKED_EXT;
-                            use_chunked=1;
+                            // use_chunked=1;
                         } else if(parse_len==2){
                             // Case - chunked size=0 
                             // FIXME: is this right condition?
                             chunked_size=atoi(tmp);
                             printf("[Last Chunk] Chunk size: %d\n", chunked_size);
                             LOG(DEBUG, "Last Chunk, size = %d", chunked_size);
-                            use_chunked=1;
+                            state=CHUNKED_EXT;
+                            // use_chunked=1;
                         }
                         free(tmp);
                     }
