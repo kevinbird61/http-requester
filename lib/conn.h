@@ -13,5 +13,6 @@
 
 // return socket descriptor
 int create_tcp_conn(const char *target, const char *port); 
+int create_tcp_keepalive_conn(const char *target, const char *port);
 
 #endif
