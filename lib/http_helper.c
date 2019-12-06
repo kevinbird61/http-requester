@@ -288,7 +288,7 @@ get_req_header_name_enum_by_str(
     char *req_header_field_name)
 {
     for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        if(!strncasecmp(req_header_field_name, get_req_header_name_by_idx[i], strlen(get_req_header_name_by_idx[i]))){
+        if(!strncasecmp(req_header_field_name, get_req_header_name_by_idx[i], strlen(req_header_field_name))){
             return i;
         }
     }

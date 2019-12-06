@@ -10,12 +10,13 @@ int main(int argc, char *argv[])
     }
 
     int client_sock_fd=create_tcp_keepalive_conn(argv[1], argv[2], 5, 5, 10);
-
-    char sendbuf[1024], buf[MAXDATASIZE];
+    check_tcp_conn_stat(client_sock_fd);
 
     // send GET request
+    char sendbuf[1024], buf[MAXDATASIZE];
     snprintf(sendbuf, 1024, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", argv[1]);
     send(client_sock_fd, sendbuf, strlen(sendbuf), 0);
+    
     // recv the result
     while(1){
         int numbytes=recv(client_sock_fd, buf, MAXDATASIZE-1, 0);

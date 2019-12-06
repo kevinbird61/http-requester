@@ -42,12 +42,6 @@ int main(int argc, char *argv[])
         /* use pipeline or not */
         if(args->enable_pipe){
             // construct multiple request headers (together) 
-            /*char *total_reqs=malloc(args->conn*(strlen(http_request)+4));
-            sprintf(total_reqs, "%s\r\n", http_request);
-            // copy 
-            for(int i=1; i<args->conn; i++){
-                sprintf(total_reqs, "%s%s\r\n", total_reqs, http_request);
-            }*/
             char *total_reqs=copy_str_n_times(http_request, args->conn);
 
             // return value

@@ -10,6 +10,12 @@
 
 #define LOG_LEVEL_STR log_level_str
 
+/** Record any activities,
+ * - design:
+ *      - file location: `/tmp/http_requester_<thread-id>.log`
+ * - format: 
+ *      [@TIME][@LOG_LEVEL][FUNC] Description.
+ */
 #define LOG(loglevel, format, args...)                  \
     do {                                                \
         char *userlog=parse_valist(format, ##args);     \
@@ -31,22 +37,17 @@ extern char *log_level_str[];
 
 typedef enum _log_level {
     NORMAL=0,
-    DEBUG,
-    INFO,
     WARNING,
     DANGER,
     ERROR,
-    LOGONLY,
     /* reserved for log-only enum */
-    LOG_LEVEL_MAXIMUM
+    LOGONLY,
+    INFO,
+    DEBUG,
+    LOG_LEVEL_MAXIMUM /* maximum */
 } log_level;
 
-/** Record any activities,
- * - design:
- *      - file location: `/tmp/http_requester_<thread-id>.log`
- * - format: 
- *      [@TIME][@LOG_LEVEL][FUNC] Description.
- */
+
 // write the log
 int syslog(char *info_args, ...);
 // turn va_list into char array

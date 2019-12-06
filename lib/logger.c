@@ -7,6 +7,8 @@ char *log_level_str[]={
     [WARNING]="WARNING",
     [DANGER]="DANGER",
     [ERROR]="ERROR",
+    /* log-only */
+    [LOGONLY]="LOG-ONLY",
     [LOG_LEVEL_MAXIMUM]=NULL
 };
 

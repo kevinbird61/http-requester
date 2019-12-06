@@ -1,6 +1,9 @@
 #include "conn.h"
 
-int create_tcp_conn(const char *target, const char *port)
+int 
+create_tcp_conn(
+    const char *target, 
+    const char *port)
 {
     struct addrinfo *p, hints, *res;
     int sockfd, rv;
@@ -150,4 +153,20 @@ create_tcp_keepalive_conn(
     printf("SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
 
     return sockfd;
+}
+
+int 
+check_tcp_conn_stat(int sockfd)
+{
+    struct tcp_info tcp_state;
+    int optlen=sizeof(tcp_state);
+    if( getsockopt(sockfd, SOL_TCP, TCP_INFO, (void *)&tcp_state, &optlen) < 0){
+        perror("getsockopt(...TCP_INFO...)");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    /* Perform the check here */
+    printf("%d\n", tcp_state.tcpi_state);
+
+    return 0;
 }

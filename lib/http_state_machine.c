@@ -32,7 +32,7 @@ http_rcv_state_machine(
     u8 status_code=0;
     u8 http_ver=0;
     u8 use_content_length=0, use_chunked=0;
-    u32 content_length=0, chunked_size=0;
+    u32 content_length=0, chunked_size=0, total_content_length=0, total_chunked_size=0;
 
     // scenario 1: byte-by-byte reading
     while(flag){
@@ -41,7 +41,7 @@ http_rcv_state_machine(
          */
         if(use_chunked && chunked_size==0){
             // printf("END, idx: %d\n", buf_idx-1);
-            printf("[Transfer-Encoding: Chunked] Parsing process has been done.\n");
+            printf("[Transfer-Encoding: Chunked] Parsing process has been done. Total chunked size: %d bytes (%d KB)\n", total_chunked_size, total_chunked_size/1024);
             break;
         } 
         /* recv byte by byte */
@@ -70,7 +70,7 @@ http_rcv_state_machine(
         if(use_content_length){
             // --content_length;
             if(!(--content_length)){ 
-                printf("[CL] Parsing process has been done.\n");
+                printf("[CL] Parsing process has been done. Total content length: %d bytes (%d KB)\n", total_content_length, total_content_length/1024);
                 break; 
             }
         }
@@ -189,6 +189,7 @@ http_rcv_state_machine(
                         use_content_length=1;
                         content_length=atoi(readbuf+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
                         printf("Get content length= %d\n", content_length);
+                        total_content_length=content_length;
                         if(content_length==0){
                             flag=0;
                         }
@@ -215,6 +216,7 @@ http_rcv_state_machine(
                             // printf("%s, %s\n", tmp, strndup(readbuf+(buf_idx-parse_len), parse_len));
                             chunked_size=atoi(tmp);
                             printf("[Get Chunk] Chunk size: %d\n", chunked_size);
+                            total_chunked_size+=chunked_size;
                             LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
                             state=CHUNKED; // don't need to check extension 
                             use_chunked=1;
@@ -292,7 +294,11 @@ http_rcv_state_machine(
                     break;
                 } else if(state==CHUNKED){
                     // need to parse the chunk size here, and prepare to parse chunk extension
-                    if(!strncasecmp(strndup(readbuf+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx), http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset), "chunked", 7)){
+                    if( !strncasecmp(
+                        strndup(readbuf+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx), 
+                        http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset), 
+                        "chunked", strlen("chunked")) ){
+                            
                         char *tmp=calloc(parse_len, sizeof(char));
                         sprintf(tmp, "%ld", strtol(strndup(readbuf+(buf_idx-parse_len), parse_len), NULL, 16));
                         if((atoi(tmp))>0){

@@ -88,6 +88,8 @@ http_req_finish(
         return ERR_MEMORY;
     }
     sprintf(*rawdata, "%s\r\n", *rawdata);
+    // LOGONLY
+    LOG(LOGONLY, "HTTP request header:\n%s", *rawdata);
 
     return ERR_NONE;
 }
