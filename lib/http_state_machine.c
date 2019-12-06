@@ -14,18 +14,24 @@ multi_bytes_http_parsing_state_machine(
     http_res_header_status_t *resp=create_http_header_status(state_m->buff);
     /* stats */
     int recvbytes=0;
-    /* poll the data until connection state is TCP_CLOSE_WAIT */
-    while(get_tcp_conn_stat(sockfd)){
+    /* poll the data until connection state is TCP_CLOSE_WAIT 
+     * - problem: if server keep-alive timeout is too large, then it will need
+     *   a lot of time to exit this while-loop.
+     */
+    while(get_tcp_conn_stat(sockfd)!=TCP_CLOSE_WAIT && (recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0)>0)){
         recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
         state_m->data_size+=recvbytes;
         // check whether need to realloc or not
         if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
             state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
         }
+        // check_tcp_conn_stat(sockfd);
     }
 
     printf("Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)\n", 
         strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
+
+    // 
 }
 
 state_machine_t *
