@@ -12,6 +12,8 @@
 /* create connections */
 #include "utils.h"
 
+extern char *tcpi_state_str[];
+
 /* create socket and return its descriptor */
 int create_tcp_conn(const char *target, const char *port); 
 int create_tcp_keepalive_conn(const char *target, const char *port, int keepcnt, int keepidle, int keepintvl);

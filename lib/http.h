@@ -20,10 +20,34 @@
  *      - log everything.
  * - after finish the request, log the response and close the socket, free the memory.
  */
+typedef struct _state_machine_t {
+    /* buf */
+    char *buff;
+    /* state */
+    u8  parsing_state;
+    /* idx */
+    u32 last_fin_idx;
+    u32 parsed_idx;
+    /* size */
+    u32 data_size;
+    u32 max_buff_size;
+} state_machine_t;
+
 http_state next_http_state(http_state cur_state, char ch);                          // calculate next http parsing state 
 int http_state_machine(int sockfd, void **http_request, int reuse, int raw);        // send next request when previous recv is finished
 int http_rcv_state_machine(int sockfd, void **return_obj);                          // only recv, for parallel 
 int http_handle_state_machine_ret(int ret, parsed_args_t *args, int *sockfd, void **return_obj);         // calling while (state machine's) return value is available
+
+/* poll & parse multi-bytes:
+ * - state machine need to be an instance (to retain the parsing state
+ *   among multiple different responses.)
+ * - input: response instance, new data chunk.
+ * - output (return): 
+ *   1) when the response parsing is finished
+ *   2) or state machine found that need to poll a new chunk
+ */
+state_machine_t *create_parsing_state_machine();
+int multi_bytes_http_parsing_state_machine(int sockfd);
 
 /** http_request_process.c (http_req_header_status_t)
  *  - construct http request header object

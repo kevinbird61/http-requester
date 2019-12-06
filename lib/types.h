@@ -1,6 +1,8 @@
 #ifndef __TYPES__
 #define __TYPES__
 
+#define CHUNK_SIZE 4096
+
 /**
  * Useful refs:
  * - Response Header Fields: https://tools.ietf.org/html/rfc7231#section-7

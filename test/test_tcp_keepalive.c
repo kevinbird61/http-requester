@@ -16,10 +16,11 @@ int main(int argc, char *argv[])
     char sendbuf[1024], buf[MAXDATASIZE];
     snprintf(sendbuf, 1024, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", argv[1]);
     send(client_sock_fd, sendbuf, strlen(sendbuf), 0);
-    
+    check_tcp_conn_stat(client_sock_fd);
     // recv the result
     while(1){
         int numbytes=recv(client_sock_fd, buf, MAXDATASIZE-1, 0);
+        check_tcp_conn_stat(client_sock_fd);
         printf("Recv: %d\n", numbytes);
         if(numbytes==-1)
         {
@@ -27,11 +28,14 @@ int main(int argc, char *argv[])
             close(client_sock_fd);
             exit(1);
         } else if(numbytes==0){
+            check_tcp_conn_stat(client_sock_fd);
             close(client_sock_fd);
+            //check_tcp_conn_stat(client_sock_fd);
             exit(1);
         }
         buf[numbytes]='\0';
         printf("client: received %ld bytes.\n", strlen(buf));
+        check_tcp_conn_stat(client_sock_fd);
 
         sleep(1);
     }

@@ -1,5 +1,19 @@
 #include "conn.h"
 
+char *tcpi_state_str[]={
+    [TCP_ESTABLISHED]="TCP-Connection-Established",
+    [TCP_SYN_SENT]="TCP-SYN-Sent",
+    [TCP_SYN_RECV]="TCP-SYN-Recv",
+    [TCP_FIN_WAIT1]="TCP-FIN-Wait-1",
+    [TCP_FIN_WAIT2]="TCP-FIN-Wait-2",
+    [TCP_TIME_WAIT]="TCP-TIME-Wait",
+    [TCP_CLOSE]="TCP-CLOSE",
+    [TCP_CLOSE_WAIT]="TCP-CLOSE-Wait",
+    [TCP_LISTEN]="TCP-LISTEN",
+    [TCP_CLOSING]="TCP-CLOSING",
+    /*[TCP_NEW_SYN_RECV]="TCP-NEW-SYN-Recv"*/
+};
+
 int 
 create_tcp_conn(
     const char *target, 
@@ -166,7 +180,7 @@ check_tcp_conn_stat(int sockfd)
         exit(EXIT_FAILURE);
     }
     /* Perform the check here */
-    printf("%d\n", tcp_state.tcpi_state);
+    printf("[TCP conn state: %s]\n", tcpi_state_str[tcp_state.tcpi_state]);
 
     return 0;
 }

@@ -5,6 +5,29 @@
 
 #include "http.h"
 
+int
+multi_bytes_http_parsing_state_machine(
+    int sockfd)
+{
+    /* create objs */
+    state_machine_t *state_m=create_parsing_state_machine();
+    http_res_header_status_t *resp=create_http_header_status(state_m->buff);
+    /* poll a chunk */
+    state_m->data_size=recv(sockfd, state_m->buff, CHUNK_SIZE, 0);
+
+    /* start parsing */
+
+}
+
+state_machine_t *
+create_parsing_state_machine()
+{
+    state_machine_t *new_obj = calloc(1, sizeof(state_machine_t));
+    new_obj->buff=calloc(CHUNK_SIZE, sizeof(char));
+    new_obj->max_buff_size=CHUNK_SIZE;
+    return new_obj;
+}
+
 int 
 http_rcv_state_machine(
     int sockfd, 
