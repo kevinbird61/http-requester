@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    int client_sock_fd=create_tcp_keepalive_conn(argv[1], argv[2]);
+    int client_sock_fd=create_tcp_keepalive_conn(argv[1], argv[2], 5, 5, 10);
 
     char sendbuf[1024], buf[MAXDATASIZE];
 

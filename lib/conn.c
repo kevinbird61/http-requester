@@ -48,7 +48,13 @@ int create_tcp_conn(const char *target, const char *port)
 }
 
 
-int create_tcp_keepalive_conn(const char *target, const char *port)
+int 
+create_tcp_keepalive_conn(
+    const char *target, 
+    const char *port,
+    int keepcnt,
+    int keepidle,
+    int keepintvl)
 {
     struct addrinfo *p, hints, *res;
     int sockfd, rv;
@@ -93,8 +99,7 @@ int create_tcp_keepalive_conn(const char *target, const char *port)
     freeaddrinfo(res);
 
     /* setup SO_KEEPALIVE */
-    int optval, optlen;
-    
+    int optval, optlen; 
     if(getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, &optlen) < 0) {
         perror("getsockopt()");
         close(sockfd);
@@ -107,30 +112,42 @@ int create_tcp_keepalive_conn(const char *target, const char *port)
     {
         perror("ERROR: setsocketopt(), SO_KEEPALIVE"); 
         close(sockfd);
-        exit(0); 
+        exit(EXIT_FAILURE); 
     }
     printf("SO_KEEPALIVE set on socket\n");
     
-    /*
-    int keepcnt=5;
-    int keepidle=10;
-    int keepitval=5;
-    if(setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &keepitval, sizeof(int)))
+    // keepalive interval
+    if(setsockopt(sockfd, SOL_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(int)))
     {
         perror("ERROR: setsocketopt(), TCP_KEEPINTVL"); 
-        exit(0); 
+        close(sockfd);
+        exit(EXIT_FAILURE); 
     }
-    if(setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(int)))
+    printf("TCP_KEEPINTVL: %d sec.\n", keepintvl);
+    // keepalive idletime
+    if(setsockopt(sockfd, SOL_TCP, TCP_KEEPIDLE, &keepidle, sizeof(int)))
     {
         perror("ERROR: setsocketopt(), TCP_KEEPIDLE"); 
-        exit(0); 
+        close(sockfd);
+        exit(EXIT_FAILURE); 
     }
-    if(setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(int)))
+    printf("TCP_KEEPIDLE: %d sec.\n", keepidle);
+    // keepalive probes
+    if(setsockopt(sockfd, SOL_TCP, TCP_KEEPCNT, &keepcnt, sizeof(int)))
     {
         perror("ERROR: setsocketopt(), TCP_KEEPCNT"); 
+        close(sockfd);
         exit(0); 
-    }*/
-
+    } 
+    printf("TCP_KEEPCNT: %d pkts.\n", keepcnt);
+    
+    optval=0;
+    if(getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, &optlen) < 0) {
+        perror("getsockopt()");
+        close(sockfd);
+        exit(EXIT_FAILURE);                     
+    }
+    printf("SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
 
     return sockfd;
 }
