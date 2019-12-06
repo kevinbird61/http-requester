@@ -12,11 +12,20 @@ multi_bytes_http_parsing_state_machine(
     /* create objs */
     state_machine_t *state_m=create_parsing_state_machine();
     http_res_header_status_t *resp=create_http_header_status(state_m->buff);
-    /* poll a chunk */
-    state_m->data_size=recv(sockfd, state_m->buff, CHUNK_SIZE, 0);
+    /* stats */
+    int recvbytes=0;
+    /* poll the data until connection state is TCP_CLOSE_WAIT */
+    while(get_tcp_conn_stat(sockfd)){
+        recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
+        state_m->data_size+=recvbytes;
+        // check whether need to realloc or not
+        if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
+            state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
+        }
+    }
 
-    /* start parsing */
-
+    printf("Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)\n", 
+        strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
 }
 
 state_machine_t *

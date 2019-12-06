@@ -20,5 +20,6 @@ int create_tcp_keepalive_conn(const char *target, const char *port, int keepcnt,
 
 /* check socket status */
 int check_tcp_conn_stat(int sockfd);
+int get_tcp_conn_stat(int sockfd);
 
 #endif

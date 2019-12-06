@@ -184,3 +184,16 @@ check_tcp_conn_stat(int sockfd)
 
     return 0;
 }
+
+int 
+get_tcp_conn_stat(int sockfd)
+{
+    struct tcp_info tcp_state;
+    int optlen=sizeof(tcp_state);
+    if( getsockopt(sockfd, SOL_TCP, TCP_INFO, (void *)&tcp_state, &optlen) < 0){
+        perror("getsockopt(...TCP_INFO...)");
+        return 0;
+    }
+    
+    return tcp_state.tcpi_state;
+}
