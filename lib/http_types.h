@@ -8,20 +8,6 @@ typedef unsigned short      u16;
 typedef unsigned int        u32;
 typedef unsigned long long  u64;
 
-/* for state_machine */
-typedef struct _state_machine_t {
-    /* buf */
-    char *buff;
-    /* state */
-    u8  parsing_state;
-    /* idx */
-    u32 last_fin_idx;
-    u32 parsed_idx;
-    /* size */
-    u32 data_size;
-    u32 max_buff_size;
-} state_machine_t;
-
 /* using linked-list to store the header fields */
 typedef struct _http_header_t {
     u8                      *field_name;
@@ -171,5 +157,32 @@ typedef struct _http_res_header_status_t {
     u8 *buff;
 } http_res_header_status_t;    // align with 64
 
+/* for state_machine */
+typedef struct _state_machine_t {
+    /* buf */
+    char *buff;
+    /* response instances */
+    http_res_header_status_t *resp; 
+    /* parsing state */
+    u8  p_state;
+    /* idx */
+    u32 buf_idx;
+    u32 parsed_len;
+    /* size */
+    u32 data_size;
+    u32 max_buff_size;
+    /* flag */
+    u8 use_content_length;
+    u8 use_chunked;
+    union {
+        u32 content_length;
+        u32 chunked_size;
+    };
+    union {
+        u32 total_content_length;
+        u32 total_chunked_size;
+    };
+    u32 curr_chunked_size;
+} state_machine_t;
 
 #endif

@@ -34,8 +34,8 @@ int http_handle_state_machine_ret(int ret, parsed_args_t *args, int *sockfd, voi
  *   2) or state machine found that need to poll a new chunk
  */
 state_machine_t *create_parsing_state_machine();
-int multi_bytes_http_parsing_state_machine(int sockfd);
-http_res_header_status_t *http_resp_parser(char *data_chunk, u32 idx);
+control_var_t *multi_bytes_http_parsing_state_machine(int sockfd);
+control_var_t *http_resp_parser(state_machine_t *state_m);
 
 /** http_request_process.c (http_req_header_status_t)
  *  - construct http request header object
