@@ -236,32 +236,10 @@ argparse(
             url_num++;
             url_trav=url_trav->next;
         }
-        if(url_num==1){
-            // only one url, use url only
-            int ret=parse_url((*this)->urls->url, &((*this)->host), &((*this)->path));
-            switch(ret){
-                case ERR_NONE:
-                    if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
-                        (*this)->port=DEFAULT_PORT;
-                    }
-                    break;
-                case ERR_USE_SSL_PORT:
-                    if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
-                        (*this)->port=DEFAULT_SSL_PORT;
-                    }
-                    break;
-                case ERR_INVALID_HOST_LEN:
-                default:
-                    exit(1);
-            }
-            return USE_URL;
-        } else {
-            /** need to parse those urls when needed 
-             * - add another function, let caller enter an URL and update the host,path, and port number 
-             */
-            printf("Not support multiple urls now!\n");
-            exit(1);
-        }
+        /** need to parse those urls when needed 
+         * - currently update randomly
+         */
+        return update_url_info_rand(this);
     }
 
     return USE_URL;
@@ -310,6 +288,48 @@ parse_url(
         *path="/";
     }
     return ret;
+}
+
+// randomly pick a url and then update
+int 
+update_url_info_rand(
+    parsed_args_t **this)
+{
+    // randomly pick an URL to update relative information
+    char *picked_url;
+    int num_url;
+    struct urls *url_trav=(*this)->urls;
+    while(url_trav!=NULL){
+        num_url++;
+        url_trav=url_trav->next;
+    }
+    url_trav=(*this)->urls;
+    srand(time(NULL));
+    int picked_id=(rand()%num_url);
+    printf("Picked id: %d\n", picked_id);
+    while(picked_id--){
+        url_trav=url_trav->next;
+    }
+    picked_url=url_trav->url;
+    printf("Num of urls: %d, Randomly pick: %s\n", num_url, picked_url);
+    // only one url, use url only
+    int ret=parse_url(picked_url, &((*this)->host), &((*this)->path));
+    switch(ret){
+        case ERR_NONE:
+            if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
+                (*this)->port=DEFAULT_PORT;
+            }
+            break;
+        case ERR_USE_SSL_PORT:
+            if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
+                (*this)->port=DEFAULT_SSL_PORT;
+            }
+            break;
+        case ERR_INVALID_HOST_LEN:
+        default:
+            exit(1);
+    }
+    return USE_URL;
 }
 
 // print out usage/helper page

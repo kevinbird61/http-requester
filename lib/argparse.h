@@ -41,6 +41,8 @@ parsed_args_t *create_argparse();
 int argparse(parsed_args_t **this, int argc, char **argv);
 // parse url, and use the result to fill host & path
 int parse_url(char *url, char **host, char **path);
+// randomly pick a url and then update
+int update_url_info_rand(parsed_args_t **this);
 // print usage
 void print_manual(u8 detail);
 
