@@ -45,6 +45,7 @@ create_argparse()
 
     parsed_args_t *new_argparse=calloc(1, sizeof(parsed_args_t));
     new_argparse->port=DEFAULT_PORT;
+    new_argparse->urls=NULL;
     // init http_req_obj
     http_req_obj_create(&new_argparse->http_req);
 
@@ -91,8 +92,30 @@ argparse(
                 (*this)->flags|=SPE_FILE;
                 break;
             case 'u':   // url
-                (*this)->url=optarg;
+                // (*this)->url=optarg;
                 (*this)->flags|=SPE_URL;
+                /* multi url */
+                int url_cnt=0;
+                optind--;
+                for( ;optind < argc && *argv[optind] != '-'; optind++){
+                    // append each url
+                    
+                    if((*this)->urls==NULL){
+                        printf("URL(%d): %s\n", url_cnt++, argv[optind]);
+                        (*this)->urls=calloc(1, sizeof(struct urls));
+                        (*this)->urls->url=argv[optind];
+                        (*this)->urls->next=NULL;
+                    } else {
+                        printf("URL(%d): %s\n", url_cnt++, argv[optind]);
+                        struct urls *root=(*this)->urls;
+                        while(root->next!=NULL){
+                            root=root->next;
+                        }
+                        root->next=calloc(1, sizeof(struct urls));
+                        root->next->url=argv[optind];
+                        root->next->next=NULL;
+                    }
+                }
                 break;
             case 'p':   // port
                 (*this)->port=atoi(optarg);
@@ -188,7 +211,14 @@ argparse(
     printf("%-50s: %d\n", "Number of concurrent connections", (*this)->conc);
     printf("%-50s: %d\n", "Number of total connections", (*this)->conn);
     printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
-    printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);
+    /*printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);*/
+    struct urls *url_trav=(*this)->urls;
+    printf("%-50s:\n", "Target URL(s): ");
+    while(url_trav!=NULL){
+        printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
+        url_trav=url_trav->next;
+    }
+
     printf("%-50s: %d\n", "Port number: ", (*this)->port);
     printf("%-50s: %s\n", "Method: ", (*this)->method);
     printf("================================================================================\n");
@@ -198,26 +228,40 @@ argparse(
         printf("Not support yet!\n");
         exit(1);
         // return USE_TEMPLATE
-    } else if((*this)->url!=NULL){
-        // use url only
-        int ret=parse_url((*this)->url, &((*this)->host), &((*this)->path));
-        switch(ret){
-            case ERR_NONE:
-                if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
-                    (*this)->port=DEFAULT_PORT;
-                }
-                break;
-            case ERR_USE_SSL_PORT:
-                if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
-                    (*this)->port=DEFAULT_SSL_PORT;
-                }
-                break;
-            case ERR_INVALID_HOST_LEN:
-            default:
-                exit(1);
+    } else if((*this)->urls!=NULL){
+        // check urls' number 
+        int url_num=0;
+        url_trav=(*this)->urls;
+        while(url_trav!=NULL){
+            url_num++;
+            url_trav=url_trav->next;
         }
-
-        return USE_URL;
+        if(url_num==1){
+            // only one url, use url only
+            int ret=parse_url((*this)->urls->url, &((*this)->host), &((*this)->path));
+            switch(ret){
+                case ERR_NONE:
+                    if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
+                        (*this)->port=DEFAULT_PORT;
+                    }
+                    break;
+                case ERR_USE_SSL_PORT:
+                    if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
+                        (*this)->port=DEFAULT_SSL_PORT;
+                    }
+                    break;
+                case ERR_INVALID_HOST_LEN:
+                default:
+                    exit(1);
+            }
+            return USE_URL;
+        } else {
+            /** need to parse those urls when needed 
+             * - add another function, let caller enter an URL and update the host,path, and port number 
+             */
+            printf("Not support multiple urls now!\n");
+            exit(1);
+        }
     }
 
     return USE_URL;

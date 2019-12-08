@@ -23,6 +23,11 @@ typedef enum {
 } error_code;
 
 /* user input */
+struct urls {
+    char *url;
+    struct urls *next;
+};
+
 typedef struct _parsed_args_t {
     u8                          flags;
     u8                          enable_pipe;
@@ -30,7 +35,7 @@ typedef struct _parsed_args_t {
     u32                         conc;
     u32                         conn;
     char*                       filename;
-    char*                       url;
+    struct urls*                urls;
     char*                       method;
     char*                       host;
     char*                       path;
