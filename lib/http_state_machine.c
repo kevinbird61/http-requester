@@ -9,8 +9,8 @@ state_machine_t *
 create_parsing_state_machine()
 {
     state_machine_t *new_obj = calloc(1, sizeof(state_machine_t));
-    new_obj->buff=calloc(CHUNK_SIZE, sizeof(char));
-    new_obj->max_buff_size=CHUNK_SIZE;
+    new_obj->buff=calloc(RECV_BUFF_SCALE*CHUNK_SIZE, sizeof(char));
+    new_obj->max_buff_size=RECV_BUFF_SCALE*CHUNK_SIZE;
     return new_obj;
 }
 
@@ -42,22 +42,40 @@ multi_bytes_http_parsing_state_machine(
         {
             case RCODE_POLL_DATA:
                 /* require another recv() to poll new data */
+                // check upperbound & move (prevent using too many realloc, and too much buff length)
+                if( (strlen(state_m->buff)) >= ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                    // then move the leftover to the front, also need to reset buf_idx;
+                    state_m->data_size=strlen(state_m->buff)-state_m->last_fin_idx;
+                    // need to adjust the offset of each response obj
+                    update_res_header_idx(state_m->resp, state_m->last_fin_idx);
+                    printf("Last fin idx: %d, Move %d bytes\n", state_m->last_fin_idx, state_m->data_size);
+                    state_m->buf_idx=state_m->data_size;
+                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size);
+                    // reset the rest and fin_idx
+                    memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
+                    state_m->last_fin_idx=0; 
+                }
+
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
                 if(recvbytes==0 && get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
                     // puts(state_m->buff);
-                    if(state_m->buf_idx <= strlen(state_m->buff)){
-                        printf("Keep parsing: %d (%ld)\n", state_m->buf_idx, strlen(state_m->buff));
+                    // if(state_m->buf_idx < strlen(state_m->buff)){
+                    if(state_m->buf_idx < state_m->data_size){
+                        printf("Keep parsing: %d (%ld)(%d)\n", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        STATS_DUMP();
                         break;
+                        // exit(1); // debug
                     } else {
                         printf("Abort: %d (%ld)\n", state_m->buf_idx, strlen(state_m->buff));
+                        STATS_DUMP();
                         exit(1);
                     }
                 }
                 state_m->data_size+=recvbytes;
-                if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
+                /*if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
                     state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
                     state_m->resp->buff=state_m->buff; // set resp buff to state_m->buff
-                }
+                }*/
                 // state_m->parsed_len=0; // because current parse_len is incomplete, need to reset
                 break;
             case RCODE_REDIRECT:
@@ -78,8 +96,9 @@ multi_bytes_http_parsing_state_machine(
                 break;
             case RCODE_NEXT_RESP:
                 puts("Finish one respose.\n");
+                /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
-                // printf("Fin idx: %d\n", state_m->last_fin_idx);
+
                 // Finish one resp, and need to parse next:
                 // - create a new resp obj (TODO: maintain a response queue to store
                 //  all the parsed responses.)

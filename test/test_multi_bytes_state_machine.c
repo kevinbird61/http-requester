@@ -4,8 +4,8 @@
 
 int main(int argc, char *argv[])
 {
-    if(argc<3){
-        fprintf(stderr, "Usage: ./program <target IP> <port>\n");
+    if(argc<4){
+        fprintf(stderr, "Usage: ./program <target IP> <port> <NUM_REQUEST>\n");
         exit(1);
     }
 
@@ -14,8 +14,8 @@ int main(int argc, char *argv[])
     // send GET request
     char sendbuf[1024], buf[MAXDATASIZE];
     // test several times
-    for(int i=0;i<20;i++){
-        snprintf(sendbuf, 1024, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", argv[1]);
+    snprintf(sendbuf, 1024, "GET / HTTP/1.1\r\nHost: %s\r\nConnection: keep-alive\r\n\r\n", argv[1]);
+    for(int i=0;i< atoi(argv[3]);i++){
         send(client_sock_fd, sendbuf, strlen(sendbuf), 0);
     }
     //snprintf(sendbuf, 1024, "GET /missing HTTP/1.1\r\nHost: %s\r\n\r\n", argv[1]);  // 4xx will let server-side close the connection

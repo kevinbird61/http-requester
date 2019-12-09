@@ -84,3 +84,18 @@ check_res_header_field_name(
     }
     return 0;
 }
+
+int 
+update_res_header_idx(
+    http_res_header_status_t *status, 
+    u32 shift_offset)
+{
+    for(int i=1;i<RES_HEADER_NAME_MAXIMUM;i++){
+        if( (status->dirty_bit_align & ( ((u64)1)<<(i-1) )) ){
+            // this field need to move 
+            // printf("Orig idx: %d ",status->field_value[i].idx);
+            status->field_value[i].idx-=shift_offset;
+            // printf(", New idx: %d \n",status->field_value[i].idx);
+        }
+    }
+}

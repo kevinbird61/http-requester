@@ -72,6 +72,7 @@ http_res_header_status_t *create_http_header_status(char *readbuf);
 int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 offset);
 int check_res_header_field_name(http_res_header_status_t *status, char *field_name);
 int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32 offset);
+int update_res_header_idx(http_res_header_status_t *status, u32 shift_offset);
 
 /* http_request.c: 
  * - send out the request, and store the return data on which rawdata points to.

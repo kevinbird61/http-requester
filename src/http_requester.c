@@ -1,4 +1,5 @@
 #include "argparse.h"
+#include "conn_mgnt.h"
 #include "types.h"
 #include "conn.h"
 #include "http.h"

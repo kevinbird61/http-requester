@@ -13,7 +13,7 @@ typedef struct _control_var_t {
 
 // enum - rcode
 enum {
-    RCODE_NEXT_RESP,
+    RCODE_NEXT_RESP=1,
     RCODE_POLL_DATA,
     RCODE_FIN,
     RCODE_REDIRECT,
