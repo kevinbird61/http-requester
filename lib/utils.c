@@ -66,10 +66,10 @@ copy_str_n_times(
     char *ori, 
     int n_times)
 {
-    char *total=malloc(n_times*(strlen(ori)+4));
-    sprintf(total, "%s\r\n", ori);
+    char *total=malloc((n_times+1)*(strlen(ori)));
+    sprintf(total, "%s", ori);
     for(int i=1;i<n_times;i++){
-        sprintf(total, "%s%s\r\n", total, ori);
+        sprintf(total+strlen(total), "%s", ori);
     }
     return total;
 }

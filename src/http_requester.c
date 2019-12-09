@@ -101,5 +101,7 @@ int main(int argc, char *argv[])
         close(sockfd);
     } /* USE_URL */
 
+    STATS_DUMP();
+
     return 0;
 }

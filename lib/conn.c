@@ -34,6 +34,7 @@ create_tcp_conn(
         return -1;
     }
 
+    int ret_check=-1;
     for(p=res; p!=NULL; p=p->ai_next)
     {
         if((sockfd=socket(p->ai_family, p->ai_socktype, p->ai_protocol))==-1)
@@ -48,8 +49,10 @@ create_tcp_conn(
             perror("connection failed.");
             continue;
         }
+        ret_check=1;
         break;
     }
+    if(ret_check<0){ return ret_check; }
 
     if(p==NULL)
     {

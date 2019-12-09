@@ -31,9 +31,12 @@ multi_bytes_http_parsing_state_machine(
     state_m->resp->http_ver=0;
 
     /* Parse the data, and store the result into respones objs */
+    /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
+     *  to prevent occupying too much memory ?
+     */
     control_var_t *control_var;
-    while(1){
-        // call parser 
+    while(flag){
+        // call parser (store the state and response obj into state_machine's instance)
         control_var=http_resp_parser(state_m);
         switch (control_var->rcode)
         {
@@ -47,7 +50,6 @@ multi_bytes_http_parsing_state_machine(
                         break;
                     } else {
                         printf("Abort: %d (%ld)\n", state_m->buf_idx, strlen(state_m->buff));
-                        printf("Content Length: %d\n", state_m->content_length);
                         exit(1);
                     }
                 }
@@ -56,26 +58,33 @@ multi_bytes_http_parsing_state_machine(
                     state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
                     state_m->resp->buff=state_m->buff; // set resp buff to state_m->buff
                 }
-                // printf("Current idx: %d, parsed_len: %d\n", state_m->buf_idx, state_m->parsed_len);
                 // state_m->parsed_len=0; // because current parse_len is incomplete, need to reset
                 break;
             case RCODE_REDIRECT:
                 /* perform redirection, notify caller that need to abort the response and resend */
                 puts("Require rediretion.\n");
-                return control_var;
+                // return control_var;
+                flag=0;
+                break;
             case RCODE_ERROR:
                 // print the error message instead of exit?
                 puts("Error occur.\n");
-                return control_var;
+                // return control_var;
+                flag=0;
+                break;
             case RCODE_FIN:
                 puts("Finish all response parsing.\n");
-                exit(1);
+                flag=0;
+                break;
             case RCODE_NEXT_RESP:
                 puts("Finish one respose.\n");
                 state_m->last_fin_idx=state_m->buf_idx;
-                printf("Fin idx: %d\n", state_m->last_fin_idx);
-                // Finish one resp, and need to parse next: 
-                // Because we don't modify the buf_idx, then we just pass buff ptr 
+                // printf("Fin idx: %d\n", state_m->last_fin_idx);
+                // Finish one resp, and need to parse next:
+                // - create a new resp obj (TODO: maintain a response queue to store
+                //  all the parsed responses.)
+                // - we don't modify the buf_idx, just pass buff ptr to response obj.
+                // - reset the essential states, prepare for parsing next response.
                 state_m->resp=create_http_header_status(state_m->buff);
                 state_m->p_state=VER;
                 state_m->resp->status_code=0;
@@ -85,24 +94,24 @@ multi_bytes_http_parsing_state_machine(
                 state_m->content_length=0;
                 state_m->total_content_length=0;
                 state_m->curr_chunked_size=0;
-
-                // this part need to be fix -> why buf_idx increase when each resp finish
-                // state_m->buf_idx-=3;
-                state_m->parsed_len=0;
+                state_m->parsed_len=0; // prevent from reading wrong starting point
                 break;
             default:
                 printf("Unknown: %d\n", control_var->rcode);
-                break;
+                exit(1); // should terminate.
         }
     }
 
+    // dump the statistics
+    STATS_DUMP();
+    // output the statistics
     printf("TCP connection state: %s\n", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
     printf("Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)\n",
         strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
 
     free(state_m->buff);
 
-    return 0;
+    return control_var;
 }
 
 control_var_t *
@@ -216,6 +225,7 @@ http_resp_parser(
                      * - if 4xx or 5xx, then connection can be terminated; (FIXME: Can we terminate directly?)
                      *
                      */
+                    STATS_INC_CODE(state_m->resp->status_code);
                     if(state_m->resp->status_code<_200_OK){
                         // 1xx
                         LOG(WARNING, "Response from server : %s (%s)", 
@@ -567,6 +577,7 @@ http_rcv_state_machine(
                      * - if 4xx or 5xx, then connection can be terminated; (FIXME: Can we terminate directly?)
                      *
                      */
+                    STATS_INC_CODE(status_code);
                     if(status_code<_200_OK){
                         // 1xx
                         LOG(WARNING, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);

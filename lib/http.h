@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "stats.h"
 #include "logger.h"
 #include "utils.h"
 #include "types.h"
