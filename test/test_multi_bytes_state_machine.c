@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
     }
 
     int client_sock_fd=create_tcp_conn(argv[1], argv[2]);
-
+    printf("Number of requests: %d\n", atoi(argv[3]));
     // send GET request
     char sendbuf[1024], buf[MAXDATASIZE];
     // test several times

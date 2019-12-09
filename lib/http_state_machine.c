@@ -43,9 +43,10 @@ multi_bytes_http_parsing_state_machine(
             case RCODE_POLL_DATA:
                 /* require another recv() to poll new data */
                 // check upperbound & move (prevent using too many realloc, and too much buff length)
-                if( (strlen(state_m->buff)) >= ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                // if( (strlen(state_m->buff)) > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
                     // then move the leftover to the front, also need to reset buf_idx;
-                    state_m->data_size=strlen(state_m->buff)-state_m->last_fin_idx;
+                    state_m->data_size=state_m->data_size-state_m->last_fin_idx;
                     // need to adjust the offset of each response obj
                     update_res_header_idx(state_m->resp, state_m->last_fin_idx);
                     printf("Last fin idx: %d, Move %d bytes\n", state_m->last_fin_idx, state_m->data_size);
@@ -55,8 +56,9 @@ multi_bytes_http_parsing_state_machine(
                     memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
                     state_m->last_fin_idx=0; 
                 }
-
+                // check_tcp_conn_stat(sockfd);
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
+                // printf("Recv %d\n", recvbytes);
                 if(recvbytes==0 && get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
                     // puts(state_m->buff);
                     // if(state_m->buf_idx < strlen(state_m->buff)){
@@ -66,9 +68,10 @@ multi_bytes_http_parsing_state_machine(
                         break;
                         // exit(1); // debug
                     } else {
-                        printf("Abort: %d (%ld)\n", state_m->buf_idx, strlen(state_m->buff));
-                        STATS_DUMP();
-                        exit(1);
+                        printf("Finish all response parsing, buf_idx=%d, strlen(buff)=%ld\n", state_m->buf_idx, strlen(state_m->buff));
+                        // STATS_DUMP();
+                        flag=0;
+                        // exit(1);
                     }
                 }
                 state_m->data_size+=recvbytes;
@@ -91,9 +94,6 @@ multi_bytes_http_parsing_state_machine(
                 flag=0;
                 break;
             case RCODE_FIN:
-                puts("Finish all response parsing.\n");
-                flag=0;
-                break;
             case RCODE_NEXT_RESP:
                 puts("Finish one respose.\n");
                 /* update fin_idx */
@@ -450,6 +450,7 @@ http_resp_parser(
     LOG(INFO, "Total received: %d bytes", state_m->buf_idx);
     printf("Parsed: %d (Total data length: %ld)\n", state_m->buf_idx, strlen(state_m->buff));
     control_var->rcode=RCODE_FIN;
+    //control_var->rcode=RCODE_POLL_DATA;
     if(state_m->buf_idx < strlen(state_m->buff)){
         // need to call parser again 
         control_var->rcode=RCODE_NEXT_RESP;
