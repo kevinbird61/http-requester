@@ -218,7 +218,6 @@ argparse(
         printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
         url_trav=url_trav->next;
     }
-
     printf("%-50s: %d\n", "Port number: ", (*this)->port);
     printf("%-50s: %s\n", "Method: ", (*this)->method);
     printf("================================================================================\n");
@@ -297,7 +296,7 @@ update_url_info_rand(
 {
     // randomly pick an URL to update relative information
     char *picked_url;
-    int num_url;
+    int num_url=0;
     struct urls *url_trav=(*this)->urls;
     while(url_trav!=NULL){
         num_url++;

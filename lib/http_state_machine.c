@@ -23,24 +23,8 @@ multi_bytes_http_parsing_state_machine(
     /* get all the data:
      * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
      */
-    while(1){
-        int recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
-        // printf("Recv: %d\n", recvbytes);
-        if(recvbytes==0 && get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
-            break;
-        }
-        state_m->data_size+=recvbytes;
-        if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
-            state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
-        }
-    }
-
-    printf("TCP connection state: %s\n", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
-    printf("Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)\n",
-        strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
-
     /* stats */
-    int flag=1;
+    int flag=1, recvbytes=0;
     state_m->resp=create_http_header_status(state_m->buff);
     state_m->p_state=VER;
     state_m->resp->status_code=0;
@@ -55,22 +39,43 @@ multi_bytes_http_parsing_state_machine(
         {
             case RCODE_POLL_DATA:
                 /* require another recv() to poll new data */
-                // recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
-                state_m->parsed_len=0; // because current parse_len is incomplete, need to reset
+                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
+                if(recvbytes==0 && get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
+                    // puts(state_m->buff);
+                    if(state_m->buf_idx <= strlen(state_m->buff)){
+                        printf("Keep parsing: %d (%ld)\n", state_m->buf_idx, strlen(state_m->buff));
+                        break;
+                    } else {
+                        printf("Abort: %d (%ld)\n", state_m->buf_idx, strlen(state_m->buff));
+                        printf("Content Length: %d\n", state_m->content_length);
+                        exit(1);
+                    }
+                }
+                state_m->data_size+=recvbytes;
+                if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
+                    state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
+                    state_m->resp->buff=state_m->buff; // set resp buff to state_m->buff
+                }
+                // printf("Current idx: %d, parsed_len: %d\n", state_m->buf_idx, state_m->parsed_len);
+                // state_m->parsed_len=0; // because current parse_len is incomplete, need to reset
                 break;
             case RCODE_REDIRECT:
                 /* perform redirection, notify caller that need to abort the response and resend */
-                puts("Require rediretion\n");
+                puts("Require rediretion.\n");
                 return control_var;
             case RCODE_ERROR:
                 // print the error message instead of exit?
-                // exit(1);
-                break;
+                puts("Error occur.\n");
+                return control_var;
             case RCODE_FIN:
                 puts("Finish all response parsing.\n");
                 exit(1);
             case RCODE_NEXT_RESP:
-                // Finish one resp, and need to parse next:
+                puts("Finish one respose.\n");
+                state_m->last_fin_idx=state_m->buf_idx;
+                printf("Fin idx: %d\n", state_m->last_fin_idx);
+                // Finish one resp, and need to parse next: 
+                // Because we don't modify the buf_idx, then we just pass buff ptr 
                 state_m->resp=create_http_header_status(state_m->buff);
                 state_m->p_state=VER;
                 state_m->resp->status_code=0;
@@ -80,13 +85,20 @@ multi_bytes_http_parsing_state_machine(
                 state_m->content_length=0;
                 state_m->total_content_length=0;
                 state_m->curr_chunked_size=0;
-                state_m->parsed_len=0; // or next time it will be started from a wrong place 
+
+                // this part need to be fix -> why buf_idx increase when each resp finish
+                // state_m->buf_idx-=3;
+                state_m->parsed_len=0;
                 break;
             default:
+                printf("Unknown: %d\n", control_var->rcode);
                 break;
         }
     }
 
+    printf("TCP connection state: %s\n", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
+    printf("Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)\n",
+        strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
 
     free(state_m->buff);
 
@@ -103,6 +115,17 @@ http_resp_parser(
     control_var_t *control_var=calloc(1, sizeof(control_var_t));
 
     while(flag){
+        // store legal char
+        state_m->buf_idx++;
+        state_m->parsed_len++;
+        // check if we need more data or not
+        if(state_m->buf_idx>state_m->data_size){
+            /* require more data */
+            state_m->buf_idx--;
+            state_m->parsed_len--;
+            control_var->rcode=RCODE_POLL_DATA;
+            return control_var;
+        }
         /** Put some checking mechanism to terminate parsing
          * state machine before recipient send FIN back (timeout).
          */
@@ -110,15 +133,6 @@ http_resp_parser(
             // printf("END, idx: %d\n", state_m->buf_idx-1);
             printf("[Transfer-Encoding: Chunked] Parsing process has been done. Total chunked size: %d bytes (%d KB)\n", state_m->total_chunked_size, state_m->total_chunked_size/1024);
             control_var->rcode=RCODE_FIN;
-            break;
-        }
-
-        // store legal char
-        state_m->buf_idx++;
-        state_m->parsed_len++;
-        if(state_m->buf_idx>=state_m->data_size){
-            /* require more data */
-            control_var->rcode=RCODE_POLL_DATA;
             break;
         }
 
@@ -344,6 +358,9 @@ http_resp_parser(
                                 LOG(ERROR, "[Version not support: %s]", tmp);
                                 free(tmp);
                                 flag=0;
+                                // means parse error, set rcode and return
+                                control_var->rcode=RCODE_NOT_SUPPORT;
+                                return control_var;
                             }
                             state_m->parsed_len=0;
                             break;
@@ -356,6 +373,8 @@ http_resp_parser(
                                 // char *tmp=malloc((state_m->parsed_len)*sizeof(char));
                                 // snprintf(tmp, state_m->parsed_len, "%s", readbuf+(state_m->buf_idx-state_m->parsed_len));
                                 // free(tmp);
+                                control_var->rcode=RCODE_NOT_SUPPORT;
+                                return control_var;
                             }
                             state_m->parsed_len=0;
                             break;
@@ -406,7 +425,6 @@ http_resp_parser(
         // need to call parser again 
         control_var->rcode=RCODE_NEXT_RESP;
     }
-
     return control_var;
 }
 
@@ -811,7 +829,13 @@ http_handle_state_machine_ret(
             // change attributes in http_req
             http_req_obj_ins_header_by_idx(&args->http_req, REQ_HOST, args->host);
             printf("================================================================================\n");
-            printf("%-50s: %s\n", "Target URL: ", (char*)args->url==NULL? "None": (char*)args->url);
+            // printf("%-50s: %s\n", "Target URL: ", (char*)args->url==NULL? "None": (char*)args->url);
+            struct urls *url_trav=args->urls;
+            printf("%-50s:\n", "Target URL(s): ");
+            while(url_trav!=NULL){
+                printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
+                url_trav=url_trav->next;
+            }
             printf("%-50s: %d\n", "Port number: ", args->port);
             printf("%-50s: %s\n", "Method: ", args->method);
             printf("********************************************************************************\n");

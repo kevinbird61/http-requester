@@ -166,6 +166,7 @@ typedef struct _state_machine_t {
     /* parsing state */
     u8  p_state;
     /* idx */
+    u32 last_fin_idx;
     u32 buf_idx;
     u32 parsed_len;
     /* size */
