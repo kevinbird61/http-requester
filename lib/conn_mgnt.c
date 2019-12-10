@@ -103,12 +103,15 @@ conn_mgnt_run(conn_mgnt_t *this)
                             // Question: Is this caused by timeout?
                             // FIXME: need to check socket status first?
                             // need to reconstruct socket
+                            /*this->sockets[i].sockfd=create_tcp_keepalive_conn(
+                                this->args->host, itoa(this->args->port), 5, 1, 5);*/
                             this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
                             if(this->sockets[i].sockfd<0){
                                 printf("(Reconstruct) Fail to reate sockfd: %d\n", this->sockets[i].sockfd);
                                 exit(1);
                             }
                             // reload
+                            this->sockets[i].unsent_req= (this->sockets[i].unsent_req < 0) ? 0 : this->sockets[i].unsent_req;
                             this->sockets[i].unsent_req+=this->sockets[i].sent_req;
                             this->sockets[i].sent_req=0;
                             this->sockets[i].retry=0;
@@ -122,17 +125,160 @@ conn_mgnt_run(conn_mgnt_t *this)
         }
     } else {
         /* not pipeline */
-        /*for(int i=0;i<this->total_req;i++){
-            // send one
-            send(this->sockfd, http_request, strlen(http_request), 0);
-            // recv one
-            control_var_t *control_var;
-            control_var=multi_bytes_http_parsing_state_machine(sockfd, 1);
-        }*/
+        int all_fin=0;
+        while(all_fin<this->total_req){
+            for(int i=0;i<this->args->conc;i++){
+                printf("(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
+                        all_fin, this->total_req,
+                        this->sockets[i].sockfd, this->sockets[i].unsent_req,
+                        this->sockets[i].sent_req, this->sockets[i].rcvd_res);
+                // send one
+                if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                    // sent error
+                    perror("Socket sent error.");
+                    exit(1);
+                }
+                this->sockets[i].unsent_req--;
+                this->sockets[i].sent_req++;
+            }
+            int ret=0;
+            if ( (ret=select(maxfd+1, &rfds, NULL, NULL, &tv))>0 ) {
+                for(int i=0;i<this->args->conc;i++){
+                    // check each one if there have any available rcv or not
+                    if ( FD_ISSET(this->sockets[i].sockfd, &rfds) ) {
+                        control_var_t *control_var;
+                        control_var=multi_bytes_http_parsing_state_machine(this->sockets[i].sockfd, this->sockets[i].sent_req);
+                        // TODO: check control_var's ret, if no error, then we can increase counter
+                        this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
+                        all_fin+=this->sockets[i].sent_req;
+                        this->sockets[i].sent_req=0;
+                        this->sockets[i].retry=0; // if this socket has sent something, reset retry
+                        ret--;
+                    }
+                    if(!ret){break;}
+                }
+            } else {
+                // need to wait more time
+                perror("select timeout error.");
+                // increase waiting time
+                tv.tv_sec++;
+                // check which socket has unfinished (e.g. sent_req > 0)
+                for(int i=0;i<this->args->conc;i++){
+                    if(this->sockets[i].sent_req>0){
+                        if(this->sockets[i].retry>MAX_RETRY){
+                            // Question: Is this caused by timeout?
+                            // FIXME: need to check socket status first?
+                            // need to reconstruct socket
+                            /* this->sockets[i].sockfd=create_tcp_keepalive_conn(
+                                this->args->host, itoa(this->args->port), 5, 1, 5);*/
+                            this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                            if(this->sockets[i].sockfd<0){
+                                printf("(Reconstruct) Fail to reate sockfd: %d\n", this->sockets[i].sockfd);
+                                exit(1);
+                            }
+                            // reload
+                            this->sockets[i].unsent_req= (this->sockets[i].unsent_req < 0) ? 0 : this->sockets[i].unsent_req;
+                            // printf("unsent: %d, sent: %d\n", this->sockets[i].unsent_req, this->sockets[i].sent_req);
+                            this->sockets[i].unsent_req+=this->sockets[i].sent_req;
+                            this->sockets[i].sent_req=0;
+                            this->sockets[i].retry=0;
+                        } else {
+                            this->sockets[i].retry++;
+                        }
+                    }
+                }
+                /** FIXME: need to set the retry-retry limitation */
+            }
+        }
     }
 
     /* finish: need to print all the statistics again */
 
+}
+
+int 
+conn_mgnt_run_blocking(conn_mgnt_t *this)
+{
+    /* forge http request header */
+    char *http_request;
+    // start-line
+    http_req_create_start_line(&http_request, this->args->method, this->args->path, HTTP_1_1);
+    // header fields
+    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_HOST, this->args->host);
+    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_CONN, ((this->args->conn > 1)? "keep-alive": "close"));
+    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
+    // finish
+    http_req_finish(&http_request, this->args->http_req);
+    printf("HTTP request:*******************************************************************\n");
+    printf("%s\n", http_request);
+    printf("================================================================================\n");
+    
+    /* create sock */
+    int sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+    if(sockfd<0){
+        exit(1);
+    }
+
+    // record total connection
+    this->total_req=this->args->conn;
+
+    if(this->args->enable_pipe){
+        /* support pipeline */
+        while(this->rcvd_res<this->total_req){
+            // send num_gap in one time, then recv all
+            // , check the rest # of reqs: 
+            int sent_req=0;
+            if(this->sent_req > (this->total_req-this->num_gap)){
+                for(int i=0;i<(this->total_req-this->sent_req);i++){
+                    send(sockfd, http_request, strlen(http_request), 0);
+                }
+                /* Problem: when you want to send packet all requests, it will make program hanging */
+                // char *total_reqs=copy_str_n_times(http_request, this->total_req-this->sent_req);
+                // send(sockfd, total_reqs, strlen(total_reqs), 0);
+                sent_req=this->total_req-this->num_gap;
+            } else {
+                // check if total_req < num_gap
+                if(this->total_req > this->num_gap){
+                    for(int i=0;i<this->num_gap;i++){
+                        send(sockfd, http_request, strlen(http_request), 0);
+                    }
+                    // char *total_reqs=copy_str_n_times(http_request, this->total_req-this->sent_req);
+                    // send(sockfd, total_reqs, strlen(total_reqs), 0);
+                    sent_req+=this->num_gap;
+                } else {
+                    for(int i=0;i<this->total_req;i++){
+                        send(sockfd, http_request, strlen(http_request), 0);
+                    }
+                    // char *total_reqs=copy_str_n_times(http_request, this->total_req);
+                    // send(sockfd, total_reqs, strlen(total_reqs), 0);
+                    sent_req+=this->total_req;
+                }
+            }
+            printf("Sent: %d\n", sent_req);
+            this->sent_req+=sent_req;
+            // check connection state first
+            // check_tcp_conn_stat(sockfd);
+            if(get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
+                // terminate
+                exit(1);
+            }
+            // call recv
+            control_var_t *control_var;
+            control_var=multi_bytes_http_parsing_state_machine(sockfd, sent_req);
+            // TODO: handle control_var
+            // - dealing with connection close (open another new connection to send rest reqs) ... 
+            this->rcvd_res+=sent_req; // this should be check control_var first (whether if there has any error)
+        }
+    } else {
+        /* not pipeline */
+        for(int i=0;i<this->total_req;i++){
+            // send one
+            send(sockfd, http_request, strlen(http_request), 0);
+            // recv one
+            control_var_t *control_var;
+            control_var=multi_bytes_http_parsing_state_machine(sockfd, 1);
+        }
+    }
 }
 
 conn_mgnt_t *
@@ -147,7 +293,9 @@ create_conn_mgnt(
     mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
     for(int i=0;i<args->conc;i++){
         // create sockfd
-        mgnt->sockets[i].sockfd=create_tcp_conn(args->host, itoa(args->port));
+        // mgnt->sockets[i].sockfd=create_tcp_conn(args->host, itoa(args->port));
+        mgnt->sockets[i].sockfd=create_tcp_keepalive_conn(
+            args->host, itoa(args->port), 5, 1, 5);
         if(mgnt->sockets[i].sockfd<0){
             printf("Fail to reate sockfd: %d\n", mgnt->sockets[i].sockfd);
             exit(1);

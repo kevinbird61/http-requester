@@ -11,7 +11,7 @@
 #include "conn.h"
 #include "http.h"
 
-#define MAX_RETRY       (5)
+#define MAX_RETRY       (3)
 #define NUM_GAP         (500)
 
 struct _conn_t {
@@ -39,7 +39,10 @@ conn_mgnt_t *create_conn_mgnt(parsed_args_t *args);
  *  - handle all connections (with different cases)
  *  - retry the unanswer one
  */
+// single thread, multiple socket (non-blocking)
 int conn_mgnt_run(conn_mgnt_t *this);
+// single thread, single socket
+int conn_mgnt_run_blocking(conn_mgnt_t *this);
 // update args
 int conn_mgnt_update_args(parsed_args_t *args);
 // update num_gap
