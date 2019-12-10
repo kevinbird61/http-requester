@@ -105,6 +105,7 @@ multi_bytes_http_parsing_state_machine(
             case RCODE_FIN:
             case RCODE_NEXT_RESP:
                 puts("Finish one respose.\n");
+                control_var->num_resp++;
                 num_reqs--; // finish one response
                 /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
