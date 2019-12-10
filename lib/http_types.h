@@ -94,7 +94,7 @@ typedef struct _http_req_header_status_t {
 // response header
 typedef struct _http_res_header_status_t {
     // essential fields
-    u32 total_payload_length;
+    u16 msg_hdr_len;
     // status-line
     u8 http_ver;
     u8 status_code;
@@ -167,6 +167,7 @@ typedef struct _state_machine_t {
     u8  p_state;
     /* idx */
     u32 last_fin_idx;
+    u32 prev_rcv_len; // previous recv bytes
     u32 buf_idx;
     u32 parsed_len;
     /* size */

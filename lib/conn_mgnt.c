@@ -23,12 +23,65 @@ conn_mgnt_run(conn_mgnt_t *this)
         exit(1);
     }
 
+    // record total connection
+    this->total_req=this->args->conn;
+
     if(this->args->enable_pipe){
         /* support pipeline */
-        // send num_gap in one time, then recv all
-        
+        while(this->rcvd_res<this->total_req){
+            // send num_gap in one time, then recv all
+            // , check the rest # of reqs: 
+            int sent_req=0;
+            if(this->sent_req > (this->total_req-this->num_gap)){
+                for(int i=0;i<(this->total_req-this->sent_req);i++){
+                    send(sockfd, http_request, strlen(http_request), 0);
+                }
+                /* Problem: when you want to send packet all requests, it will make program hanging */
+                // char *total_reqs=copy_str_n_times(http_request, this->total_req-this->sent_req);
+                // send(sockfd, total_reqs, strlen(total_reqs), 0);
+                sent_req=this->total_req-this->num_gap;
+            } else {
+                // check if total_req < num_gap
+                if(this->total_req > this->num_gap){
+                    for(int i=0;i<this->num_gap;i++){
+                        send(sockfd, http_request, strlen(http_request), 0);
+                    }
+                    // char *total_reqs=copy_str_n_times(http_request, this->total_req-this->sent_req);
+                    // send(sockfd, total_reqs, strlen(total_reqs), 0);
+                    sent_req+=this->num_gap;
+                } else {
+                    for(int i=0;i<this->total_req;i++){
+                        send(sockfd, http_request, strlen(http_request), 0);
+                    }
+                    // char *total_reqs=copy_str_n_times(http_request, this->total_req);
+                    // send(sockfd, total_reqs, strlen(total_reqs), 0);
+                    sent_req+=this->total_req;
+                }
+            }
+            printf("Sent: %d\n", sent_req);
+            this->sent_req+=sent_req;
+            // check connection state first
+            // check_tcp_conn_stat(sockfd);
+            if(get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
+                // terminate
+                exit(1);
+            }
+            // call recv
+            control_var_t *control_var;
+            control_var=multi_bytes_http_parsing_state_machine(sockfd, sent_req);
+            // TODO: handle control_var
+            // - dealing with connection close (open another new connection to send rest reqs) ... 
+            this->rcvd_res+=sent_req; // this should be check control_var first (whether if there has any error)
+        }
     } else {
         /* not pipeline */
+        for(int i=0;i<this->total_req;i++){
+            // send one
+            send(sockfd, http_request, strlen(http_request), 0);
+            // recv one
+            control_var_t *control_var;
+            control_var=multi_bytes_http_parsing_state_machine(sockfd, 1);
+        }
     }
 }
 
