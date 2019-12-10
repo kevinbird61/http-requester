@@ -873,13 +873,7 @@ http_handle_state_machine_ret(
             // change attributes in http_req
             http_req_obj_ins_header_by_idx(&args->http_req, REQ_HOST, args->host);
             printf("================================================================================\n");
-            // printf("%-50s: %s\n", "Target URL: ", (char*)args->url==NULL? "None": (char*)args->url);
-            struct urls *url_trav=args->urls;
-            printf("%-50s:\n", "Target URL(s): ");
-            while(url_trav!=NULL){
-                printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
-                url_trav=url_trav->next;
-            }
+            printf("%-50s: %s\n", "Redirect URL: ", loc);
             printf("%-50s: %d\n", "Port number: ", args->port);
             printf("%-50s: %s\n", "Method: ", args->method);
             printf("********************************************************************************\n");
