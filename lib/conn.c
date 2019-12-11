@@ -60,8 +60,16 @@ create_tcp_conn(
         return -1;
     }
 
+    // get sock info (server & client side)
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof(s));
-    printf("client: connecting to %s\n", s);
+    struct sockaddr_in sin;
+    socklen_t len = sizeof(sin);
+    if (getsockname(sockfd, (struct sockaddr *)&sin, &len) == -1){
+        perror("getsockname");
+    }
+
+    // logging
+    LOG(INFO, "[Success][client, port=%d]: connecting to %s:%d", ntohs(sin.sin_port), s, ntohs( ((struct sockaddr_in*)p->ai_addr)->sin_port) );
     freeaddrinfo(res);
 
     return sockfd;

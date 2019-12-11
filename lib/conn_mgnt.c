@@ -27,13 +27,11 @@ conn_mgnt_run(conn_mgnt_t *this)
 
     if(this->args->enable_pipe){
         /* support pipeline */
-        // using fd_set to handle all connection
-        int maxfd=-1;
-        fd_set rfds;
-        FD_ZERO(&rfds);
+        // using poll()
+        struct pollfd ufds[this->args->conc];
         for(int i=0;i<this->args->conc;i++){
-            if(this->sockets[i].sockfd>maxfd){maxfd=this->sockets[i].sockfd;}
-            FD_SET(this->sockets[i].sockfd, &rfds);
+            ufds[i].fd=this->sockets[i].sockfd;
+            ufds[i].events = POLLIN;
         }
 
         // each sockfd check its workload, and send its request 
@@ -75,57 +73,29 @@ conn_mgnt_run(conn_mgnt_t *this)
                 } /*  */
             } /* each socket send their workload */
 
-            // using select to pick which fd can rcv
+            // using poll()
             int ret=0;
-            if ( (ret=select(maxfd+1, &rfds, NULL, NULL, &tv))>0 ) {
+            if ( (ret= poll(ufds, this->args->conc, 500) )>0 ) { // 0.5 sec
                 for(int i=0;i<this->args->conc;i++){
                     // check each one if there have any available rcv or not
-                    if ( FD_ISSET(this->sockets[i].sockfd, &rfds) ) {
+                    if ( ufds[i].revents & POLLIN ) {
                         control_var_t *control_var;
                         control_var=multi_bytes_http_parsing_state_machine(this->sockets[i].sockfd, this->sockets[i].sent_req);
                         // TODO: check control_var's ret, if no error, then we can increase counter
                         this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
                         all_fin+=this->sockets[i].sent_req;
                         this->sockets[i].sent_req=0;
-                        /*this->sockets[i].rcvd_res+=control_var->num_resp;
-                        all_fin+=control_var->num_resp;
-                        this->sockets[i].sent_req-=control_var->num_resp;*/
                         this->sockets[i].retry=0; // if this socket has sent something, reset retry
-                        ret--;
+                        // ret--;
                     }
-                    if(!ret){break;}
+                    // if(!ret){break;}
                 }
+            } else if(ret==-1) {
+                perror("poll");
             } else {
                 // need to wait more time
-                perror("select timeout error.");
-                // increase waiting time
-                // tv.tv_usec=5000;
+                printf("Timeout occurred! No data after waiting seconds.\n");
                 // check which socket has unfinished (e.g. sent_req > 0)
-                for(int i=0;i<this->args->conc;i++){
-                    if(this->sockets[i].sent_req>0){
-                        if(this->sockets[i].retry>MAX_RETRY){
-                            // Question: Is this caused by timeout?
-                            // FIXME: need to check socket status first?
-                            // need to reconstruct socket
-                            FD_CLR(this->sockets[i].sockfd, &rfds);
-                            this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
-                            if(this->sockets[i].sockfd<0){
-                                printf("(Reconstruct) Fail to reate sockfd: %d\n", this->sockets[i].sockfd);
-                                exit(1);
-                            } 
-                            FD_SET(this->sockets[i].sockfd, &rfds);
-                            if(this->sockets[i].sockfd>maxfd){maxfd=this->sockets[i].sockfd;}
-
-                            // reload
-                            this->sockets[i].unsent_req= (this->sockets[i].unsent_req < 0) ? 0 : this->sockets[i].unsent_req;
-                            this->sockets[i].unsent_req+=this->sockets[i].sent_req;
-                            this->sockets[i].sent_req=0;
-                            this->sockets[i].retry=0;
-                        } else {
-                            this->sockets[i].retry++;
-                        }
-                    }
-                }
                 /** FIXME: need to set the retry-retry limitation */
             }
         }

@@ -10,6 +10,7 @@
 #include <netinet/tcp.h> // TCP_*
 
 /* create connections */
+#include "logger.h"
 #include "utils.h"
 
 extern char *tcpi_state_str[];

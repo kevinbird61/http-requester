@@ -22,6 +22,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [4]={"file", required_argument, NULL, 'f'},
         [5]={"method", required_argument, NULL, 'm'},
         [6]={"pipe", no_argument, NULL, 'i'},
+        [7]={"log", no_argument, NULL, 'l'},
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -61,12 +62,12 @@ argparse(
 {
     int c;
     int digit_optind=0;
-
+    log_visible=0;
     while(1){
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":hu:p:m:c:n:f:", options, &option_index);
+        c=getopt_long(argc, argv, ":lihu:p:m:c:n:f:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -124,6 +125,10 @@ argparse(
             case 'm':   // method
                 (*this)->method=optarg;
                 (*this)->flags|=SPE_METHOD;
+                break;
+            case 'l':
+                printf("Enable logging.\n");
+                log_visible=1;
                 break;
             case 'i':   // pipeline
                 printf("Enable HTTP pipelining.\n");

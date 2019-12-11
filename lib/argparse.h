@@ -2,10 +2,11 @@
 #define __ARGPARSE__
 
 #include <getopt.h>
+#include "logger.h"
 #include "types.h"
 #include "http.h"
 
-#define NUM_PARAMS          (10)
+#define NUM_PARAMS          (9)
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define AGENT               "http-requester-c"
