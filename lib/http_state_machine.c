@@ -181,6 +181,7 @@ http_resp_parser(
             if(!(--state_m->content_length)){
                 LOG(INFO, "[CL] Parsing process has been done. Total content length: %d bytes (%d KB)", state_m->total_content_length, state_m->total_content_length/1024);
                 control_var->rcode=RCODE_FIN;
+                // return control_var;
                 break;
             }
             continue; // if not enough, then keep going
@@ -224,6 +225,9 @@ http_resp_parser(
                     }
                     state_m->p_state=next_http_state(state_m->p_state, '\r');
                     state_m->parsed_len=0;
+                } else if(state_m->p_state == REASON_OR_RESOURCE && state_m->parsed_len==1){
+                    // special case (when server don't send reason phase), need to change it to HEADER here
+                    state_m->p_state=next_http_state(state_m->p_state, '\r');
                 }
                 break;
             case '\n':
@@ -916,6 +920,7 @@ next_http_state(http_state cur_state, char ch)
         // header
         case HEADER:
             switch(ch){
+                case '\r':
                 case '\n':
                     return FIELD_NAME;
                 default:
