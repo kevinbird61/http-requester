@@ -95,7 +95,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                 // need to wait more time
                 perror("select timeout error.");
                 // increase waiting time
-                tv.tv_sec++;
+                tv.tv_usec=5000;
                 // check which socket has unfinished (e.g. sent_req > 0)
                 for(int i=0;i<this->args->conc;i++){
                     if(this->sockets[i].sent_req>0){
@@ -105,11 +105,15 @@ conn_mgnt_run(conn_mgnt_t *this)
                             // need to reconstruct socket
                             /*this->sockets[i].sockfd=create_tcp_keepalive_conn(
                                 this->args->host, itoa(this->args->port), 5, 1, 5);*/
+                            FD_CLR(this->sockets[i].sockfd, &rfds);
                             this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
                             if(this->sockets[i].sockfd<0){
                                 printf("(Reconstruct) Fail to reate sockfd: %d\n", this->sockets[i].sockfd);
                                 exit(1);
-                            }
+                            } 
+                            FD_SET(this->sockets[i].sockfd, &rfds);
+                            if(this->sockets[i].sockfd>maxfd){maxfd=this->sockets[i].sockfd;}
+
                             // reload
                             this->sockets[i].unsent_req= (this->sockets[i].unsent_req < 0) ? 0 : this->sockets[i].unsent_req;
                             this->sockets[i].unsent_req+=this->sockets[i].sent_req;
@@ -132,14 +136,16 @@ conn_mgnt_run(conn_mgnt_t *this)
                         all_fin, this->total_req,
                         this->sockets[i].sockfd, this->sockets[i].unsent_req,
                         this->sockets[i].sent_req, this->sockets[i].rcvd_res);
-                // send one
-                if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
-                    // sent error
-                    perror("Socket sent error.");
-                    exit(1);
+                // send one if there have available workload
+                if(this->sockets[i].sent_req==0 && this->sockets[i].unsent_req>0){
+                    if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                        // sent error
+                        perror("Socket sent error.");
+                        exit(1);
+                    }
+                    this->sockets[i].unsent_req--;
+                    this->sockets[i].sent_req++;
                 }
-                this->sockets[i].unsent_req--;
-                this->sockets[i].sent_req++;
             }
             int ret=0;
             if ( (ret=select(maxfd+1, &rfds, NULL, NULL, &tv))>0 ) {
@@ -160,22 +166,33 @@ conn_mgnt_run(conn_mgnt_t *this)
             } else {
                 // need to wait more time
                 perror("select timeout error.");
-                // increase waiting time
-                tv.tv_sec++;
+                tv.tv_usec=5000;
                 // check which socket has unfinished (e.g. sent_req > 0)
                 for(int i=0;i<this->args->conc;i++){
                     if(this->sockets[i].sent_req>0){
                         if(this->sockets[i].retry>MAX_RETRY){
                             // Question: Is this caused by timeout?
                             // FIXME: need to check socket status first?
+                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_ESTABLISHED){
+                                // we don't need to reconstruct socket for it
+                                control_var_t *control_var;
+                                control_var=multi_bytes_http_parsing_state_machine(this->sockets[i].sockfd, this->sockets[i].sent_req);
+                                // TODO: check control_var's ret, if no error, then we can increase counter
+                                this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
+                                all_fin+=this->sockets[i].sent_req;
+                                this->sockets[i].sent_req=0;
+                                this->sockets[i].retry=0; // if this socket has sent something, reset retry                    
+                                continue;
+                            } 
                             // need to reconstruct socket
-                            /* this->sockets[i].sockfd=create_tcp_keepalive_conn(
-                                this->args->host, itoa(this->args->port), 5, 1, 5);*/
+                            FD_CLR(this->sockets[i].sockfd, &rfds);
                             this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
                             if(this->sockets[i].sockfd<0){
                                 printf("(Reconstruct) Fail to reate sockfd: %d\n", this->sockets[i].sockfd);
                                 exit(1);
                             }
+                            FD_SET(this->sockets[i].sockfd, &rfds);
+                            if(this->sockets[i].sockfd>maxfd){maxfd=this->sockets[i].sockfd;}
                             // reload
                             this->sockets[i].unsent_req= (this->sockets[i].unsent_req < 0) ? 0 : this->sockets[i].unsent_req;
                             // printf("unsent: %d, sent: %d\n", this->sockets[i].unsent_req, this->sockets[i].sent_req);
@@ -293,9 +310,9 @@ create_conn_mgnt(
     mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
     for(int i=0;i<args->conc;i++){
         // create sockfd
-        // mgnt->sockets[i].sockfd=create_tcp_conn(args->host, itoa(args->port));
-        mgnt->sockets[i].sockfd=create_tcp_keepalive_conn(
-            args->host, itoa(args->port), 5, 1, 5);
+        mgnt->sockets[i].sockfd=create_tcp_conn(args->host, itoa(args->port));
+        // mgnt->sockets[i].sockfd=create_tcp_keepalive_conn(
+        //    args->host, itoa(args->port), 5, 1, 5);
         if(mgnt->sockets[i].sockfd<0){
             printf("Fail to reate sockfd: %d\n", mgnt->sockets[i].sockfd);
             exit(1);
