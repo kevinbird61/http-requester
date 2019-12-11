@@ -37,7 +37,6 @@ multi_bytes_http_parsing_state_machine(
      */
     control_var_t *control_var;
     while(flag){
-        check_tcp_conn_stat(sockfd);
         // call parser (store the state and response obj into state_machine's instance)
         control_var=http_resp_parser(state_m);
         switch (control_var->rcode)
