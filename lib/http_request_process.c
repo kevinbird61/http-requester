@@ -82,7 +82,7 @@ http_req_finish(
     }
 
     // CRLF 
-    int h_len=2; // CRLF
+    int h_len=3; // CRLF
     *rawdata=realloc(*rawdata, strlen(*rawdata)+h_len);
     if(*rawdata==NULL){
         return ERR_MEMORY;

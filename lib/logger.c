@@ -11,7 +11,7 @@ char *log_level_str[]={
     [DANGER]="DANGER",
     [ERROR]="ERROR",
     /* log-only */
-    [LOGONLY]="LOG-ONLY",
+    [LOGONLY]="LOGONLY",
     [LOG_LEVEL_MAXIMUM]=NULL
 };
 
