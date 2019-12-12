@@ -10,6 +10,8 @@ int main(int argc, char *argv[])
     }
 
     int client_sock_fd=create_tcp_conn(argv[1], argv[2]);
+    // init our state machine
+    state_machine_t *state_m=create_parsing_state_machine();
     printf("Number of requests: %d\n", atoi(argv[3]));
     // send GET request
     char sendbuf[1024], buf[MAXDATASIZE];
@@ -24,7 +26,7 @@ int main(int argc, char *argv[])
     //send(client_sock_fd, sendbuf, strlen(sendbuf), 0);
     
 
-    control_var_t *control_var=multi_bytes_http_parsing_state_machine(client_sock_fd, atoi(argv[3]));
+    control_var_t *control_var=multi_bytes_http_parsing_state_machine(state_m, client_sock_fd, atoi(argv[3]));
     
 
     return 0;

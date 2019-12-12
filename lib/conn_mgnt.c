@@ -26,6 +26,8 @@ conn_mgnt_run(conn_mgnt_t *this)
     tv.tv_sec=0;
     tv.tv_usec=0;
 
+    // init our state machine
+    state_machine_t *state_m=create_parsing_state_machine();
     // record total connection
     this->total_req=this->args->conn;
 
@@ -110,7 +112,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                     // check each one if there have any available rcv or not
                     if ( ufds[i].revents & POLLIN ) {
                         control_var_t *control_var;
-                        control_var=multi_bytes_http_parsing_state_machine(this->sockets[i].sockfd, this->sockets[i].sent_req);
+                        control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
                         // TODO: check control_var's ret, if no error, then we can increase counter
                         this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
                         all_fin+=this->sockets[i].sent_req;
@@ -161,7 +163,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                     // check each one if there have any available rcv or not
                     if ( ufds[i].revents & POLLIN ) {
                         control_var_t *control_var;
-                        control_var=multi_bytes_http_parsing_state_machine(this->sockets[i].sockfd, this->sockets[i].sent_req);
+                        control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
                         // TODO: check control_var's ret, if no error, then we can increase counter
                         this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
                         all_fin+=this->sockets[i].sent_req;
@@ -182,6 +184,10 @@ conn_mgnt_run(conn_mgnt_t *this)
             }
         }
     }
+
+    /* free */
+    free(http_request);
+    free(state_m);
 
     /* finish: need to print all the statistics again */
 
@@ -210,6 +216,8 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
         exit(1);
     }
 
+    // init our state machine
+    state_machine_t *state_m=create_parsing_state_machine();
     // record total connection
     this->total_req=this->args->conn;
 
@@ -255,7 +263,7 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
             }
             // call recv
             control_var_t *control_var;
-            control_var=multi_bytes_http_parsing_state_machine(sockfd, sent_req);
+            control_var=multi_bytes_http_parsing_state_machine(state_m, sockfd, sent_req);
             // TODO: handle control_var
             // - dealing with connection close (open another new connection to send rest reqs) ... 
             this->rcvd_res+=sent_req; // this should be check control_var first (whether if there has any error)
@@ -267,7 +275,7 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
             send(sockfd, http_request, strlen(http_request), 0);
             // recv one
             control_var_t *control_var;
-            control_var=multi_bytes_http_parsing_state_machine(sockfd, 1);
+            control_var=multi_bytes_http_parsing_state_machine(state_m, sockfd, 1);
         }
     }
 }

@@ -2,20 +2,20 @@
 
 control_var_t *
 multi_bytes_http_parsing_state_machine(
+    state_machine_t *state_m,
     int sockfd,
     u32 num_reqs)
 {
     /* create objs */
-    state_machine_t *state_m=create_parsing_state_machine();
+    // state_machine_t *state_m=create_parsing_state_machine();
+    // reset state machine
+    reset_parsing_state_machine(state_m);
+
     /* get all the data:
      * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
      */
     /* stats */
     int flag=1, recvbytes=0;
-    state_m->resp=create_http_header_status(state_m->buff);
-    state_m->p_state=VER;
-    state_m->resp->status_code=0;
-    state_m->resp->http_ver=0;
 
     /* Parse the data, and store the result into respones objs */
     /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
@@ -124,8 +124,6 @@ multi_bytes_http_parsing_state_machine(
     LOG(NORMAL, "TCP connection state: %s", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
     LOG(NORMAL, "Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)",
         strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
-
-    free(state_m->buff);
 
     return control_var;
 }
@@ -443,10 +441,8 @@ http_resp_parser(
         }
     }
 
-    // LOG(INFO, "Total received: %d bytes", state_m->buf_idx); // buf_idx can be rotated, so currently it is not correct in this func
-    // printf("Parsed: %d (Total data length: %ld)\n", state_m->buf_idx, strlen(state_m->buff));
+    // finish one request
     control_var->rcode=RCODE_FIN;
-    //control_var->rcode=RCODE_POLL_DATA;
     if(state_m->buf_idx <= strlen(state_m->buff)){
         // need to call parser again 
         control_var->rcode=RCODE_NEXT_RESP;
@@ -459,6 +455,32 @@ create_parsing_state_machine()
 {
     state_machine_t *new_obj = calloc(1, sizeof(state_machine_t));
     new_obj->buff=calloc(RECV_BUFF_SCALE*CHUNK_SIZE, sizeof(char));
+    new_obj->resp=create_http_header_status(new_obj->buff);
     new_obj->max_buff_size=RECV_BUFF_SCALE*CHUNK_SIZE;
     return new_obj;
+}
+
+void 
+reset_parsing_state_machine(
+    state_machine_t *state_m)
+{
+    // state_m->resp=create_http_header_status(state_m->buff);
+    memset(state_m->resp, 1 , sizeof(http_res_header_status_t));
+    state_m->resp->buff=state_m->buff;
+
+    state_m->p_state=VER;
+    state_m->resp->status_code=0;
+    state_m->resp->http_ver=0;
+
+    state_m->last_fin_idx=0;
+    state_m->prev_rcv_len=0;
+    state_m->buf_idx=0;
+    state_m->data_size=0;
+    
+    state_m->use_content_length=0;
+    state_m->use_chunked=0;
+    state_m->content_length=0;
+    state_m->total_content_length=0;
+    state_m->curr_chunked_size=0;
+    state_m->parsed_len=0;
 }
