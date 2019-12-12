@@ -176,7 +176,7 @@ http_resp_parser(
         if(state_m->use_chunked){
             if(!(--state_m->chunked_size)){
                 state_m->curr_chunked_size++;
-                LOG(INFO, "Finish chunk, idx: %d (Parsed: %d)\n", state_m->buf_idx-1, state_m->curr_chunked_size);
+                LOG(INFO, "Finish chunk, idx: %d (Parsed: %d)", state_m->buf_idx-1, state_m->curr_chunked_size);
                 state_m->parsed_len=0;
                 state_m->use_chunked=0;
                 state_m->p_state=NEXT_CHUNKED;
@@ -338,7 +338,8 @@ http_resp_parser(
                             // FIXME: is this right condition?
                             state_m->chunked_size=atoi(tmp);
                             LOG(INFO, "[Last Chunk] size = %d", state_m->chunked_size);
-                            state_m->use_chunked=1;
+                            flag=0; // exit
+                            // state_m->use_chunked=1;
                         }
                         free(tmp);
                     }
@@ -446,7 +447,7 @@ http_resp_parser(
     // printf("Parsed: %d (Total data length: %ld)\n", state_m->buf_idx, strlen(state_m->buff));
     control_var->rcode=RCODE_FIN;
     //control_var->rcode=RCODE_POLL_DATA;
-    if(state_m->buf_idx < strlen(state_m->buff)){
+    if(state_m->buf_idx <= strlen(state_m->buff)){
         // need to call parser again 
         control_var->rcode=RCODE_NEXT_RESP;
     }

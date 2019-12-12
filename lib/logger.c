@@ -55,7 +55,7 @@ syslog(
 
         // write into screen
         if(loglevel<LOGONLY){
-            fprintf(stdout, "%s\n", loginfo);
+            fprintf(stdout, "%s", loginfo);
         } 
 
         // free
