@@ -15,19 +15,20 @@ multi_bytes_http_parsing_state_machine(
      * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
      */
     /* stats */
-    int flag=1, recvbytes=0;
-
+    int flag=1, recvbytes=0, fin_resp=0;
+    control_var_t *control_var;
+    
     /* Parse the data, and store the result into respones objs */
     /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
      *  to prevent occupying too much memory ?
      */
-    control_var_t *control_var;
     while(flag){
         // call parser (store the state and response obj into state_machine's instance)
         control_var=http_resp_parser(state_m);
         switch (control_var->rcode)
         {
             case RCODE_POLL_DATA:
+                // if not enough, keep polling 
                 if(!num_reqs){
                     flag=0;
                     break;
@@ -51,6 +52,15 @@ multi_bytes_http_parsing_state_machine(
                     state_m->last_fin_idx=0; 
                 }
                 
+                /* FIXME: check the connection state before call recv() */
+                // check_tcp_conn_stat(sockfd);
+                if(get_tcp_conn_stat(sockfd)==TCP_CLOSE){
+                    /* connection is close or ready to close */
+                    LOG(WARNING, "Connection(%d) is closed.", sockfd);
+                    flag=0;
+                    break;
+                }
+
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
                 state_m->prev_rcv_len=recvbytes;
                 
@@ -66,6 +76,7 @@ multi_bytes_http_parsing_state_machine(
                         LOG(NORMAL, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
                         // STATS_DUMP();
                         flag=0;
+                        break;
                         // exit(1);
                     }
                 }
@@ -91,8 +102,8 @@ multi_bytes_http_parsing_state_machine(
             case RCODE_FIN:
             case RCODE_NEXT_RESP:
                 LOG(WARNING, "Finish one respose.");
-                control_var->num_resp++;
                 num_reqs--; // finish one response
+                fin_resp++;
                 /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
 
@@ -114,17 +125,20 @@ multi_bytes_http_parsing_state_machine(
                 break;
             default:
                 LOG(ERROR, "Unknown: %d", control_var->rcode);
-                exit(1); // should terminate.
+                // exit(1); // should terminate.
+                flag=0;
+                break;
         }
     }
 
     // dump the statistics
-    STATS_DUMP();
+    // STATS_DUMP();
     // output the statistics
     LOG(NORMAL, "TCP connection state: %s", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
     LOG(NORMAL, "Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)",
         strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
-
+    
+    control_var->num_resp=fin_resp;
     return control_var;
 }
 

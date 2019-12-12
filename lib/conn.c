@@ -191,7 +191,7 @@ check_tcp_conn_stat(int sockfd)
         exit(EXIT_FAILURE);
     }
     /* Perform the check here */
-    printf("[TCP conn state: %s]\n", tcpi_state_str[tcp_state.tcpi_state]);
+    printf("(%d)[TCP conn state: %s]\n", sockfd, tcpi_state_str[tcp_state.tcpi_state]);
 
     return 0;
 }

@@ -44,6 +44,7 @@ conn_mgnt_run(conn_mgnt_t *this)
         int all_fin=0;
         // if unfinished, keep send & recv
         while(all_fin<this->total_req){
+            printf("Work status(%d/%d)\n", all_fin, this->total_req);
             // each socket send num_gap at one time
             for(int i=0;i<this->args->conc;i++){
                 // each sockfd's status
@@ -113,14 +114,22 @@ conn_mgnt_run(conn_mgnt_t *this)
                     if ( ufds[i].revents & POLLIN ) {
                         control_var_t *control_var;
                         control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
+                        // printf("Control_var: %d, sent_req: %d\n", control_var->num_resp, this->sockets[i].sent_req);
                         // TODO: check control_var's ret, if no error, then we can increase counter
+                        // - this part need to handle error when there using http pipelining 
+                        // - in some case, control_var->num_resp != sent_req (need to retransmit)
+                        //      e.g. using very big number of --burst (pipeline size)
                         this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
                         all_fin+=this->sockets[i].sent_req;
                         this->sockets[i].sent_req=0;
+
+                        // this->sockets[i].unsent_req+=(this->sent_req-control_var->num_resp);
+                        // this->sockets[i].rcvd_res+=control_var->num_resp;
+                        // all_fin+=control_var->num_resp;
+                        // this->sockets[i].sent_req-=control_var->num_resp;
                         this->sockets[i].retry=0; // if this socket has sent something, reset retry
-                        // ret--;
+                        // printf("(%d: %s) Finished: %d (un: %d/ sent: %d)\n", this->sockets[i].sockfd, tcpi_state_str[get_tcp_conn_stat(this->sockets[i].sockfd)], control_var->num_resp, this->sockets[i].unsent_req, this->sockets[i].sent_req);
                     }
-                    // if(!ret){break;}
                 }
             } else if(ret==-1) {
                 perror("poll");
@@ -129,6 +138,15 @@ conn_mgnt_run(conn_mgnt_t *this)
                 LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
                 // check which socket has unfinished (e.g. sent_req > 0)
                 /** FIXME: need to set the retry-retry limitation */
+                for(int i=0; i<this->args->conc; i++){
+                    this->sockets[i].retry++;
+                    if(this->sockets[i].retry>MAX_RETRY){
+                        // reset the connection
+                        close(this->sockets[i].sockfd);
+                        this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                        this->sockets[i].retry=0;
+                    }
+                }
             }
         }
     } else {
@@ -184,6 +202,9 @@ conn_mgnt_run(conn_mgnt_t *this)
             }
         }
     }
+
+    // dump the statistics
+    STATS_DUMP();
 
     /* free */
     free(http_request);
