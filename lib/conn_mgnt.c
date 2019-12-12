@@ -41,7 +41,7 @@ conn_mgnt_run(conn_mgnt_t *this)
             // each socket send num_gap at one time
             for(int i=0;i<this->args->conc;i++){
                 // each sockfd's status
-                printf("(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
+                LOG(NORMAL, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
                     all_fin, this->total_req,
                     this->sockets[i].sockfd, this->sockets[i].unsent_req,
                     this->sockets[i].sent_req, this->sockets[i].rcvd_res);
@@ -94,7 +94,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                 perror("poll");
             } else {
                 // need to wait more time
-                printf("Timeout occurred! No data after waiting seconds.\n");
+                LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
                 // check which socket has unfinished (e.g. sent_req > 0)
                 /** FIXME: need to set the retry-retry limitation */
             }
@@ -110,7 +110,7 @@ conn_mgnt_run(conn_mgnt_t *this)
         int all_fin=0;
         while(all_fin<this->total_req){
             for(int i=0;i<this->args->conc;i++){
-                printf("(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
+                LOG(NORMAL, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
                         all_fin, this->total_req,
                         this->sockets[i].sockfd, this->sockets[i].unsent_req,
                         this->sockets[i].sent_req, this->sockets[i].rcvd_res);
@@ -145,7 +145,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                 perror("poll");
             } else {
                 // need to wait more time
-                printf("Timeout occurred! No data after waiting seconds.\n");
+                LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
                 // check which socket has unfinished (e.g. sent_req > 0)
    
                 /** FIXME: need to set the retry-retry limitation */
