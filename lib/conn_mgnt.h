@@ -15,6 +15,9 @@
 #define MAX_RETRY       (3)
 #define NUM_GAP         (500)
 
+extern u32  burst_length;
+extern u8   fast;
+
 struct _conn_t {
     int             sockfd; 
     int             unsent_req; 

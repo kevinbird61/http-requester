@@ -2,11 +2,12 @@
 #define __ARGPARSE__
 
 #include <getopt.h>
+#include "conn_mgnt.h" /* fetch global var */
 #include "logger.h"
 #include "types.h"
 #include "http.h"
 
-#define NUM_PARAMS          (9)
+#define NUM_PARAMS          (11)
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define AGENT               "http-requester-c"

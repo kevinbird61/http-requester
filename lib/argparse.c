@@ -1,15 +1,19 @@
 #include "argparse.h"
 
 /* option we support:
- * - `-h`:              Print helper function
- * - `-c`, --conc:      Specify number of concurrent connections.
- * - `-n`, --conn:      Specify number of total connections. 
+ * - [x] `-h`:              Print helper function
+ * - [x] `-c`, --conc:      Specify number of concurrent connections.
+ * - [x] `-n`, --conn:      Specify number of total connections. 
  *                      (So there will need to execute `conn/conc` times to finish all connections)
- * - `-f`, --file:      Specify input file with HTTP request header template (use to setup those HTTP connections)
- * - `-u`, --url:       Specify URL (if --file & --url both exist, url will override the duplicated part in template file)
- * - `-p`, --port:      Specify target port number
- * - `-m`, --method:    Specify method token
- * - `--pipe`           Enable pipelining
+ * - [x] `-f`, --file:      Specify input file with HTTP request header template (use to setup those HTTP connections)
+ * - [x] `-u`, --url:       Specify URL (if --file & --url both exist, url will override the duplicated part in template file)
+ * - [x] `-p`, --port:      Specify target port number
+ * - [x] `-m`, --method:    Specify method token
+ * - [x] `--pipe`           Enable pipelining
+ * - [x] `--log`            Enable logging
+ * - [ ] `-b, --burst`      Control the num_gap (between send & recv), e.g pipelining size
+ * - [ ] `--fast`           Reduce the send() syscall
+ * ...
  * 
  * (Other: HTTP request headers)
  */
@@ -23,6 +27,8 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [5]={"method", required_argument, NULL, 'm'},
         [6]={"pipe", no_argument, NULL, 'i'},
         [7]={"log", no_argument, NULL, 'l'},
+        [8]={"burst", required_argument, NULL, 'b'},
+        [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -67,7 +73,7 @@ argparse(
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":lihu:p:m:c:n:f:", options, &option_index);
+        c=getopt_long(argc, argv, ":liahb:u:p:m:c:n:f:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -79,6 +85,15 @@ argparse(
                 // puts(options[option_index].name);
                 // puts(optarg);
                 http_req_obj_ins_header_by_idx(&((*this)->http_req), option_index-(NUM_PARAMS-2), optarg);
+                break;
+            case 'a':   // fast (cooperate with -b, burst length)
+                printf("Enable fast transmit (for http pipelining).\n");
+                fast=1;
+                break;
+            case 'b':   // burst length
+                burst_length=atoi(optarg);
+                burst_length=(burst_length<=0)?NUM_GAP:burst_length;
+                printf("Configure burst length = %d (for http pipelining).\n", burst_length);
                 break;
             case 'c':   // concurrent connections
                 (*this)->conc=atoi(optarg);
@@ -351,7 +366,11 @@ print_manual(
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
-    printf("\t-%-2c, --%-7s %-7s: Specify method token.\n", 'm', "method", "METHOD");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'm', "method", "METHOD", "Specify method token");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Packed several http requests together for HTTP pipelining (default is false)");
+
     if(detail){
         printf("[Customized Request Header]-----------------------------------------------------\n");
         for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){

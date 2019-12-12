@@ -1,5 +1,9 @@
 #include "conn_mgnt.h"
 
+// global init
+u32 burst_length=NUM_GAP;
+u8  fast=0; // default is false
+
 int 
 conn_mgnt_run(conn_mgnt_t *this)
 {
@@ -49,26 +53,52 @@ conn_mgnt_run(conn_mgnt_t *this)
                 if(this->sockets[i].sent_req==0){
                     // each socket send num_gap (or smaller) at one time
                     if(this->sockets[i].unsent_req < this->num_gap && this->sockets[i].unsent_req>=0){
-                        // if < num_gap, just send all
-                        while(this->sockets[i].unsent_req--){
-                            if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                        // check if --fast is enable or not
+                        if(!fast){
+                            // if < num_gap, just send all
+                            while(this->sockets[i].unsent_req--){
+                                if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                                    // sent error
+                                    perror("Socket sent error.");
+                                    exit(1);
+                                }
+                                this->sockets[i].sent_req++;
+                            }
+                        } else {
+                            // fast is enable, pack several send request together
+                            char *packed_req=copy_str_n_times(http_request, this->sockets[i].unsent_req);
+                            if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                 // sent error
-                                perror("Socket sent error.");
+                                perror("Socket sent error. (packed req)");
                                 exit(1);
                             }
-                            this->sockets[i].sent_req++;
+                            this->sockets[i].sent_req=this->sockets[i].unsent_req;
+                            this->sockets[i].unsent_req=0;
                         }
                     } else if(this->sockets[i].unsent_req >= this->num_gap){
-                        // if not, sent num_gap at one time
-                        for(int j=0;j<this->num_gap;j++){
-                            this->sockets[i].unsent_req--;
-                            if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                        // check if --fast is enable or not
+                        if(!fast){
+                            // if not, sent num_gap at one time
+                            for(int j=0;j<this->num_gap;j++){
+                                this->sockets[i].unsent_req--;
+                                if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                                    // sent error
+                                    perror("Socket sent error.");
+                                    exit(1);
+                                }
+                                this->sockets[i].sent_req++;
+                            }   
+                        } else {
+                            // fast is enable, pack several send request together
+                            char *packed_req=copy_str_n_times(http_request, this->num_gap);
+                            if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                 // sent error
-                                perror("Socket sent error.");
+                                perror("Socket sent error. (packed req)");
                                 exit(1);
                             }
-                            this->sockets[i].sent_req++;
-                        }   
+                            this->sockets[i].sent_req=this->num_gap;
+                            this->sockets[i].unsent_req-=this->num_gap;
+                        }
                     }
                 } /*  */
             } /* each socket send their workload */
@@ -248,7 +278,7 @@ create_conn_mgnt(
 {
     conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
     mgnt->args=args;
-    mgnt->num_gap=NUM_GAP; // default
+    mgnt->num_gap=burst_length; // configurable
 
     /* create socket lists */
     mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
