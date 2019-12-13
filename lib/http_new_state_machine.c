@@ -475,8 +475,9 @@ reset_parsing_state_machine(
     state_machine_t *state_m)
 {
     // state_m->resp=create_http_header_status(state_m->buff);
-    memset(state_m->resp, 1 , sizeof(http_res_header_status_t));
-    memset(state_m->buff, state_m->max_buff_size, sizeof(char));
+    memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
+    memset(state_m->buff, 0x00, state_m->max_buff_size*sizeof(char));
+    state_m->resp->msg_hdr_len=0;
     state_m->resp->buff=state_m->buff;
 
     state_m->p_state=VER;

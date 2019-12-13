@@ -1,6 +1,11 @@
 #include "stats.h"
 
-stat_t statistics;
+stat_t statistics={ 
+    .pkt_byte_cnt=0,
+    .hdr_size=0,
+    .body_size=0,
+    .resp_cnt=0
+};
 
 void 
 stats_inc_code(unsigned char code_enum)
