@@ -8,6 +8,7 @@
 typedef struct _control_var_t {
     int     rcode;
     int     num_resp;
+    int     failed_resp;
     int     return_obj_type;
     void*   return_obj;
 } control_var_t;
@@ -21,7 +22,7 @@ enum {
     RCODE_NOT_SUPPORT,
     RCODE_IMCOMPLETE,
     RCODE_ERROR,
-    RCODE_MAX
+    RCODE_MAXIMUM
 };
 
 #endif 

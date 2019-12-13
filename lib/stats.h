@@ -28,23 +28,40 @@
 
 #include <stdio.h>
 // essential deps
-#include "http_enum.h"
+#include "argparse.h"
+#include "http.h"
 
 typedef struct _statistics_t {
-    // status code (1xx ~ 5xx)
+    /* status code (1xx ~ 5xx) */
     int status_code[5];
-    // connection status
+    int status_code_detail[STATUS_CODE_MAXIMUM];
+    /* connection status */
 
+    /* response number */
+    u64 pkt_byte_cnt; // bytes counts
+    u64 hdr_size;
+    u64 body_size;
+    u64 resp_cnt; // pkt counts (response)
 } stat_t;
 
+/* main statistics (single thread) */
 extern stat_t statistics;
 
-void stats_inc_code(unsigned char code_enum);
+void stats_inc_code(unsigned char code_enum); // status code
+void stats_inc_pkt_bytes(u64 size);
+void stats_inc_hdr_size(u64 size);
+void stats_inc_body_size(u64 size);
+void stats_inc_resp_cnt(u64 resp_num);
 void stats_dump();
 
 // stats for status code
-#define STATS_INC_CODE(status_code) stats_inc_code(status_code)
-#define STATS_DUMP()                stats_dump()
+#define STATS_INC_CODE(status_code)         stats_inc_code(status_code)
+#define STATS_INC_PKT_BYTES(size)           stats_inc_pkt_bytes(size)
+#define STATS_INC_HDR_BYTES(size)           stats_inc_hdr_size(size)
+#define STATS_INC_BODY_BYTES(size)          stats_inc_body_size(size)
+#define STATS_INC_RESP_NUM(cnt)             stats_inc_resp_cnt(cnt)
+
+#define STATS_DUMP()                        stats_dump()
 
 
 #endif

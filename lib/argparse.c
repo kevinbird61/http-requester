@@ -1,5 +1,7 @@
 #include "argparse.h"
 
+u8 verbose=0; // default is false
+
 /* option we support:
  * - [x] `-h`:              Print helper function
  * - [x] `-c`, --conc:      Specify number of concurrent connections.
@@ -13,6 +15,7 @@
  * - [x] `--log`            Enable logging
  * - [ ] `-b, --burst`      Control the num_gap (between send & recv), e.g pipelining size
  * - [ ] `--fast`           Reduce the send() syscall
+ * - [ ] `-v, --verbose`    Output more debug information
  * ...
  * 
  * (Other: HTTP request headers)
@@ -29,6 +32,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [7]={"log", no_argument, NULL, 'l'},
         [8]={"burst", required_argument, NULL, 'b'},
         [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
+        [10]={"verbose", no_argument, NULL, 'v'},
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -73,7 +77,7 @@ argparse(
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":liahb:u:p:m:c:n:f:", options, &option_index);
+        c=getopt_long(argc, argv, ":liavhb:u:p:m:c:n:f:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -132,6 +136,10 @@ argparse(
                         root->next->next=NULL;
                     }
                 }
+                break;
+            case 'v':   // verbose
+                verbose=1;
+                printf("Enable verbose mode.\n");
                 break;
             case 'p':   // port
                 (*this)->port=atoi(optarg);

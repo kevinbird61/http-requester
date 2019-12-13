@@ -24,15 +24,20 @@ extern unsigned char log_visible;
  *      - file location: `/tmp/http_requester_<thread-id>.log`
  * - format: 
  *      [@TIME][@LOG_LEVEL][FUNC] Description.
+ *
+ *  log_visible: avoid logging to have better performance
  */
 #define LOG(loglevel, format, args...)              \
     do {                                            \
+    if(log_visible){                                \
         char *userlog=parse_valist(format, ##args); \
         syslog(loglevel,                            \
             "[%s][%-10s][%s] %s\n",                 \
-            getdate(), LOG_LEVEL_STR[loglevel],     \
+            getdate(),                              \
+            LOG_LEVEL_STR[loglevel],                \
             __func__,                               \
             userlog);                               \
+    }                                               \
     } while(0)
 
 

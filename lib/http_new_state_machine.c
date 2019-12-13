@@ -54,38 +54,27 @@ multi_bytes_http_parsing_state_machine(
                 
                 /* FIXME: check the connection state before call recv() */
                 // check_tcp_conn_stat(sockfd);
-                if(get_tcp_conn_stat(sockfd)==TCP_CLOSE){
-                    /* connection is close or ready to close */
+                /*if(get_tcp_conn_stat(sockfd)==TCP_CLOSE){
+                    // connection is close or ready to close 
                     LOG(WARNING, "Connection(%d) is closed.", sockfd);
                     flag=0;
                     break;
-                }
+                }*/
 
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
                 state_m->prev_rcv_len=recvbytes;
                 
-                if(recvbytes==0 && get_tcp_conn_stat(sockfd)==TCP_CLOSE_WAIT){
-                    // puts(state_m->buff);
-                    // if(state_m->buf_idx < strlen(state_m->buff)){
-                    if(state_m->buf_idx < state_m->data_size){
+                if(recvbytes==0){ // handle the state that RX is empty and server has send fin
+                    if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
                         LOG(NORMAL, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
-                        STATS_DUMP();
                         break;
-                        // exit(1); // debug
                     } else {
                         LOG(NORMAL, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
-                        // STATS_DUMP();
                         flag=0;
                         break;
-                        // exit(1);
                     }
                 }
-                state_m->data_size+=recvbytes;
-                /*if(state_m->data_size>=(state_m->max_buff_size-CHUNK_SIZE)){
-                    state_m->buff=realloc(state_m->buff, (state_m->max_buff_size+=CHUNK_SIZE));
-                    state_m->resp->buff=state_m->buff; // set resp buff to state_m->buff
-                }*/
-                // state_m->parsed_len=0; // because current parse_len is incomplete, need to reset
+                state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
                 break;
             case RCODE_REDIRECT:
                 /* perform redirection, notify caller that need to abort the response and resend */
@@ -95,8 +84,7 @@ multi_bytes_http_parsing_state_machine(
                 break;
             case RCODE_ERROR:
                 // print the error message instead of exit?
-                LOG(WARNING, "Error occur.");
-                // return control_var;
+                LOG(WARNING, "Parsing error occur.");
                 flag=0;
                 break;
             case RCODE_FIN:
@@ -104,6 +92,11 @@ multi_bytes_http_parsing_state_machine(
                 LOG(WARNING, "Finish one respose.");
                 num_reqs--; // finish one response
                 fin_resp++;
+                /* increase stats */
+                STATS_INC_PKT_BYTES(state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
+                STATS_INC_HDR_BYTES(state_m->resp->msg_hdr_len);
+                STATS_INC_BODY_BYTES(state_m->total_content_length);
+                STATS_INC_RESP_NUM(1);
                 /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
 
@@ -122,22 +115,24 @@ multi_bytes_http_parsing_state_machine(
                 state_m->total_content_length=0;
                 state_m->curr_chunked_size=0;
                 state_m->parsed_len=0; // prevent from reading wrong starting point
+                
+                // reset_parsing_state_machine(state_m);
                 break;
+            case RCODE_NOT_SUPPORT: /* cautious: this case could be caused by parsing error. */
+                LOG(WARNING, "Not support.");
+                flag=0; // do not keep parsing, break 
+                /* FIXME: do we need to recover from this kind of error? */
+                break; 
             default:
                 LOG(ERROR, "Unknown: %d", control_var->rcode);
-                // exit(1); // should terminate.
                 flag=0;
                 break;
         }
     }
 
-    // dump the statistics
-    // STATS_DUMP();
-    // output the statistics
-    LOG(NORMAL, "TCP connection state: %s", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
-    LOG(NORMAL, "Total received: %ld bytes (data size: %d bytes, max buff size: %d bytes)",
-        strlen(state_m->buff), state_m->data_size, state_m->max_buff_size);
-    
+    // LOG(NORMAL, "TCP connection state: %s", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
+
+    control_var->failed_resp=num_reqs; // the leftover are unfinish num_resp 
     control_var->num_resp=fin_resp;
     return control_var;
 }
@@ -457,7 +452,8 @@ http_resp_parser(
 
     // finish one request
     control_var->rcode=RCODE_FIN;
-    if(state_m->buf_idx <= strlen(state_m->buff)){
+    // if(state_m->buf_idx <= strlen(state_m->buff)){
+    if(state_m->buf_idx <= state_m->data_size){
         // need to call parser again 
         control_var->rcode=RCODE_NEXT_RESP;
     }
@@ -480,6 +476,7 @@ reset_parsing_state_machine(
 {
     // state_m->resp=create_http_header_status(state_m->buff);
     memset(state_m->resp, 1 , sizeof(http_res_header_status_t));
+    memset(state_m->buff, state_m->max_buff_size, sizeof(char));
     state_m->resp->buff=state_m->buff;
 
     state_m->p_state=VER;

@@ -22,9 +22,13 @@ conn_mgnt_run(conn_mgnt_t *this)
     printf("================================================================================\n");
     
     struct timeval tv;
+    char *packed_req=NULL;
+    int packed_len=0;
     // don't wait
     tv.tv_sec=0;
     tv.tv_usec=0;
+    // timeout
+    int timeout=500;
 
     // init our state machine
     state_machine_t *state_m=create_parsing_state_machine();
@@ -44,7 +48,7 @@ conn_mgnt_run(conn_mgnt_t *this)
         int all_fin=0;
         // if unfinished, keep send & recv
         while(all_fin<this->total_req){
-            printf("Work status(%d/%d)\n", all_fin, this->total_req);
+            // printf("Work status(%d/%d)\n", all_fin, this->total_req);
             // each socket send num_gap at one time
             for(int i=0;i<this->args->conc;i++){
                 // each sockfd's status
@@ -69,7 +73,11 @@ conn_mgnt_run(conn_mgnt_t *this)
                             }
                         } else {
                             // fast is enable, pack several send request together
-                            char *packed_req=copy_str_n_times(http_request, this->sockets[i].unsent_req);
+                            if(packed_len != this->sockets[i].unsent_req){
+                                packed_req=copy_str_n_times(http_request, this->sockets[i].unsent_req);
+                                packed_len=this->sockets[i].unsent_req;
+                            }
+                            
                             if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                 // sent error
                                 perror("Socket sent error. (packed req)");
@@ -93,7 +101,11 @@ conn_mgnt_run(conn_mgnt_t *this)
                             }   
                         } else {
                             // fast is enable, pack several send request together
-                            char *packed_req=copy_str_n_times(http_request, this->num_gap);
+                            if(packed_len != this->num_gap){
+                                packed_req=copy_str_n_times(http_request, this->num_gap);
+                                packed_len=this->num_gap;
+                            }
+                            
                             if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                 // sent error
                                 perror("Socket sent error. (packed req)");
@@ -108,7 +120,7 @@ conn_mgnt_run(conn_mgnt_t *this)
 
             // using poll()
             int ret=0;
-            if ( (ret= poll(ufds, this->args->conc, 500) )>0 ) { // 0.5 sec
+            if ( (ret= poll(ufds, this->args->conc, timeout) )>0 ) { // 0.5 sec
                 for(int i=0;i<this->args->conc;i++){
                     // check each one if there have any available rcv or not
                     if ( ufds[i].revents & POLLIN ) {

@@ -7,7 +7,7 @@
 #include "types.h"
 #include "http.h"
 
-#define NUM_PARAMS          (11)
+#define NUM_PARAMS          (12)
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define AGENT               "http-requester-c"
@@ -36,6 +36,8 @@ enum {
 };
 
 extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
+/* flag for verbose print */
+extern u8 verbose;
 
 // create argparse object
 parsed_args_t *create_argparse();
