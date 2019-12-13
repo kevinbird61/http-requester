@@ -1,6 +1,6 @@
 CC:=gcc
 CFLAGS:=-std=gnu99 -g3
-LIBS:=-Ilib/
+LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
 TEST:= $(patsubst %.c, %.out, $(subst test/,,$(wildcard test/*.c)))

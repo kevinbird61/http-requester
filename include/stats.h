@@ -60,7 +60,7 @@ void stats_inc_resp_cnt(u64 resp_num);
 // retransmit (connection fail)
 
 // all connections statistics - need to call stats_init_sockets first.
-void stats_set_conn(conn_mgnt_t* cm);  // only available in conn_mgnt class
+void stats_conn(void* cm);  // only available in conn_mgnt class
 
 // dump all statistics
 void stats_dump();

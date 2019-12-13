@@ -55,6 +55,16 @@ stats_inc_resp_cnt(u64 resp_num)
 }
 
 void 
+stats_conn(
+    void* cm)
+{
+    // setup connection manager
+    conn_mgnt_t* mgnt=(conn_mgnt_t*) cm;
+
+    // TODO: store the statistics
+}
+
+void 
 stats_dump()
 {
     printf("Statistics==============================================================\n");
