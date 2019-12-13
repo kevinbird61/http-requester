@@ -101,10 +101,12 @@ argparse(
                 break;
             case 'c':   // concurrent connections
                 (*this)->conc=atoi(optarg);
+                (*this)->conc=(*this)->conc>0?(*this)->conc:1; // default value (when illegal)
                 (*this)->flags|=SPE_CONC;
                 break;
             case 'n':   // total connections
                 (*this)->conn=atoi(optarg);
+                (*this)->conn=(*this)->conn>0?(*this)->conn:1; // default value (when illegal)
                 (*this)->flags|=SPE_CONN;
                 break;
             case 'f':   // using template file

@@ -99,15 +99,22 @@ stats_dump()
         }
     } /* status code */
     printf("************************************************************************\n");
-    // byte counts
+    // packet / byte counts
     if(statistics.resp_cnt>0){
         printf("└> Pkts: \n");
-        printf("| %-30s | %-30s | %-30s | %-30s | %-30s |\n", 
+        /*printf("| %-30s | %-30s | %-30s | %-30s | %-30s |\n", 
             "Total received bytes", "Total response pkts", "Avg. bytes per pkt", "Avg. header length", "Avg. body length");
         printf("| %-30lld | %-30lld | %-30lld | %-30lld | %-30lld |\n", 
             statistics.pkt_byte_cnt, statistics.resp_cnt, statistics.pkt_byte_cnt/statistics.resp_cnt
             , statistics.hdr_size/statistics.resp_cnt, statistics.body_size/statistics.resp_cnt);
+        */
+
+        printf("%-30s: %lld\n", "Total recevied bytes", statistics.pkt_byte_cnt);
+        printf("%-30s: %lld\n", "Total response pkts", statistics.resp_cnt);
+        printf("%-30s: %lld\n", "Avg. bytes per pkt", statistics.pkt_byte_cnt/statistics.resp_cnt);
+        printf("%-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.resp_cnt);
+        printf("%-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.resp_cnt); 
         printf("************************************************************************\n");
-    }
+    } /* packet, byte counts */
     printf("========================================================================\n");
 }

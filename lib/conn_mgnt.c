@@ -188,7 +188,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                 }
             }
             int ret=0;
-            if ( (ret= poll(ufds, this->args->conc, 500) )>0 ) {
+            if ( (ret= poll(ufds, this->args->conc, timeout) )>0 ) {
                 for(int i=0;i<this->args->conc;i++){
                     // check each one if there have any available rcv or not
                     if ( ufds[i].revents & POLLIN ) {

@@ -29,6 +29,7 @@
 #include <stdio.h>
 // essential deps
 #include "argparse.h"
+#include "conn_mgnt.h"
 #include "http.h"
 
 typedef struct _statistics_t {
@@ -36,7 +37,7 @@ typedef struct _statistics_t {
     int status_code[5];
     int status_code_detail[STATUS_CODE_MAXIMUM];
     /* connection status */
-
+    struct _conn_t *sockets;
     /* response number */
     u64 pkt_byte_cnt; // bytes counts
     u64 hdr_size;
@@ -47,11 +48,21 @@ typedef struct _statistics_t {
 /* main statistics (single thread) */
 extern stat_t statistics;
 
-void stats_inc_code(unsigned char code_enum); // status code
+// status code
+void stats_inc_code(unsigned char code_enum);
+// pkt, byte counts
 void stats_inc_pkt_bytes(u64 size);
 void stats_inc_hdr_size(u64 size);
 void stats_inc_body_size(u64 size);
 void stats_inc_resp_cnt(u64 resp_num);
+// response time
+
+// retransmit (connection fail)
+
+// all connections statistics - need to call stats_init_sockets first.
+void stats_set_conn(conn_mgnt_t* cm);  // only available in conn_mgnt class
+
+// dump all statistics
 void stats_dump();
 
 // stats for status code

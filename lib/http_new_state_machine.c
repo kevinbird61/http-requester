@@ -276,8 +276,6 @@ http_resp_parser(
                                     strndup(
                                         state_m->buff+1+(http_h_status_check->field_value[RES_LOC].idx), 
                                         http_h_status_check->field_value[RES_LOC].offset));
-                                // close the connection
-                                // close(sockfd);
                                 // redirect to new target (new conn + modified request)
                                 // reuse http_request ptr (to store Location)
                                 control_var->return_obj=
@@ -294,20 +292,15 @@ http_resp_parser(
                     } else if(state_m->resp->status_code>=_400_BAD_REQUEST && state_m->resp->status_code<=_505_HTTP_VER_NOT_SUPPORTED){
                         LOG(DANGER, "Connection is terminated by %s's failure ...", state_m->resp->status_code<_500_INTERNAL_SERV_ERR?"client":"server");
                         LOG(ERROR, "Response from server : %s (%s)", get_http_status_code_by_idx[state_m->resp->status_code], get_http_reason_phrase_by_idx[state_m->resp->status_code]);
-                        // terminate, we don't need the parse the rest of data
-                        // close(sockfd);
-                        // FIXME: return error code instead terminate directly
+                        // return error code, we don't need the parse the rest of data
                         control_var->rcode=RCODE_ERROR;
                         return control_var;
-                        // exit(1);
                     }
 
                     /** Transfer coding/Message body info -
                      * check current using Transfer-Encoding or Content-Length
                      */
-                    // if(http_h_status_check->dirty_bit_align&(1<<(RES_CONTENT_LEN-1))){
                     if(http_h_status_check->content_len_dirty){
-                        // printf("%d\n", http_h_status_check->content_len_dirty);
                         state_m->use_content_length=1;
                         state_m->content_length=atoi(state_m->buff+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
                         LOG(NORMAL, "[Content length] size = %d", state_m->content_length);
@@ -317,7 +310,6 @@ http_resp_parser(
                         }
                     } else if(http_h_status_check->transfer_encoding_dirty){
                         // need to parse under chunked size=0
-                        // printf("%d, %d\n", http_h_status_check->transfer_encoding_dirty, http_h_status_check->spare2);
                         state_m->p_state=CHUNKED;
                     }
 
@@ -367,7 +359,6 @@ http_resp_parser(
                 // for parsing field-name
                 if(state_m->p_state==FIELD_NAME && state_m->parsed_len>0){
                     state_m->p_state=next_http_state(state_m->p_state, RES);
-                    //fwrite(readbuf+1+(state_m->buf_idx-state_m->parsed_len), sizeof(char), state_m->parsed_len-2, stdout);
                     /* check the return value, if return error, then terminate the parsing process */
                     insert_new_header_field_name(http_h_status_check, state_m->buf_idx, state_m->parsed_len);
                     state_m->parsed_len=0;
@@ -376,12 +367,10 @@ http_resp_parser(
             case ' ':
                 // parse only when in "start-line" state;
                 if(state_m->p_state>START_LINE && state_m->p_state<REASON_OR_RESOURCE && state_m->parsed_len>0){
-                    //fwrite(readbuf+(state_m->buf_idx-state_m->parsed_len), sizeof(char), state_m->parsed_len, stdout);
                     int ret=0;
                     switch (state_m->p_state)
                     {
                         case VER:
-                            // printf("%d\n", encap_http_version(readbuf+(state_m->buf_idx-state_m->parsed_len)));
                             if((ret=encap_http_version(state_m->buff+(state_m->buf_idx-state_m->parsed_len))) > 1){ // current only support HTTP/1.1
                                 LOG(DEBUG, "[Version: %s]",  get_http_version_by_idx[ret]);
                                 state_m->resp->http_ver=ret;
@@ -398,14 +387,10 @@ http_resp_parser(
                             state_m->parsed_len=0;
                             break;
                         case CODE_OR_TOKEN:
-                            // printf("%d\n", encap_http_status_code(atoi(readbuf+(state_m->buf_idx-state_m->parsed_len))));
                             if((ret=encap_http_status_code(atoi(state_m->buff+(state_m->buf_idx-state_m->parsed_len)))) > 0){
                                 state_m->resp->status_code=ret;
                                 LOG(DEBUG, "[Status code: %s]", get_http_status_code_by_idx[ret]);
                             } else { // not support
-                                // char *tmp=malloc((state_m->parsed_len)*sizeof(char));
-                                // snprintf(tmp, state_m->parsed_len, "%s", readbuf+(state_m->buf_idx-state_m->parsed_len));
-                                // free(tmp);
                                 control_var->rcode=RCODE_NOT_SUPPORT;
                                 return control_var;
                             }
@@ -416,7 +401,6 @@ http_resp_parser(
                     }
                     // change the state
                     state_m->p_state=next_http_state(state_m->p_state, ' ');
-                    // printf("Pstate: %d\n", state_m->p_state);
                     break;
                 } else if(state_m->p_state==CHUNKED){
                     // need to parse the chunk size here, and prepare to parse chunk extension
@@ -428,7 +412,6 @@ http_resp_parser(
                         char *tmp=calloc(state_m->parsed_len, sizeof(char));
                         sprintf(tmp, "%ld", strtol(strndup(state_m->buff+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len), NULL, 16));
                         if((atoi(tmp))>0){
-                            // printf("%s, %s\n", tmp, strndup(readbuf+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len));
                             state_m->chunked_size=atoi(tmp);
                             LOG(INFO, "[Get Chunk] size = %d", state_m->chunked_size);
                             state_m->p_state=CHUNKED_EXT;
@@ -452,7 +435,6 @@ http_resp_parser(
 
     // finish one request
     control_var->rcode=RCODE_FIN;
-    // if(state_m->buf_idx <= strlen(state_m->buff)){
     if(state_m->buf_idx <= state_m->data_size){
         // need to call parser again 
         control_var->rcode=RCODE_NEXT_RESP;
