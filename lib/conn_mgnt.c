@@ -88,7 +88,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                             this->sockets[i].unsent_req=0;
                         }
                         // add workload 
-                        workload+=this->sockets[i].unsent_req;
+                        workload+=this->sockets[i].sent_req;
                     } else if(this->sockets[i].unsent_req >= this->num_gap){
                         // check if --fast is enable or not
                         if(!fast){
@@ -132,34 +132,43 @@ conn_mgnt_run(conn_mgnt_t *this)
                         // check each one if there have any available rcv or not
                         if ( ufds[i].revents & POLLIN ) {
                             control_var_t *control_var;
+                            control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
                             /** Issue (single thread, multi-connections): 
                              *  - if you tend to finish all `burst_length` recv at one time, it will block the following connections 
                              *  - if we always start from first one, it will always let first connection finished, while let the rest keep waiting (sometimes it will timeout)
                              */
-                            control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
-                            this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
-                            all_fin+=this->sockets[i].sent_req;
-                            workload-=this->sockets[i].sent_req;
-                            this->sockets[i].sent_req=0;
-
-                            /*control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, 5);
                             this->sockets[i].rcvd_res+=control_var->num_resp;
+                            workload-=control_var->num_resp;
                             all_fin+=control_var->num_resp;
-                            this->sockets[i].sent_req-=control_var->num_resp;*/
+                            this->sockets[i].unsent_req+=(this->sockets[i].sent_req-control_var->num_resp);
+                            this->sockets[i].sent_req-=control_var->num_resp;
 
-                            // TODO: check control_var's ret, if no error, then we can increase counter
+                            // check control_var's ret, if no error, then we can increase counter
                             // - using control->num_resp as the response we have finished
                             // - this part need to handle error when there using http pipelining 
                             // - in some case, control_var->num_resp != sent_req (need to retransmit)
                             //      e.g. using very big number of --burst (pipeline size)
-                            
-                            // this->sockets[i].unsent_req+=(this->sent_req-control_var->num_resp);
-                            // this->sockets[i].rcvd_res+=control_var->num_resp;
-                            // all_fin+=control_var->num_resp;
-                            // this->sockets[i].sent_req-=control_var->num_resp;
-
+                            switch(control_var->rcode){
+                                case RCODE_POLL_DATA: // still have unfinished data (pipe)
+                                case RCODE_FIN: // finish
+                                case RCODE_CLOSE: // connection close, check the workload
+                                    if(this->sockets[i].sent_req>0){
+                                        // not finish yet, need to open new connection
+                                        close(this->sockets[i].sockfd);
+                                        this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                                        ufds[i].fd=this->sockets[i].sockfd;
+                                        workload-=this->sockets[i].sent_req; // exit the loop
+                                        this->sockets[i].sent_req=0;
+                                    }
+                                    break;
+                                case RCODE_REDIRECT: // redirect
+                                    break;
+                                default: // other errors
+                                    printf("Error, code=%d\n", control_var->rcode);
+                                    exit(1);
+                                    break;
+                            }
                             this->sockets[i].retry=0; // if this socket has sent something, reset retry
-                            // printf("(%d: %s) Finished: %d (un: %d/ sent: %d)\n", this->sockets[i].sockfd, tcpi_state_str[get_tcp_conn_stat(this->sockets[i].sockfd)], control_var->num_resp, this->sockets[i].unsent_req, this->sockets[i].sent_req);
                         }
                     }
                 } else if(ret==-1) {
@@ -167,16 +176,18 @@ conn_mgnt_run(conn_mgnt_t *this)
                 } else {
                     // need to wait more time
                     LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
-                    // check which socket has unfinished (e.g. sent_req > 0)
+                    // check which socket has unfinished (e.g. unsent_req > 0)
                     /** FIXME: need to set the retry-retry limitation */
                     for(int i=0; i<this->args->conc; i++){
-                        this->sockets[i].retry++;
-                        if(this->sockets[i].retry>MAX_RETRY){
-                            // reset the connection
-                            close(this->sockets[i].sockfd);
-                            this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
-                            ufds[i].fd=this->sockets[i].sockfd; // update the file descriptor in polling set
-                            this->sockets[i].retry=0;
+                        if(this->sockets[i].unsent_req>0){
+                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
+                                    get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
+                                // reset the connection
+                                close(this->sockets[i].sockfd);
+                                this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                                ufds[i].fd=this->sockets[i].sockfd; // update the file descriptor in polling set
+                                this->sockets[i].retry=0;
+                            }
                         }
                     }
                 }
@@ -213,7 +224,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                 workload+=this->sockets[i].sent_req;
             }
             // need to make sure all the workload has been finished !
-            while(workload){
+            while(workload>0){
                 int ret=0;
                 if ( (ret= poll(ufds, this->args->conc, timeout) )>0 ) {
                     for(int i=0;i<this->args->conc;i++){
@@ -221,11 +232,34 @@ conn_mgnt_run(conn_mgnt_t *this)
                         if ( ufds[i].revents & POLLIN ) {
                             control_var_t *control_var;
                             control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
-                            // TODO: check control_var's ret, if no error, then we can increase counter
-                            this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
-                            workload-=this->sockets[i].sent_req; // decrease the worload
-                            all_fin+=this->sockets[i].sent_req;
-                            this->sockets[i].sent_req=0;
+                            // check control_var's ret, if no error, then we can increase counter
+                            this->sockets[i].rcvd_res+=control_var->num_resp;
+                            workload-=control_var->num_resp; // decrease the worload
+                            all_fin+=control_var->num_resp; 
+                            this->sockets[i].unsent_req+=(this->sockets[i].sent_req-control_var->num_resp);
+                            this->sockets[i].sent_req-=control_var->num_resp; 
+                            switch(control_var->rcode){
+                                case RCODE_POLL_DATA: // ?
+                                case RCODE_FIN:
+                                    // finish
+                                case RCODE_CLOSE:
+                                    // connection close, check the workload
+                                    if(this->sockets[i].sent_req>0){
+                                        // not finish yet, need to open new connection 
+                                        close(this->sockets[i].sockfd);
+                                        this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                                        ufds[i].fd=this->sockets[i].sockfd;
+                                        workload-=this->sockets[i].sent_req; // exit the loop
+                                        this->sockets[i].sent_req=0;
+                                    }
+                                    break;
+                                case RCODE_REDIRECT:
+                                    // redirect
+                                    break;
+                                default:
+                                    // other errors
+                                    break;
+                            }
                             this->sockets[i].retry=0; // if this socket has sent something, reset retry
                         }
                     }
@@ -234,9 +268,19 @@ conn_mgnt_run(conn_mgnt_t *this)
                 } else {
                     // need to wait more time
                     LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
-                    // check which socket has unfinished (e.g. sent_req > 0)
-   
+                    // check which socket has unfinished (e.g. unsent_req > 0)
                     /** FIXME: need to set the retry-retry limitation */
+                    for(int i=0; i<this->args->conc; i++){
+                        if(this->sockets[i].unsent_req>0){
+                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
+                                // reset the connection
+                                close(this->sockets[i].sockfd);
+                                this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                                ufds[i].fd=this->sockets[i].sockfd; // update the fd into polling set
+                                this->sockets[i].retry=0;
+                            }
+                        }
+                    }
                 }
             
             }

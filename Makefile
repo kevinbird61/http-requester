@@ -9,10 +9,12 @@ TOOLS:= $(patsubst %.c, %.app, $(subst tools/,,$(wildcard tools/*.c)))
 RELEASE:=libhttp_requester.a
 STATIC_BUILD:=sc_http_requester.exe
 
-all: $(OBJS) $(EXEC) $(TEST) $(TOOLS)
+all: $(OBJS) $(EXEC)
+
+test: $(OBJS) $(TEST) $(TOOLS)
 
 # build the shared lib
-lib: $(OBJS)
+$(RELEASE): $(OBJS)
 	ar cr $(RELEASE) $(OBJS)
 	ranlib $(RELEASE)
 

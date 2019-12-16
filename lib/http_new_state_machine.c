@@ -29,7 +29,7 @@ multi_bytes_http_parsing_state_machine(
         {
             case RCODE_POLL_DATA:
                 // if not enough, keep polling 
-                if(!num_reqs){
+                if(!num_reqs){ // finish all response
                     flag=0;
                     break;
                 }
@@ -83,6 +83,8 @@ multi_bytes_http_parsing_state_machine(
                         break;
                     } else {
                         LOG(NORMAL, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
+                        // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)
+                        control_var->rcode=RCODE_CLOSE; // server turn off the connection
                         flag=0;
                         break;
                     }

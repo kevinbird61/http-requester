@@ -15,13 +15,14 @@ typedef struct _control_var_t {
 
 // enum - rcode
 enum {
-    RCODE_NEXT_RESP=1,
-    RCODE_POLL_DATA,
-    RCODE_FIN,
-    RCODE_REDIRECT,
-    RCODE_NOT_SUPPORT,
-    RCODE_IMCOMPLETE,
-    RCODE_ERROR,
+    RCODE_NEXT_RESP=1,          // finish one response, parse next response
+    RCODE_POLL_DATA,            // require new data chunk
+    RCODE_FIN,                  // finish parsing
+    RCODE_CLOSE,                // connection is close-wait/close
+    RCODE_REDIRECT,             // 3xx, require redirection
+    RCODE_NOT_SUPPORT,          // parsing error - not support
+    RCODE_INCOMPLETE,           // parsing error - incomplete
+    RCODE_ERROR,                // error
     RCODE_MAXIMUM
 };
 
