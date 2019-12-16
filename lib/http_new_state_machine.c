@@ -37,10 +37,21 @@ multi_bytes_http_parsing_state_machine(
                 // check upperbound & move (prevent using too many realloc, and too much buff length)
                 // if( (strlen(state_m->buff)) > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
                 if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                    /* we need to skip the chunked data (or store it temporary) to prevent override the http header */
+                    if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
+                        // override current chunk (to prevent too many chunked in one response) 
+                        // can't override the hdr, so move the reading ptr to `last_fin_idx + msg_hdr_len`
+                        // FIXME: what if last_fin_idx is too large?
+                        state_m->data_size=state_m->resp->msg_hdr_len;
+                    } else {
+                        // other case
+                        state_m->data_size=state_m->data_size-state_m->last_fin_idx;
+                    }
+                    // LOG(NORMAL ,"Data bytes: %d, last_fin_idx=%d (use_chunked: %d, chunked size=%d)", state_m->data_size, state_m->last_fin_idx, state_m->use_chunked, state_m->chunked_size);
                     // then move the leftover to the front, also need to reset buf_idx;
-                    state_m->data_size=state_m->data_size-state_m->last_fin_idx;
-                    if(state_m->use_content_length){
+                    if(state_m->use_content_length ){ // if parsing chunk data now, then we just set the data_size & parse_len to 0
                         state_m->data_size=0; // if parsing "content length" (chunked need to consider more case), we don't care the data_size (just set to 0, means that all parsed content has been dropped -> we don't store it currently)
+                        state_m->parsed_len=0; 
                     }
                     // need to adjust the offset of each response obj
                     update_res_header_idx(state_m->resp, state_m->last_fin_idx);
@@ -51,7 +62,8 @@ multi_bytes_http_parsing_state_machine(
                     memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
                     state_m->last_fin_idx=0; 
                 }
-                
+               
+
                 /* FIXME: check the connection state before call recv() */
                 // check_tcp_conn_stat(sockfd);
                 /*if(get_tcp_conn_stat(sockfd)==TCP_CLOSE){
@@ -62,6 +74,7 @@ multi_bytes_http_parsing_state_machine(
                 }*/
 
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
+                LOG(NORMAL, "RECV: %d bytes", recvbytes);
                 state_m->prev_rcv_len=recvbytes;
                 
                 if(recvbytes==0){ // handle the state that RX is empty and server has send fin
@@ -184,6 +197,7 @@ http_resp_parser(
             if(!(--state_m->chunked_size)){
                 state_m->curr_chunked_size++;
                 LOG(INFO, "Finish chunk, idx: %d (Parsed: %d)", state_m->buf_idx-1, state_m->curr_chunked_size);
+                // state_m->last_fin_idx=state_m->buf_idx-1; // update last_fin_idx
                 state_m->parsed_len=0;
                 state_m->use_chunked=0;
                 state_m->p_state=NEXT_CHUNKED;
@@ -337,6 +351,7 @@ http_resp_parser(
                             // FIXME: is this right condition?
                             state_m->chunked_size=atoi(tmp);
                             LOG(INFO, "[Last Chunk] size = %d", state_m->chunked_size);
+                            // state_m->use_chunked=1; // let outside know 
                             flag=0; // exit
                             // state_m->use_chunked=1;
                         }
