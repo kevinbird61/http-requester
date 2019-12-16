@@ -192,6 +192,8 @@ conn_mgnt_run(conn_mgnt_t *this)
 
         int all_fin=0;
         while(all_fin<this->total_req){
+            // workload in current iteration
+            u32 workload=0;
             for(int i=0;i<this->args->conc;i++){
                 LOG(NORMAL, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
                         all_fin, this->total_req,
@@ -207,29 +209,36 @@ conn_mgnt_run(conn_mgnt_t *this)
                     this->sockets[i].unsent_req--;
                     this->sockets[i].sent_req++;
                 }
+                // inc workload
+                workload+=this->sockets[i].sent_req;
             }
-            int ret=0;
-            if ( (ret= poll(ufds, this->args->conc, timeout) )>0 ) {
-                for(int i=0;i<this->args->conc;i++){
-                    // check each one if there have any available rcv or not
-                    if ( ufds[i].revents & POLLIN ) {
-                        control_var_t *control_var;
-                        control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
-                        // TODO: check control_var's ret, if no error, then we can increase counter
-                        this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
-                        all_fin+=this->sockets[i].sent_req;
-                        this->sockets[i].sent_req=0;
-                        this->sockets[i].retry=0; // if this socket has sent something, reset retry
+            // need to make sure all the workload has been finished !
+            while(workload){
+                int ret=0;
+                if ( (ret= poll(ufds, this->args->conc, timeout) )>0 ) {
+                    for(int i=0;i<this->args->conc;i++){
+                        // check each one if there have any available rcv or not
+                        if ( ufds[i].revents & POLLIN ) {
+                            control_var_t *control_var;
+                            control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
+                            // TODO: check control_var's ret, if no error, then we can increase counter
+                            this->sockets[i].rcvd_res+=this->sockets[i].sent_req;
+                            workload-=this->sockets[i].sent_req; // decrease the worload
+                            all_fin+=this->sockets[i].sent_req;
+                            this->sockets[i].sent_req=0;
+                            this->sockets[i].retry=0; // if this socket has sent something, reset retry
+                        }
                     }
-                }
-            } else if(ret==-1) {
-                perror("poll");
-            } else {
-                // need to wait more time
-                LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
-                // check which socket has unfinished (e.g. sent_req > 0)
+                } else if(ret==-1) {
+                    perror("poll");
+                } else {
+                    // need to wait more time
+                    LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
+                    // check which socket has unfinished (e.g. sent_req > 0)
    
-                /** FIXME: need to set the retry-retry limitation */
+                    /** FIXME: need to set the retry-retry limitation */
+                }
+            
             }
         }
     }
