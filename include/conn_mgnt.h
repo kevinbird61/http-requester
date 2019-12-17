@@ -19,11 +19,12 @@ extern u32  burst_length;
 extern u8   fast;
 
 struct _conn_t {
-    int             sockfd; 
-    int             unsent_req; 
-    int             sent_req;
-    int             rcvd_res;
-    int             retry;
+    int             sockfd;         // socket fd
+    int             unsent_req;     // unfinished req
+    int             sent_req;       // unanswered req
+    int             rcvd_res;       // received resp
+    int             retry_conn_num; // retry connection number (create a new sockfd)
+    int             retry;          // (reserved)
 };  
 
 typedef struct _conn_mgnt_t {

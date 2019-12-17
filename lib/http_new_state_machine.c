@@ -209,9 +209,9 @@ http_resp_parser(
                 continue;
             }
         }
-
         // header will go to here, count length
         http_h_status_check->msg_hdr_len++;
+
         // read byte, check the byte
         switch(state_m->buff[state_m->buf_idx-1]){
             case '\r':
@@ -381,6 +381,7 @@ http_resp_parser(
                     state_m->parsed_len=0;
                 }
                 state_m->p_state=next_http_state(state_m->p_state, ':');
+            case 0x09: // HTAB
             case ' ':
                 // parse only when in "start-line" state;
                 if(state_m->p_state>START_LINE && state_m->p_state<REASON_OR_RESOURCE && state_m->parsed_len>0){

@@ -26,4 +26,16 @@ enum {
     RCODE_MAXIMUM
 };
 
+static char *rcode_str[]={
+    [RCODE_NEXT_RESP]=      "RCODE: Parse next response",
+    [RCODE_POLL_DATA]=      "RCODE: Require new data chunk",
+    [RCODE_FIN]=            "RCODE: Finish parsing",
+    [RCODE_CLOSE]=          "RCODE: Connection state is close-wait/close",
+    [RCODE_REDIRECT]=       "RCODE: Require redirection",
+    [RCODE_NOT_SUPPORT]=    "RCODE: Parsing error(Not support)",
+    [RCODE_INCOMPLETE]=     "RCODE: Parsing error(Incomplete)",
+    [RCODE_ERROR]=          "RCODE: Error",
+    [RCODE_MAXIMUM]=        NULL
+};
+
 #endif 

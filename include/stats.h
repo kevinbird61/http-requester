@@ -38,6 +38,8 @@ typedef struct _statistics_t {
     int status_code_detail[STATUS_CODE_MAXIMUM];
     /* connection status */
     struct _conn_t *sockets;
+    u64 conn_num;
+    u64 retry_conn_num;
     /* response number */
     u64 pkt_byte_cnt; // bytes counts
     u64 hdr_size;
@@ -47,17 +49,12 @@ typedef struct _statistics_t {
 
 /* main statistics (single thread) */
 extern stat_t statistics;
+#define STATS   statistics
 
 // status code
 void stats_inc_code(unsigned char code_enum);
-// pkt, byte counts
-void stats_inc_pkt_bytes(u64 size);
-void stats_inc_hdr_size(u64 size);
-void stats_inc_body_size(u64 size);
-void stats_inc_resp_cnt(u64 resp_num);
 // response time
 
-// retransmit (connection fail)
 
 // all connections statistics - need to call stats_init_sockets first.
 void stats_conn(void* cm);  // only available in conn_mgnt class
@@ -67,11 +64,11 @@ void stats_dump();
 
 // stats for status code
 #define STATS_INC_CODE(status_code)         stats_inc_code(status_code)
-#define STATS_INC_PKT_BYTES(size)           stats_inc_pkt_bytes(size)
-#define STATS_INC_HDR_BYTES(size)           stats_inc_hdr_size(size)
-#define STATS_INC_BODY_BYTES(size)          stats_inc_body_size(size)
-#define STATS_INC_RESP_NUM(cnt)             stats_inc_resp_cnt(cnt)
-
+#define STATS_INC_PKT_BYTES(size)           (STATS.pkt_byte_cnt+=size)
+#define STATS_INC_HDR_BYTES(size)           (STATS.hdr_size+=size)
+#define STATS_INC_BODY_BYTES(size)          (STATS.body_size+=size)
+#define STATS_INC_RESP_NUM(cnt)             (STATS.resp_cnt+=cnt)
+#define STATS_CONN(conn_mgnt)               (stats_conn(conn_mgnt))
 #define STATS_DUMP()                        stats_dump()
 
 

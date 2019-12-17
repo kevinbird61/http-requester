@@ -21,12 +21,8 @@ conn_mgnt_run(conn_mgnt_t *this)
     printf("%s\n", http_request);
     printf("================================================================================\n");
     
-    struct timeval tv;
     char *packed_req=NULL;
     int packed_len=0;
-    // don't wait
-    tv.tv_sec=0;
-    tv.tv_usec=0;
     // timeout
     int timeout=500;
 
@@ -62,16 +58,23 @@ conn_mgnt_run(conn_mgnt_t *this)
                     // each socket send num_gap (or smaller) at one time
                     if(this->sockets[i].unsent_req < this->num_gap && this->sockets[i].unsent_req>=0){
                         // check if --fast is enable or not
+                        // DONWAIT: (using non-blocking) measure how many reqs have been sent (it can't be use under --fast mode)
                         if(!fast){
                             // if < num_gap, just send all
                             while(this->sockets[i].unsent_req--){
-                                if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
+                                //if((send(this->sockets[i].sockfd, http_request, strlen(http_request), MSG_DONTWAIT)) < 0){
+                                if((send(this->sockets[i].sockfd, http_request, strlen(http_request), 0)) < 0){
                                     // sent error
                                     perror("Socket sent error.");
                                     exit(1);
+                                    // sometime means that peer's recv buffer is full, abort
+                                    //this->sockets[i].unsent_req++;
+                                    //break;
                                 }
                                 this->sockets[i].sent_req++;
                             }
+                            // unsent will be -1 when break
+                            this->sockets[i].unsent_req++;
                         } else {
                             // fast is enable, pack several send request together
                             if(packed_len != this->sockets[i].unsent_req){
@@ -79,6 +82,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                                 packed_len=this->sockets[i].unsent_req;
                             }
                             
+                            // because is fast mode, we deliver all reqs in one send(), so its hard to handle DONWAIT
                             if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                 // sent error
                                 perror("Socket sent error. (packed req)");
@@ -94,12 +98,16 @@ conn_mgnt_run(conn_mgnt_t *this)
                         if(!fast){
                             // if not, sent num_gap at one time
                             for(int j=0;j<this->num_gap;j++){
-                                this->sockets[i].unsent_req--;
+                                //if(send(this->sockets[i].sockfd, http_request, strlen(http_request), MSG_DONTWAIT) < 0){
                                 if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
                                     // sent error
                                     perror("Socket sent error.");
+                                    // check_tcp_conn_stat(this->sockets[i].sockfd);
+                                    //printf("Sent: %d\n, Unsent: %d\n", this->sockets[i].sent_req, this->sockets[i].unsent_req);
+                                    //break;
                                     exit(1);
                                 }
+                                this->sockets[i].unsent_req--;
                                 this->sockets[i].sent_req++;
                             }   
                         } else {
@@ -119,7 +127,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                         }
                         workload+=this->num_gap;
                     }
-                } /*  */
+                } /* sent only when your sent_req (workload) is finished (e.g. == 0) */
             } /* each socket send their workload */
 
             // quit when finish all workload of this round
@@ -159,12 +167,13 @@ conn_mgnt_run(conn_mgnt_t *this)
                                         ufds[i].fd=this->sockets[i].sockfd;
                                         workload-=this->sockets[i].sent_req; // exit the loop
                                         this->sockets[i].sent_req=0;
+                                        this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                                     }
                                     break;
-                                case RCODE_REDIRECT: // redirect
+                                case RCODE_REDIRECT: // TODO: require redirection
                                     break;
                                 default: // other errors
-                                    printf("Error, code=%d\n", control_var->rcode);
+                                    printf("Error, code=%s\n", rcode_str[control_var->rcode]);
                                     exit(1);
                                     break;
                             }
@@ -186,6 +195,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                                 close(this->sockets[i].sockfd);
                                 this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
                                 ufds[i].fd=this->sockets[i].sockfd; // update the file descriptor in polling set
+                                this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                                 this->sockets[i].retry=0;
                             }
                         }
@@ -250,6 +260,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                                         this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
                                         ufds[i].fd=this->sockets[i].sockfd;
                                         workload-=this->sockets[i].sent_req; // exit the loop
+                                        this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                                         this->sockets[i].sent_req=0;
                                     }
                                     break;
@@ -258,6 +269,8 @@ conn_mgnt_run(conn_mgnt_t *this)
                                     break;
                                 default:
                                     // other errors
+                                    printf("Error=%s\n", rcode_str[control_var->rcode]);
+                                    exit(1);
                                     break;
                             }
                             this->sockets[i].retry=0; // if this socket has sent something, reset retry
@@ -277,6 +290,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                                 close(this->sockets[i].sockfd);
                                 this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
                                 ufds[i].fd=this->sockets[i].sockfd; // update the fd into polling set
+                                this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                                 this->sockets[i].retry=0;
                             }
                         }
@@ -287,17 +301,20 @@ conn_mgnt_run(conn_mgnt_t *this)
         }
     }
 
+    // store the connection status into statistics.
+    STATS_CONN(this); 
     // dump the statistics
     STATS_DUMP();
 
     /* free */
     free(http_request);
     free(state_m);
-
+    free(this); // conn_mgnt obj
     /* finish: need to print all the statistics again */
-
+    return 0; 
 }
 
+// deprecated currently
 int 
 conn_mgnt_run_blocking(conn_mgnt_t *this)
 {

@@ -1,6 +1,8 @@
 #include "stats.h"
 
 stat_t statistics={ 
+    .conn_num=0,
+    .retry_conn_num=0,
     .pkt_byte_cnt=0,
     .hdr_size=0,
     .body_size=0,
@@ -31,43 +33,24 @@ stats_inc_code(unsigned char code_enum)
 }
 
 void 
-stats_inc_pkt_bytes(u64 size)
-{
-    statistics.pkt_byte_cnt+=size;
-}
-
-void 
-stats_inc_hdr_size(u64 size)
-{
-    statistics.hdr_size+=size;
-}
-
-void 
-stats_inc_body_size(u64 size)
-{
-    statistics.body_size+=size;
-}
-
-void 
-stats_inc_resp_cnt(u64 resp_num)
-{
-    statistics.resp_cnt+=resp_num;
-}
-
-void 
 stats_conn(
     void* cm)
 {
     // setup connection manager
     conn_mgnt_t* mgnt=(conn_mgnt_t*) cm;
-
-    // TODO: store the statistics
+    // get the condition of each connection
+    statistics.sockets=mgnt->sockets;
+    // store the statistics
+    statistics.conn_num=mgnt->args->conc;
+    for(int i=0; i<statistics.conn_num; i++){
+        statistics.retry_conn_num+=mgnt->sockets[i].retry_conn_num;
+    }
 }
 
 void 
 stats_dump()
 {
-    printf("Statistics==============================================================\n");
+    printf("Statistics======================================================================\n");
     // status code
     printf("└> Status Code:\n");
     for(int i=0; i<5; i++){
@@ -108,23 +91,34 @@ stats_dump()
             }
         }
     } /* status code */
-    printf("************************************************************************\n");
+    printf("********************************************************************************\n");
     // packet / byte counts
     if(statistics.resp_cnt>0){
         printf("└> Pkts: \n");
-        /*printf("| %-30s | %-30s | %-30s | %-30s | %-30s |\n", 
-            "Total received bytes", "Total response pkts", "Avg. bytes per pkt", "Avg. header length", "Avg. body length");
-        printf("| %-30lld | %-30lld | %-30lld | %-30lld | %-30lld |\n", 
-            statistics.pkt_byte_cnt, statistics.resp_cnt, statistics.pkt_byte_cnt/statistics.resp_cnt
-            , statistics.hdr_size/statistics.resp_cnt, statistics.body_size/statistics.resp_cnt);
-        */
-
-        printf("%-30s: %lld\n", "Total recevied bytes", statistics.pkt_byte_cnt);
-        printf("%-30s: %lld\n", "Total response pkts", statistics.resp_cnt);
-        printf("%-30s: %lld\n", "Avg. bytes per pkt", statistics.pkt_byte_cnt/statistics.resp_cnt);
-        printf("%-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.resp_cnt);
-        printf("%-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.resp_cnt); 
-        printf("************************************************************************\n");
+        printf("* %-30s: %lld\n", "Total recevied bytes", statistics.pkt_byte_cnt);
+        printf("* %-30s: %lld\n", "Total response pkts", statistics.resp_cnt);
+        printf("* %-30s: %lld\n", "Avg. bytes per pkt", statistics.pkt_byte_cnt/statistics.resp_cnt);
+        printf("* %-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.resp_cnt);
+        printf("* %-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.resp_cnt); 
+        printf("********************************************************************************\n");
     } /* packet, byte counts */
-    printf("========================================================================\n");
+    printf("********************************************************************************\n");
+    // conn state
+    if(statistics.conn_num>0){
+        printf("└> Connection state: \n");
+        printf("* %-30s: %lld\n", "Number of connections", statistics.conn_num);
+        printf("* %-30s: %lld\n", "Number of retry connections", statistics.retry_conn_num);
+        printf("* %-30s: %f\n", "Avg. retry (per conn)", statistics.retry_conn_num/(float)statistics.conn_num);
+        printf("* Each connection status: \n");
+        printf("|%-10s|%-10s|%-10s|%-10s|\n", "socket ID", "unsent_req", "sent_req", "recv_resp");
+        for(int i=0; i<statistics.conn_num; i++){
+            printf("|%-10d|%-10d|%-10d|%-10d|\n", 
+                    statistics.sockets[i].sockfd, statistics.sockets[i].unsent_req, 
+                    statistics.sockets[i].sent_req, statistics.sockets[i].rcvd_res);
+        }
+    }
+    printf("********************************************************************************\n");
+    // response time interval
+    printf("└> Response time interval: TODO\n");
+    printf("================================================================================\n");
 }
