@@ -34,6 +34,7 @@ typedef struct _parsed_args_t {
     u8                          flags;
     u8                          enable_pipe;
     u32                         port;
+    u32                         thrd;
     u32                         conc;
     u32                         conn;
     char*                       filename;

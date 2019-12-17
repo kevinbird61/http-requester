@@ -32,6 +32,9 @@
 #include "conn_mgnt.h"
 #include "http.h"
 
+#define STATS       statistics
+#define PRIV_STATS  (priv_statistics[pthread_self()])
+
 typedef struct _statistics_t {
     /* status code (1xx ~ 5xx) */
     int status_code[5];
@@ -49,12 +52,13 @@ typedef struct _statistics_t {
 
 /* main statistics (single thread) */
 extern stat_t statistics;
-#define STATS   statistics
+extern stat_t priv_statistics[];
 
+// reset/init
+void stats_init();
 // status code
 void stats_inc_code(unsigned char code_enum);
 // response time
-
 
 // all connections statistics - need to call stats_init_sockets first.
 void stats_conn(void* cm);  // only available in conn_mgnt class
@@ -62,12 +66,13 @@ void stats_conn(void* cm);  // only available in conn_mgnt class
 // dump all statistics
 void stats_dump();
 
-// stats for status code
+// stats call
+#define STATS_INIT()                        stats_init()
 #define STATS_INC_CODE(status_code)         stats_inc_code(status_code)
-#define STATS_INC_PKT_BYTES(size)           (STATS.pkt_byte_cnt+=size)
-#define STATS_INC_HDR_BYTES(size)           (STATS.hdr_size+=size)
-#define STATS_INC_BODY_BYTES(size)          (STATS.body_size+=size)
-#define STATS_INC_RESP_NUM(cnt)             (STATS.resp_cnt+=cnt)
+#define STATS_INC_PKT_BYTES(size)           (PRIV_STATS.pkt_byte_cnt+=size)
+#define STATS_INC_HDR_BYTES(size)           (PRIV_STATS.hdr_size+=size)
+#define STATS_INC_BODY_BYTES(size)          (PRIV_STATS.body_size+=size)
+#define STATS_INC_RESP_NUM(cnt)             (PRIV_STATS.resp_cnt+=cnt)
 #define STATS_CONN(conn_mgnt)               (stats_conn(conn_mgnt))
 #define STATS_DUMP()                        stats_dump()
 

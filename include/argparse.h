@@ -7,7 +7,8 @@
 #include "types.h"
 #include "http.h"
 
-#define NUM_PARAMS          (12)
+#define NUM_PARAMS          (13)
+#define MAX_THREAD          (32)    // max thread number
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define AGENT               "http-requester-c"
@@ -20,6 +21,7 @@
  *      0x08: url
  *      0x10: port
  *      0x20: method
+ *      0x40: thrd
  */
 enum {
     SPE_CONC=0x01,
@@ -27,7 +29,8 @@ enum {
     SPE_FILE=0x04,
     SPE_URL=0x08,
     SPE_PORT=0x10,
-    SPE_METHOD=0x20
+    SPE_METHOD=0x20,
+    SPE_THRD=0x40
 };
 
 enum {

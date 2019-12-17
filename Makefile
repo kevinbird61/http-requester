@@ -1,6 +1,6 @@
 CC:=gcc
 LDFLAGS:=-static
-CFLAGS:=-std=gnu99 -fPIC -g3
+CFLAGS:=-std=gnu99 -fPIC -g3 -lpthread
 LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))

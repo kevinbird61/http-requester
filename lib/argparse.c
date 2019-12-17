@@ -4,6 +4,7 @@ u8 verbose=0; // default is false
 
 /* option we support:
  * - [x] `-h`:              Print helper function
+ * - [x] `-t`, --thread:    Specify number of threads
  * - [x] `-c`, --conc:      Specify number of concurrent connections.
  * - [x] `-n`, --conn:      Specify number of total connections. 
  *                      (So there will need to execute `conn/conc` times to finish all connections)
@@ -13,9 +14,9 @@ u8 verbose=0; // default is false
  * - [x] `-m`, --method:    Specify method token
  * - [x] `--pipe`           Enable pipelining
  * - [x] `--log`            Enable logging
- * - [ ] `-b, --burst`      Control the num_gap (between send & recv), e.g pipelining size
- * - [ ] `--fast`           Reduce the send() syscall
- * - [ ] `-v, --verbose`    Output more debug information
+ * - [x] `-b, --burst`      Control the num_gap (between send & recv), e.g pipelining size
+ * - [x] `--fast`           Reduce the send() syscall
+ * - [x] `-v, --verbose`    Output more debug information
  * ...
  * 
  * (Other: HTTP request headers)
@@ -33,6 +34,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [8]={"burst", required_argument, NULL, 'b'},
         [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
         [10]={"verbose", no_argument, NULL, 'v'},
+        [11]={"thread", required_argument, NULL, 't'}, 
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -77,7 +79,7 @@ argparse(
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":liavhb:u:p:m:c:n:f:", options, &option_index);
+        c=getopt_long(argc, argv, ":liavhb:u:p:m:c:n:f:t:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -99,15 +101,20 @@ argparse(
                 burst_length=(burst_length<=0)?NUM_GAP:burst_length;
                 printf("Configure burst length = %d (for http pipelining).\n", burst_length);
                 break;
-            case 'c':   // concurrent connections
+            case 'c':   // connections (socket)
                 (*this)->conc=atoi(optarg);
                 (*this)->conc=(*this)->conc>0?(*this)->conc:1; // default value (when illegal)
                 (*this)->flags|=SPE_CONC;
                 break;
-            case 'n':   // total connections
+            case 'n':   // total connections (requests)
                 (*this)->conn=atoi(optarg);
                 (*this)->conn=(*this)->conn>0?(*this)->conn:1; // default value (when illegal)
                 (*this)->flags|=SPE_CONN;
+                break;
+            case 't':   // thread number
+                (*this)->thrd=atoi(optarg);
+                (*this)->thrd=(*this)->thrd>0?(*this)->thrd:1; // default value (set to 1 if value is 0)
+                (*this)->flags|=SPE_THRD;
                 break;
             case 'f':   // using template file
                 (*this)->filename=optarg;
@@ -236,10 +243,17 @@ argparse(
     } else {
         // TODO: check the method is legal or not
     }
+    if(!((*this)->flags&SPE_THRD)){ // if not set, using default value
+        (*this)->thrd=1;
+    } else {
+        // check upperbound
+        (*this)->thrd=((*this)->thrd>MAX_THREAD)? MAX_THREAD: (*this)->thrd;
+    }
 
     printf("================================================================================\n");
-    printf("%-50s: %d\n", "Number of concurrent connections", (*this)->conc);
-    printf("%-50s: %d\n", "Number of total connections", (*this)->conn);
+    printf("%-50s: %d\n", "Number of threads", (*this)->thrd);
+    printf("%-50s: %d\n", "Number of connections", (*this)->conc);
+    printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
     printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
     /*printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);*/
     struct urls *url_trav=(*this)->urls;

@@ -303,9 +303,7 @@ conn_mgnt_run(conn_mgnt_t *this)
 
     // store the connection status into statistics.
     STATS_CONN(this); 
-    // dump the statistics
-    STATS_DUMP();
-
+    
     /* free */
     free(http_request);
     free(state_m);

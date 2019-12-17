@@ -18,6 +18,7 @@ char *log_level_str[]={
 int 
 syslog(
     u8 loglevel,
+    u64 thread_id,
     char *info_args, ...)
 {
     // check the log is enable or not (log_visible will be modified in argparse.c)
@@ -47,8 +48,8 @@ syslog(
     }
 
     // write into logfile (FIXME: date)
-    char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+1)*sizeof(char));
-    sprintf(logfile, "%s%s%s", log_dir, log_filename, log_ext);
+    char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+strlen(itoa(thread_id))+1)*sizeof(char));
+    sprintf(logfile, "%s%s%lld%s", log_dir, log_filename, thread_id, log_ext);
     FILE *logfd=fopen(logfile, "a+");
     fwrite(loginfo, sizeof(char), strlen(loginfo), logfd);
 

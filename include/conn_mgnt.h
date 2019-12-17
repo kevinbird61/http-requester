@@ -1,6 +1,7 @@
 #ifndef __CONN_MGNT__
 #define __CONN_MGNT__
 
+#include <pthread.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>

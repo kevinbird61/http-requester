@@ -1,6 +1,7 @@
 #ifndef __LOGGER__
 #define __LOGGER__
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,7 @@ extern unsigned char log_visible;
     if(log_visible){                                \
         char *userlog=parse_valist(format, ##args); \
         syslog(loglevel,                            \
+            pthread_self(),                         \
             "[%s][%-10s][%s] %s\n",                 \
             getdate(),                              \
             LOG_LEVEL_STR[loglevel],                \
@@ -39,8 +41,6 @@ extern unsigned char log_visible;
             userlog);                               \
     }                                               \
     } while(0)
-
-
 
 typedef enum _log_level {
     /* only display on the screen */
@@ -59,7 +59,7 @@ typedef enum _log_level {
 
 
 // write the log
-int syslog(u8 loglevel, char *info_args, ...);
+int syslog(u8 loglevel, u64 thread_id, char *info_args, ...);
 // turn va_list into char array
 char *parse_valist(char *info_args, ...);
 
