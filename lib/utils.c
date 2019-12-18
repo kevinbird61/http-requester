@@ -73,3 +73,22 @@ copy_str_n_times(
     }
     return total;
 }
+
+unsigned int 
+get_cpufreq()
+{
+    struct timezone tz;
+    struct timeval tvstart, tvstop;
+    unsigned long long int cycles[2];
+    unsigned long microseconds;
+    unsigned int mhz;
+    memset(&tz, 0, sizeof(tz));
+    cycles[0]=read_tsc();
+    gettimeofday(&tvstart, &tz);
+    usleep(25000);
+    cycles[1]=read_tsc();
+    gettimeofday(&tvstop, &tz);                                             
+    microseconds = ((tvstop.tv_sec-tvstart.tv_sec)*USEC) + (tvstop.tv_usec-tvstart.tv_usec);                                                 
+    mhz = (unsigned int) (cycles[1]-cycles[0]) / (microseconds);
+    return mhz*USEC;
+}

@@ -6,6 +6,7 @@ int main(int argc, char *argv[]){
     
     // pthread_self() not always return 0, need to maintain a mapping table 
     STATS_INIT(); // init statistics
+    STATS_TIME_START();
 
     // enable multiple threads
     if(args->thrd){
@@ -23,11 +24,8 @@ int main(int argc, char *argv[]){
             pthread_join(thrds[i].tid, NULL);
         }
     }
-    /*conn_mgnt_t *conn_mgnt=create_conn_mgnt(args);
-    if(ret==USE_URL){
-        conn_mgnt_run(conn_mgnt);
-    } */
-
+    // t_end
+    STATS_TIME_END();
     // dump the statistics
     STATS_DUMP();
     return 0;

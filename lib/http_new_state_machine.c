@@ -17,7 +17,6 @@ multi_bytes_http_parsing_state_machine(
     /* stats */
     int flag=1, recvbytes=0, fin_resp=0;
     control_var_t *control_var;
-    
     /* Parse the data, and store the result into respones objs */
     /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
      *  to prevent occupying too much memory ?

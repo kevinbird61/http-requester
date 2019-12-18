@@ -34,6 +34,7 @@ conn_mgnt_run(conn_mgnt_t *this)
 
     if(this->args->enable_pipe){
         /* support pipeline */
+        u64 t_start=0, t_end=0;
         // using poll()
         struct pollfd ufds[this->args->conc];
         for(int i=0;i<this->args->conc;i++){
@@ -141,7 +142,10 @@ conn_mgnt_run(conn_mgnt_t *this)
                         // check each one if there have any available rcv or not
                         if ( ufds[i].revents & POLLIN ) {
                             control_var_t *control_var;
+                            t_start=read_tsc();
                             control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
+                            t_end=read_tsc();
+                            STATS_INC_PROCESS_TIME(this->thrd_num, t_end-t_start);
                             /** Issue (single thread, multi-connections): 
                              *  - if you tend to finish all `burst_length` recv at one time, it will block the following connections 
                              *  - if we always start from first one, it will always let first connection finished, while let the rest keep waiting (sometimes it will timeout)
@@ -206,6 +210,8 @@ conn_mgnt_run(conn_mgnt_t *this)
         }
     } else {
         /* not pipeline */
+        u64 t_start=0, t_end=0;
+        u64 resp_intvl=0;
         struct pollfd ufds[this->args->conc];
         for(int i=0;i<this->args->conc;i++){
             ufds[i].fd=this->sockets[i].sockfd;
@@ -233,16 +239,29 @@ conn_mgnt_run(conn_mgnt_t *this)
                 }
                 // inc workload
                 workload+=this->sockets[i].sent_req;
+                // record request `timestamp` only when "single connection"
+                if(this->args->conc==1){
+                    resp_intvl=read_tsc();     
+                }
             }
             // need to make sure all the workload has been finished !
             while(workload>0){
                 int ret=0;
                 if ( (ret= poll(ufds, this->args->conc, timeout) )>0 ) {
+                    // record response `timestamp` only when "single connection", and then PUSH into response interval queue
+                    if(this->args->conc==1){
+                        resp_intvl=read_tsc()-resp_intvl;
+                        STATS_PUSH_RESP_INTVL(this->thrd_num, resp_intvl);
+                    }
                     for(int i=0;i<this->args->conc;i++){
                         // check each one if there have any available rcv or not
                         if ( ufds[i].revents & POLLIN ) {
                             control_var_t *control_var;
+                            t_start=read_tsc();
                             control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
+                            t_end=read_tsc();
+                            // store into stats
+                            STATS_INC_PROCESS_TIME(this->thrd_num, t_end-t_start);
                             // check control_var's ret, if no error, then we can increase counter
                             this->sockets[i].rcvd_res+=control_var->num_resp;
                             workload-=control_var->num_resp; // decrease the worload

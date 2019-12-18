@@ -23,6 +23,7 @@ u8  to_lowercase(u8 *str);
 u64 gettime(void);
 u8 *getdate(void);
 char *copy_str_n_times(char *ori, int n_times);
+unsigned int get_cpufreq();
 
 static inline unsigned long long read_tsc(void)
 {

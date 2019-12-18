@@ -5,13 +5,23 @@
 */
 stat_t statistics;
 stat_t priv_statistics[MAX_THREAD];
+struct _resp_intvl_t resp_intvl_queue[MAX_THREAD];
 
 void 
 stats_init()
 {
     memset(&statistics, 0x00, sizeof(stat_t));
+    statistics.resp_intvl_max=-1;
+    statistics.resp_intvl_min=(u64)~0;
+
     for(int i=0; i<MAX_THREAD; i++){
+        // priv statistics (for each thread)
         memset(&priv_statistics[i], 0x00, sizeof(stat_t));
+        priv_statistics[i].resp_intvl_cnt=0;
+        priv_statistics[i].resp_intvl_max=-1;
+        priv_statistics[i].resp_intvl_min=(u64)~0;
+        // response interval queue
+        memset(&resp_intvl_queue[i], 0x00, sizeof(struct _resp_intvl_t));
     }
 }
 
@@ -38,18 +48,53 @@ stats_inc_code(u8 thrd_num, unsigned char code_enum)
     }
 }
 
+void
+stats_push_resp_intvl(
+    u8 thrd_num,
+    u64 intvl)
+{
+    // record intvl count
+    priv_statistics[thrd_num].resp_intvl_cnt++;
+    priv_statistics[thrd_num].avg_resp_intvl_time=(priv_statistics[thrd_num].avg_resp_intvl_time*(priv_statistics[thrd_num].resp_intvl_cnt-1)+intvl)/(float)priv_statistics[thrd_num].resp_intvl_cnt;
+    if((long long)intvl > (long long)priv_statistics[thrd_num].resp_intvl_max){
+        priv_statistics[thrd_num].resp_intvl_max=intvl;
+    }
+    if(intvl < priv_statistics[thrd_num].resp_intvl_min){
+        priv_statistics[thrd_num].resp_intvl_min=intvl;
+    }
+
+    // push interval into queue
+    if(resp_intvl_queue[thrd_num].next==NULL){
+        resp_intvl_queue[thrd_num].next=calloc(1, sizeof(struct _resp_intvl_t));
+        resp_intvl_queue[thrd_num].next->resp_intvl=intvl;
+        resp_intvl_queue[thrd_num].next->next=NULL;
+        return;
+    }
+
+    struct _resp_intvl_t *head=resp_intvl_queue[thrd_num].next;
+    while(head->next!=NULL){
+        head=head->next;
+    }
+    head->next=calloc(1, sizeof(struct _resp_intvl_t));
+    head->next->resp_intvl=intvl;
+    head->next->next=NULL;
+}
+
 void 
 stats_conn(
     void* cm)
 {
     // setup connection manager
     conn_mgnt_t* mgnt=(conn_mgnt_t*) cm;
+    // record thread number
+    statistics.thrd_cnt=mgnt->args->thrd;
     // get the condition of each connection
     PRIV_STATS[mgnt->thrd_num].sockets=mgnt->sockets;
     // store the statistics
     PRIV_STATS[mgnt->thrd_num].conn_num=mgnt->args->conc;
     for(int i=0; i<PRIV_STATS[mgnt->thrd_num].conn_num; i++){
         PRIV_STATS[mgnt->thrd_num].retry_conn_num+=mgnt->sockets[i].retry_conn_num;
+        PRIV_STATS[mgnt->thrd_num].workload+=mgnt->sockets[i].rcvd_res;
     }
 }
 
@@ -74,6 +119,28 @@ stats_dump()
         // conn stat
         statistics.conn_num+=priv_statistics[i].conn_num;
         statistics.retry_conn_num+=priv_statistics[i].retry_conn_num;
+        statistics.workload+=priv_statistics[i].workload;
+        // process time
+        statistics.process_time+=priv_statistics[i].process_time;
+
+        // response time (only enable when user using "single connection")
+        if( (statistics.conn_num/statistics.thrd_cnt)==1 && resp_intvl_queue[i].next!=NULL ){
+            statistics.resp_intvl_cnt+=priv_statistics[i].resp_intvl_cnt;
+            statistics.avg_resp_intvl_time+=priv_statistics[i].avg_resp_intvl_time;
+            // summarize, analyze the response time
+            struct _resp_intvl_t *head=resp_intvl_queue[i].next;
+            while(head){
+                // printf("Resp. time: %d\n", head->resp_intvl);
+                head=head->next;
+            }
+            // max, min 
+            if((long long)priv_statistics[i].resp_intvl_max > (long long)statistics.resp_intvl_max){
+                statistics.resp_intvl_max=priv_statistics[i].resp_intvl_max;
+            }
+            if(priv_statistics[i].resp_intvl_min < statistics.resp_intvl_min){
+                statistics.resp_intvl_min=priv_statistics[i].resp_intvl_min;
+            }
+        }
     }
 
     printf("Statistics======================================================================\n");
@@ -126,14 +193,20 @@ stats_dump()
         printf("* %-30s: %lld\n", "Avg. bytes per pkt", statistics.pkt_byte_cnt/statistics.resp_cnt);
         printf("* %-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.resp_cnt);
         printf("* %-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.resp_cnt); 
-        printf("********************************************************************************\n");
     } /* packet, byte counts */
+    printf("********************************************************************************\n");
+    // thrd info
+    if(statistics.thrd_cnt>0){
+        printf("└─> Thread info: \n");
+        printf("* %-30s: %d\n", "Number of threads", statistics.thrd_cnt);
+    }
     printf("********************************************************************************\n");
     // conn state
     if(statistics.conn_num>0){
         printf("└─> Connection state: \n");
-        printf("* %-30s: %lld\n", "Number of connections", statistics.conn_num);
-        printf("* %-30s: %lld\n", "Number of retry connections", statistics.retry_conn_num);
+        printf("* %-30s: %d\n", "Number of connections", statistics.conn_num);
+        printf("* %-30s: %d\n", "Workload of each connection", statistics.workload/statistics.conn_num);
+        printf("* %-30s: %d\n", "Number of retry connections", statistics.retry_conn_num);
         printf("* %-30s: %f\n", "Avg. retry (per conn)", statistics.retry_conn_num/(float)statistics.conn_num);
         /** this part will be unavailable under multi-threads mode 
          * (because each thread has its connections, so this part need to re-design)
@@ -147,7 +220,25 @@ stats_dump()
         }*/
     }
     printf("********************************************************************************\n");
+    // time 
+    printf("└─> Time: \n");
+    unsigned int cpuMHZ=get_cpufreq();
+    if(statistics.total_time>0){
+        printf("* %-30s: %f\n", "Total execution time (sec.)", statistics.total_time/(float)cpuMHZ);
+    }
+    // processing time
+    if(statistics.process_time>0){
+        printf("* %-30s: %f\n", "Avg. parsing time (sec./thrd)", statistics.process_time/((float)cpuMHZ*statistics.thrd_cnt));
+        printf("* %-30s: %f\n", "Avg. parsing time (sec./conn)", statistics.process_time/((float)cpuMHZ*statistics.conn_num));
+    }
+    printf("********************************************************************************\n");
     // response time interval
-    printf("└─> Response time interval: TODO\n");
+    printf("└─> Response interval: (Only enable when using `single conn + non-pipeline`)\n");
+    if(statistics.resp_intvl_cnt>0){
+        printf("* %-30s: %lld\n", "# of response intvl", statistics.resp_intvl_cnt);
+        printf("* %-30s: %f\n", "Avg. response time (sec.)", statistics.avg_resp_intvl_time/(double)cpuMHZ*statistics.thrd_cnt);
+        printf("* %-30s: %f\n", "MAX resp. intvl (sec.)", statistics.resp_intvl_max/(float)cpuMHZ);
+        printf("* %-30s: %f\n", "MIN resp. intvl (sec.)", statistics.resp_intvl_min/(float)cpuMHZ);
+    }
     printf("================================================================================\n");
 }
