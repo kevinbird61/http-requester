@@ -16,24 +16,24 @@ stats_init()
 }
 
 void 
-stats_inc_code(unsigned char code_enum)
+stats_inc_code(u8 thrd_num, unsigned char code_enum)
 {
-    PRIV_STATS.status_code_detail[code_enum-1]++; // because index start from 1
+    PRIV_STATS[thrd_num].status_code_detail[code_enum-1]++; // because index start from 1
     switch(code_enum){
         case _100_CONTINUE ... _101_SWITCHING_PROTO:
-            PRIV_STATS.status_code[0]++;
+            PRIV_STATS[thrd_num].status_code[0]++;
             break;
         case _200_OK ... _205_RESET_CONTENT:
-            PRIV_STATS.status_code[1]++;
+            PRIV_STATS[thrd_num].status_code[1]++;
             break;
         case _300_MULTI_CHOICES ... _307_TEMP_REDIRECT:
-            PRIV_STATS.status_code[2]++;
+            PRIV_STATS[thrd_num].status_code[2]++;
             break;
         case _400_BAD_REQUEST ... _426_UPGRADE_REQUIRED:
-            PRIV_STATS.status_code[3]++;
+            PRIV_STATS[thrd_num].status_code[3]++;
             break;
         case _500_INTERNAL_SERV_ERR ... _505_HTTP_VER_NOT_SUPPORTED:
-            PRIV_STATS.status_code[4]++;
+            PRIV_STATS[thrd_num].status_code[4]++;
             break;
     }
 }
@@ -45,11 +45,11 @@ stats_conn(
     // setup connection manager
     conn_mgnt_t* mgnt=(conn_mgnt_t*) cm;
     // get the condition of each connection
-    PRIV_STATS.sockets=mgnt->sockets;
+    PRIV_STATS[mgnt->thrd_num].sockets=mgnt->sockets;
     // store the statistics
-    PRIV_STATS.conn_num=mgnt->args->conc;
-    for(int i=0; i<PRIV_STATS.conn_num; i++){
-        PRIV_STATS.retry_conn_num+=mgnt->sockets[i].retry_conn_num;
+    PRIV_STATS[mgnt->thrd_num].conn_num=mgnt->args->conc;
+    for(int i=0; i<PRIV_STATS[mgnt->thrd_num].conn_num; i++){
+        PRIV_STATS[mgnt->thrd_num].retry_conn_num+=mgnt->sockets[i].retry_conn_num;
     }
 }
 

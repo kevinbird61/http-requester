@@ -1,6 +1,6 @@
 CC:=gcc
 LDFLAGS:=-static
-CFLAGS:=-std=gnu99 -fPIC -g3 -lpthread
+CFLAGS:=-std=gnu99 -fPIC -g3
 LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
@@ -20,19 +20,19 @@ $(RELEASE): $(OBJS)
 
 # build the release program
 release: $(RELEASE)
-	gcc -o $(STATIC_BUILD) src/new_http_requester.c $(LIBS) -L. -lhttp_requester $(CFLAGS)
+	gcc -o $(STATIC_BUILD) src/new_http_requester.c $(LIBS) -L. -lhttp_requester $(CFLAGS) -lpthread
 
 %.o: lib/%.c 
-	$(CC) $(CFLAGS) -c $^ $(LIBS)
+	$(CC) $(CFLAGS) -c $^ $(LIBS) -lpthread
 
 %.exe: src/%.c $(OBJS)
-	$(CC) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
+	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS) -lpthread
 
 %.out: test/%.c $(OBJS)
-	$(CC) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
+	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
 
 %.app: tools/%.c $(OBJS)
-	$(CC) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
+	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
 
 .PHONY=clean
 

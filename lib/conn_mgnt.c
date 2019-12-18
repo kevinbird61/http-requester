@@ -28,6 +28,7 @@ conn_mgnt_run(conn_mgnt_t *this)
 
     // init our state machine
     state_machine_t *state_m=create_parsing_state_machine();
+    state_m->thrd_num=(*this).thrd_num;
     // record total connection
     this->total_req=this->args->conn;
 
@@ -405,6 +406,7 @@ create_conn_mgnt(
     parsed_args_t *args)
 {
     conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
+    mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=burst_length; // configurable
 

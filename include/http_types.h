@@ -159,6 +159,8 @@ typedef struct _http_res_header_status_t {
 
 /* for state_machine */
 typedef struct _state_machine_t {
+    /* thrd_num */
+    u8  thrd_num;
     /* buf */
     char *buff;
     /* response instances */

@@ -139,7 +139,7 @@ http_rcv_state_machine(
                      * - if 4xx or 5xx, then connection can be terminated; (FIXME: Can we terminate directly?)
                      *
                      */
-                    STATS_INC_CODE(status_code);
+                    // STATS_INC_CODE(status_code);
                     if(status_code<_200_OK){
                         // 1xx
                         LOG(WARNING, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);

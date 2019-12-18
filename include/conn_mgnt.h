@@ -19,6 +19,16 @@
 extern u32  burst_length;
 extern u8   fast;
 
+// per thread info
+struct _thrd_t {
+    pthread_t       tid;
+    u8              num;
+    u8              type; // type of this thread
+    struct _conn_mgnt_t     *mgnt;
+    // FIXME: shared info
+};
+
+// per connection
 struct _conn_t {
     int             sockfd;         // socket fd
     int             unsent_req;     // unfinished req
@@ -30,6 +40,7 @@ struct _conn_t {
 
 typedef struct _conn_mgnt_t {
     parsed_args_t*  args;       // user's arguments
+    u8              thrd_num;   // belong to which thread.
     u8              pipe;       // ON/OFF, enable pipeline or not (default is 0, not enable)
     u16             num_gap;    // number of gaps between "sent" and "rcvd"
     u32             total_req;  // total # of reqs

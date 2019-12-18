@@ -24,4 +24,11 @@ u64 gettime(void);
 u8 *getdate(void);
 char *copy_str_n_times(char *ori, int n_times);
 
+static inline unsigned long long read_tsc(void)
+{
+    unsigned low, high;
+    asm volatile("rdtsc":"=a"(low),"=d"(high));
+    return ((low)|((unsigned long long)(high)<<32));
+}
+
 #endif
