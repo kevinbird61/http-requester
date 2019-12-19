@@ -8,6 +8,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <netinet/tcp.h> // TCP_*
+#include <fcntl.h>
 
 /* create connections */
 #include "logger.h"
@@ -17,6 +18,7 @@ extern char *tcpi_state_str[];
 
 /* create socket and return its descriptor */
 int create_tcp_conn(const char *target, const char *port); 
+int create_tcp_conn_non_blocking(const char *target, const char *port); 
 int create_tcp_keepalive_conn(const char *target, const char *port, int keepcnt, int keepidle, int keepintvl);
 
 /* check socket status */

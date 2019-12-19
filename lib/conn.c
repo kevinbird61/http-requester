@@ -75,6 +75,42 @@ create_tcp_conn(
     return sockfd;
 }
 
+int 
+create_tcp_conn_non_blocking(
+    const char *target, 
+    const char *port)
+{
+    struct addrinfo *p, hints, *res;
+    int sockfd, rv;
+    char s[INET6_ADDRSTRLEN];
+    memset(&hints, 0, sizeof(hints));
+
+    hints.ai_family=AF_INET;
+    hints.ai_socktype=SOCK_STREAM;
+    hints.ai_protocol=6;
+
+    if((rv=getaddrinfo(target, port, &hints, &res))!=0)
+    {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return -1;
+    }
+
+    int ret_check=-1;
+    for(p=res; p!=NULL; p=p->ai_next)
+    {
+        if((sockfd=socket(p->ai_family, p->ai_socktype, p->ai_protocol))==-1)
+        {
+            perror("invalid socket");
+            continue;
+        }
+        fcntl(sockfd, F_SETFL, O_NONBLOCK); // set as non-blocking
+        connect(sockfd, p->ai_addr, p->ai_addrlen);
+        break;
+    }
+    
+    return sockfd;
+}
+
 
 int 
 create_tcp_keepalive_conn(

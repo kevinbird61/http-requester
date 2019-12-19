@@ -30,6 +30,7 @@ struct _thrd_t {
 
 // per connection
 struct _conn_t {
+    state_machine_t *state_m;
     int             sockfd;         // socket fd
     int             unsent_req;     // unfinished req
     int             sent_req;       // unanswered req
@@ -51,6 +52,7 @@ typedef struct _conn_mgnt_t {
 
 // create 
 conn_mgnt_t *create_conn_mgnt(parsed_args_t *args);
+conn_mgnt_t *create_conn_mgnt_non_blocking(parsed_args_t *args);
 /** main function: 
  *  - run with configuration (manage all connections)
  *  - handle all connections (with different cases)
@@ -58,6 +60,7 @@ conn_mgnt_t *create_conn_mgnt(parsed_args_t *args);
  */
 // single thread, multiple socket (non-blocking)
 int conn_mgnt_run(conn_mgnt_t *this);
+int conn_mgnt_run_non_blocking(conn_mgnt_t *this);
 // single thread, single socket
 int conn_mgnt_run_blocking(conn_mgnt_t *this);
 // update args
