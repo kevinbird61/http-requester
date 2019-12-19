@@ -328,21 +328,9 @@ http_resp_parser(
             control_var->rcode=RCODE_FIN;
             break;
         }
-
-        // check if header using content-length
-        if(state_m->use_content_length){
-            if(!(--state_m->content_length)){
-                LOG(INFO, "[CL] Parsing process has been done. Total content length: %d bytes (%d KB)", state_m->total_content_length, state_m->total_content_length/1024);
-                control_var->rcode=RCODE_FIN;
-                // return control_var;
-                break;
-            }
-            continue; // if not enough, then keep going
-        }
-
         // check if header using transfer-encoding
         if(state_m->use_chunked){
-            if(!(--state_m->chunked_size)){
+            /*if(!(--state_m->chunked_size)){
                 state_m->curr_chunked_size++;
                 LOG(INFO, "Finish chunk, idx: %d (Parsed: %d)", state_m->buf_idx-1, state_m->curr_chunked_size);
                 // state_m->last_fin_idx=state_m->buf_idx-1; // update last_fin_idx
@@ -350,11 +338,59 @@ http_resp_parser(
                 state_m->use_chunked=0;
                 state_m->p_state=NEXT_CHUNKED;
             } else {
-                /* Parsing other chunk features here */
+                // Parsing other chunk features here 
                 state_m->curr_chunked_size++;
+                continue;
+            }*/
+            if(state_m->chunked_size>0){
+                // move idx
+                int avail_data=(state_m->data_size-state_m->buf_idx)+1;
+                if(avail_data >= state_m->chunked_size){
+                    state_m->buf_idx+=(state_m->chunked_size-1);
+                    state_m->curr_chunked_size+=state_m->chunked_size;
+                    LOG(INFO, "Finish chunk, idx: %d (Parsed: %d)", state_m->buf_idx, state_m->curr_chunked_size);
+                    state_m->chunked_size=0;
+                    state_m->parsed_len=0;
+                    state_m->use_chunked=0;
+                    state_m->p_state=NEXT_CHUNKED;
+                } else {
+                    state_m->buf_idx=state_m->data_size;
+                    state_m->chunked_size-=avail_data;
+                    state_m->curr_chunked_size+=avail_data;
+                    continue;
+                }
+            }
+        }
+
+        // check if header using content-length
+        if(state_m->use_content_length){
+            /*if(!(--state_m->content_length)){
+                LOG(INFO, "[CL] Parsing process has been done. Total content length: %d bytes (%d KB)", state_m->total_content_length, state_m->total_content_length/1024);
+                control_var->rcode=RCODE_FIN;
+                // return control_var;
+                break;
+            }
+            continue; // if not enough, then keep going
+            */
+            if(state_m->content_length>0){
+                // move idx
+                int avail_data=(state_m->data_size-state_m->buf_idx)+1;
+                // printf("content_length: %d, avail: %d\n", state_m->content_length, avail_data);
+                if(avail_data >= state_m->content_length){
+                    state_m->buf_idx+=(state_m->content_length-1); // -1 (buf_idx)
+                    state_m->content_length=0;
+                    LOG(INFO, "[CL] Parsing process has been done. Total content length: %d bytes (%d KB)", state_m->total_content_length, state_m->total_content_length/1024);
+                    control_var->rcode=RCODE_FIN;
+                    break;
+                } else {
+                    // avail_data < state_m->content_length;
+                    state_m->buf_idx=state_m->data_size;
+                    state_m->content_length-=avail_data;
+                }
                 continue;
             }
         }
+
         // header will go to here, count length
         http_h_status_check->msg_hdr_len++;
 
@@ -484,7 +520,7 @@ http_resp_parser(
                     // check if it is `chunked` (If no extension)
                     /** FIXME: need to using strtok to parse all possible value
                      */
-                    if(!strncasecmp(strndup(state_m->buff+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx), http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset), "chunked", 7)){
+                    if(http_h_status_check->use_chunked){
                         char *tmp=calloc(state_m->parsed_len, sizeof(char));
                         sprintf(tmp, "%ld", strtol(strndup(state_m->buff+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len), NULL, 16));
                         if((atoi(tmp))>0){
@@ -567,11 +603,7 @@ http_resp_parser(
                     break;
                 } else if(state_m->p_state==CHUNKED){
                     // need to parse the chunk size here, and prepare to parse chunk extension
-                    if( !strncasecmp(
-                            strndup(state_m->buff+1+(http_h_status_check->field_value[RES_TRANSFER_ENCODING].idx),
-                            http_h_status_check->field_value[RES_TRANSFER_ENCODING].offset),
-                            "chunked", strlen("chunked")) ){
-
+                    if( http_h_status_check->use_chunked ){
                         char *tmp=calloc(state_m->parsed_len, sizeof(char));
                         sprintf(tmp, "%ld", strtol(strndup(state_m->buff+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len), NULL, 16));
                         if((atoi(tmp))>0){

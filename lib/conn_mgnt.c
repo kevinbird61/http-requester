@@ -114,15 +114,11 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             if(this->sockets[i].unsent_req < this->num_gap && this->sockets[i].unsent_req>=0){
                                 if(!fast){ // non-fast mode
                                     while(this->sockets[i].unsent_req--){
+                                        // send the requests
                                         if((send(this->sockets[i].sockfd, http_request, strlen(http_request), 0)) < 0){
                                             this->sockets[i].unsent_req++; // current sent need to discard
-                                            // int ret=sock_sent_err_handler();
-                                            if(errno==EAGAIN){
-                                                /* need to adjust the num_gap */
-                                                this->num_gap>>=1; // half (+1, prevent 0)
-                                                this->num_gap=(this->num_gap==0)?1:this->num_gap;
-                                                //printf("Adjust pipeline size to %d\n", this->num_gap);
-                                            }
+                                            // handle errno
+                                            sock_sent_err_handler(this);
                                         } else {
                                             this->sockets[i].sent_req++;
                                         }
@@ -141,14 +137,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
 
                                     if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                         // req not sent complete
-                                        // sock_sent_err_handler();
-                                        if(errno==EAGAIN){
-                                            /* need to adjust the num_gap */
-                                            // this->num_gap=(this->num_gap>>1)|1; // half (+1, prevent 0)
-                                            this->num_gap>>=1; // half (+1, prevent 0)
-                                            this->num_gap=(this->num_gap==0)?1:this->num_gap;
-                                            //printf("Adjust pipeline size to %d\n", this->num_gap);
-                                        }
+                                        sock_sent_err_handler(this);
                                     }
                                     
                                 }
@@ -158,14 +147,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     for(int j=0;j<this->num_gap;j++){
                                         if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
                                             j--; // go back
-                                            // sock_sent_err_handler();
-                                            if(errno==EAGAIN){
-                                                /* need to adjust the num_gap */
-                                                //this->num_gap=(this->num_gap>>1)|1; // half (+1, prevent 0)
-                                                this->num_gap>>=1; // half (+1, prevent 0)
-                                                this->num_gap=(this->num_gap==0)?1:this->num_gap;
-                                                //printf("Adjust pipeline size to %d\n", this->num_gap);
-                                            }
+                                            sock_sent_err_handler(this);
                                         } else {
                                             this->sockets[i].unsent_req--;
                                             this->sockets[i].sent_req++;
@@ -181,14 +163,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     //if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), MSG_DONTWAIT) < 0){
                                     if(send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0) < 0){
                                         // req sent not success
-                                        // sock_sent_err_handler();
-                                        if(errno==EAGAIN){
-                                            /* need to adjust the num_gap */
-                                            //this->num_gap=(this->num_gap>>1)|1; // half (+1, prevent 0)
-                                            this->num_gap>>=1; // half (+1, prevent 0)
-                                            this->num_gap=(this->num_gap==0)?1:this->num_gap;
-                                            //printf("Adjust pipeline size to %d\n", this->num_gap);
-                                        }
+                                        sock_sent_err_handler(this);
                                     } else {
                                         this->sockets[i].sent_req=this->num_gap;
                                         this->sockets[i].unsent_req-=this->num_gap;
@@ -222,17 +197,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
             }
         } else if (ret==-1){
             perror("poll");
-            // need to handle
-            switch(errno){
-                case EFAULT:    // The array given as argument was not contained in the calling program's address space 
-                    break;
-                case EINTR:     // A signal occurred before any requested event
-                    break;
-                case EINVAL:    // The nfds value exceeds the RLIMIT_NOFILE value.
-                    break;
-                case ENOMEM:    // There was no space to allocate file descriptor tables.
-                    break;
-            }
+            poll_err_handler();
             break;
         } else {
             // need to wait more time

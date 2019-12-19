@@ -56,6 +56,18 @@ insert_new_header_field_value(
          */
         LOG(DEBUG, "[Field-name: %s]", get_res_header_name_by_idx[status->curr_bit]);
         LOG(DEBUG, "[Field-value: %s]", strndup(status->buff+(idx-offset), offset-1));
+        
+        /* record content-length or transfer-encoding (chunked) here */
+        if(status->transfer_encoding_dirty){
+            // check if it is chunked
+            if(!strncasecmp(
+                strndup(
+                    status->buff+1+(status->field_value[RES_TRANSFER_ENCODING].idx), 
+                    status->field_value[RES_TRANSFER_ENCODING].offset), 
+                "chunked", strlen("chunked"))){
+                status->use_chunked=1;
+            }
+        }
 
         status->field_value[status->curr_bit].idx=(idx-offset);
         status->field_value[status->curr_bit].offset=offset-2;

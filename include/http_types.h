@@ -95,6 +95,7 @@ typedef struct _http_req_header_status_t {
 typedef struct _http_res_header_status_t {
     // essential fields
     u16 msg_hdr_len;
+    u8  use_chunked;
     // status-line
     u8 http_ver;
     u8 status_code;
@@ -159,25 +160,21 @@ typedef struct _http_res_header_status_t {
 
 /* for state_machine */
 typedef struct _state_machine_t {
-    /* thrd_num */
-    u8  thrd_num;
-    /* buf */
-    char *buff;
-    /* response instances */
-    http_res_header_status_t *resp; 
-    /* parsing state */
-    u8  p_state;
-    /* idx */
-    u32 last_fin_idx;
-    u32 prev_rcv_len; // previous recv bytes
-    u32 buf_idx;
-    u32 parsed_len;
-    /* size */
-    u32 data_size;
-    u32 max_buff_size;
+    char                            *buff;              // buf 
+    http_res_header_status_t        *resp;              // response instances 
+    u8                              thrd_num;           // thrd_num 
+    u8                              p_state;            // parsing state            
     /* flag */
-    u8 use_content_length;
-    u8 use_chunked;
+    u8                              use_content_length;
+    u8                              use_chunked;
+    /* idx & offset */
+    u32                             last_fin_idx;       // idx of latest work (resp, or msg hdr, ...)
+    u32                             prev_rcv_len;       // previous recv bytes
+    u32                             buf_idx;            // current reading buffer hdr idx
+    u32                             parsed_len;         // parsed data length (e.g. offset)
+    u32                             data_size;          // buffer size 
+    u32                             max_buff_size;      // 
+    /* record size */
     union {
         u32 content_length;
         u32 chunked_size;
