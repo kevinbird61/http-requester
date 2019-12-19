@@ -35,6 +35,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
         [10]={"verbose", no_argument, NULL, 'v'},
         [11]={"thread", required_argument, NULL, 't'}, 
+        [12]={"non-blocking", no_argument, NULL, 'N'}, /* using non-blocking */
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -75,11 +76,12 @@ argparse(
     int c;
     int digit_optind=0;
     log_visible=0;
+    (*this)->use_non_block=0;
     while(1){
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":liavhb:u:p:m:c:n:f:t:", options, &option_index);
+        c=getopt_long(argc, argv, ":liavhBb:u:p:m:c:n:f:t:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -100,6 +102,10 @@ argparse(
                 burst_length=atoi(optarg);
                 burst_length=(burst_length<=0)?NUM_GAP:burst_length;
                 printf("Configure burst length = %d (for http pipelining).\n", burst_length);
+                break;
+            case 'B':   // using non-blocking
+                (*this)->use_non_block=1;
+                printf("Using non-blocking mode.\n");
                 break;
             case 'c':   // connections (socket)
                 (*this)->conc=atoi(optarg);

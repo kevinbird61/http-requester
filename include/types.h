@@ -33,6 +33,7 @@ struct urls {
 typedef struct _parsed_args_t {
     u8                          flags;
     u8                          enable_pipe;
+    u8                          use_non_block;
     u32                         port;
     u32                         thrd;
     u32                         conc;
