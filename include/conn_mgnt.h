@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/poll.h>
+#include "err_handler.h"
 #include "argparse.h"
 #include "types.h"
 #include "conn.h"

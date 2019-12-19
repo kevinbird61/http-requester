@@ -1,13 +1,13 @@
 CC:=gcc
 LDFLAGS:=-static
-CFLAGS:=-std=gnu99 -fPIC -g3
+CFLAGS:=-std=gnu99 -fPIC 
 LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
 TEST:= $(patsubst %.c, %.out, $(subst test/,,$(wildcard test/*.c)))
 TOOLS:= $(patsubst %.c, %.app, $(subst tools/,,$(wildcard tools/*.c)))
 RELEASE:=libhttp_requester.a
-STATIC_BUILD:=sc_http_requester.exe
+STATIC_BUILD:=kb
 
 all: $(OBJS) $(EXEC)
 
@@ -37,5 +37,4 @@ release: $(RELEASE)
 .PHONY=clean
 
 clean:
-	rm *.exe *.o *.out *.app *.a
-	rm /tmp/http_request* 
+	rm -rf $(OBJS) $(EXEC) $(STATIC_BUILD) $(RELEASE) $(TEST) $(TOOLS) && rm -rf /tmp/http_request* 

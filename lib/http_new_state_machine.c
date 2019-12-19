@@ -103,6 +103,7 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
                 STATS_INC_RESP_NUM(state_m->thrd_num, 1);
+                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
                 /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
 
@@ -256,6 +257,7 @@ multi_bytes_http_parsing_state_machine(
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
                 STATS_INC_RESP_NUM(state_m->thrd_num, 1);
+                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
                 /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
 
@@ -414,7 +416,6 @@ http_resp_parser(
                      * - if 4xx or 5xx, then connection can be terminated; (FIXME: Can we terminate directly?)
                      *
                      */
-                    STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
                     if(state_m->resp->status_code<_200_OK){
                         // 1xx
                         LOG(INFO, "Response from server : %s (%s)", 

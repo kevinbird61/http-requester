@@ -1,7 +1,7 @@
 #include "argparse.h"
 
 u8 verbose=0; // default is false
-
+char *program=NULL;
 /* option we support:
  * - [x] `-h`:              Print helper function
  * - [x] `-t`, --thread:    Specify number of threads
@@ -35,7 +35,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
         [10]={"verbose", no_argument, NULL, 'v'},
         [11]={"thread", required_argument, NULL, 't'}, 
-        [12]={"non-blocking", no_argument, NULL, 'N'}, /* using non-blocking */
+        [12]={"nonblk", no_argument, NULL, 'N'}, /* using non-blocking */
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -77,11 +77,15 @@ argparse(
     int digit_optind=0;
     log_visible=0;
     (*this)->use_non_block=0;
+
+    // get prog name
+    program=argv[0];
+
     while(1){
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":liavhBb:u:p:m:c:n:f:t:", options, &option_index);
+        c=getopt_long(argc, argv, ":liavhNb:u:p:m:c:n:f:t:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -103,7 +107,7 @@ argparse(
                 burst_length=(burst_length<=0)?NUM_GAP:burst_length;
                 printf("Configure burst length = %d (for http pipelining).\n", burst_length);
                 break;
-            case 'B':   // using non-blocking
+            case 'N':   // using non-blocking
                 (*this)->use_non_block=1;
                 printf("Using non-blocking mode.\n");
                 break;
@@ -225,7 +229,7 @@ argparse(
         // check url
         if(!((*this)->flags&SPE_URL)){
             // if not specified URL, then print help info and exit
-            fprintf(stderr, "You need to specify `template file` or `url`.\n");
+            fprintf(stderr, "You need to specify `template file` (-f) or `url` (-u).\n");
             print_manual(0);
             exit(1);
         }
@@ -388,11 +392,13 @@ print_manual(
 {
     printf("********************************************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
+    printf("Author: Kevin Cyu (scyu@a10networks.com).\n");
     printf("\n");
-    printf("Usage: [sudo] ./http_requester.exe\n");
+    printf("Usage: [sudo] %s\n", program);
     printf("\t-h: Print this helper function.\n");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of concurrent connections");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of total connections");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
@@ -400,6 +406,7 @@ print_manual(
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Packed several http requests together for HTTP pipelining (default is false)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'N', "nonblk", " ", "Enable non-blocking connect, send and recv.");
 
     if(detail){
         printf("[Customized Request Header]-----------------------------------------------------\n");
