@@ -124,21 +124,23 @@ stats_dump()
         statistics.process_time+=priv_statistics[i].process_time;
 
         // response time (only enable when user using "single connection")
-        if( (statistics.conn_num/statistics.thrd_cnt)==1 && resp_intvl_queue[i].next!=NULL ){
-            statistics.resp_intvl_cnt+=priv_statistics[i].resp_intvl_cnt;
-            statistics.avg_resp_intvl_time+=priv_statistics[i].avg_resp_intvl_time;
-            // summarize, analyze the response time
-            struct _resp_intvl_t *head=resp_intvl_queue[i].next;
-            while(head){
-                // printf("Resp. time: %d\n", head->resp_intvl);
-                head=head->next;
-            }
-            // max, min 
-            if((long long)priv_statistics[i].resp_intvl_max > (long long)statistics.resp_intvl_max){
-                statistics.resp_intvl_max=priv_statistics[i].resp_intvl_max;
-            }
-            if(priv_statistics[i].resp_intvl_min < statistics.resp_intvl_min){
-                statistics.resp_intvl_min=priv_statistics[i].resp_intvl_min;
+        if(statistics.conn_num > 0 && statistics.thrd_cnt > 0 ){
+            if( (statistics.conn_num/statistics.thrd_cnt)==1 && resp_intvl_queue[i].next!=NULL ){
+                statistics.resp_intvl_cnt+=priv_statistics[i].resp_intvl_cnt;
+                statistics.avg_resp_intvl_time+=priv_statistics[i].avg_resp_intvl_time;
+                // summarize, analyze the response time
+                struct _resp_intvl_t *head=resp_intvl_queue[i].next;
+                while(head){
+                    // printf("Resp. time: %d\n", head->resp_intvl);
+                    head=head->next;
+                }
+                // max, min 
+                if((long long)priv_statistics[i].resp_intvl_max > (long long)statistics.resp_intvl_max){
+                    statistics.resp_intvl_max=priv_statistics[i].resp_intvl_max;
+                }
+                if(priv_statistics[i].resp_intvl_min < statistics.resp_intvl_min){
+                    statistics.resp_intvl_min=priv_statistics[i].resp_intvl_min;
+                }
             }
         }
     }

@@ -1,9 +1,15 @@
+#include "signal_handler.h"
 #include "conn_mgnt.h"
+
 
 int main(int argc, char *argv[]){
     parsed_args_t *args=create_argparse();
     u8 ret=argparse(&args, argc, argv);
-    
+
+    // signal handler
+    SIG_HANDLE(SIGINT);
+    SIG_HANDLE(SIGPIPE);
+
     // pthread_self() not always return 0, need to maintain a mapping table 
     STATS_INIT(); // init statistics
     STATS_TIME_START();
