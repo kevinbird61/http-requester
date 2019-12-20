@@ -10,7 +10,7 @@ multi_bytes_http_parsing_state_machine_non_blocking(
      * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
      */
     /* stats */
-    int flag=1, recvbytes=0, fin_resp=0;
+    int flag=1, recvbytes=0, fin_resp=0, fin_idx=0;
     control_var_t *control_var;
     /* Parse the data, and store the result into respones objs */
     /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
@@ -112,7 +112,8 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                 //  all the parsed responses.)
                 // - we don't modify the buf_idx, just pass buff ptr to response obj.
                 // - reset the essential states, prepare for parsing next response.
-                state_m->resp=create_http_header_status(state_m->buff);
+                memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
+                state_m->resp->buff=state_m->buff;
                 state_m->p_state=VER;
                 state_m->resp->status_code=0;
                 state_m->resp->http_ver=0;
@@ -123,7 +124,6 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                 state_m->curr_chunked_size=0;
                 state_m->parsed_len=0; // prevent from reading wrong starting point
                 
-                // reset_parsing_state_machine(state_m);
                 break;
             case RCODE_NOT_SUPPORT: /* cautious: this case could be caused by parsing error. */
                 LOG(WARNING, "Not support.");
@@ -138,9 +138,6 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                 break;
         }
     }
-
-    // LOG(NORMAL, "TCP connection state: %s", tcpi_state_str[get_tcp_conn_stat(sockfd)] );
-
     control_var->failed_resp=num_reqs; // the leftover are unfinish num_resp 
     control_var->num_resp=fin_resp;
     return control_var;

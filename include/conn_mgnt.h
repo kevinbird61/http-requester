@@ -14,8 +14,10 @@
 #include "conn.h"
 #include "http.h"
 
-#define MAX_RETRY       (3)
-#define NUM_GAP         (500)
+#define MAX_RETRY           (3)
+#define NUM_GAP             (500)
+#define POLL_TIMEOUT        (1000)  // 1 sec (normal/start case)
+#define POLL_MAX_TIMEOUT    (16000) // 16 sec (will exit sending process)
 
 extern u32  burst_length;
 extern u8   fast;

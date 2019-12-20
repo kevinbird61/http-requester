@@ -393,6 +393,7 @@ print_manual(
     printf("********************************************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
     printf("Author: Kevin Cyu (scyu@a10networks.com).\n");
+    printf("%s\n", a10logo);
     printf("\n");
     printf("Usage: [sudo] %s\n", program);
     printf("\t-h: Print this helper function.\n");

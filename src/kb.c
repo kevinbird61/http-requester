@@ -1,13 +1,13 @@
 #include "signal_handler.h"
 #include "conn_mgnt.h"
 
-
 int main(int argc, char *argv[]){
     parsed_args_t *args=create_argparse();
     u8 ret=argparse(&args, argc, argv);
 
     // signal handler
     SIG_HANDLE(SIGINT);
+    SIG_HANDLE(SIGSEGV);
     SIG_HANDLE(SIGPIPE);
 
     // pthread_self() not always return 0, need to maintain a mapping table 
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]){
                     exit(1);
                 }
             }
-            
+            SIG_PROTECT_CM(thrds[i].mgnt);
         }
         for(int i=0; i<args->thrd; i++){
             pthread_join(thrds[i].tid, NULL);
