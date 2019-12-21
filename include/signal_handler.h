@@ -21,7 +21,8 @@ static inline void sig_handler(int signal){
     switch(signal){
         case SIGPIPE: /* Broken pipe: write to pipe with no reader */
             STATS_DUMP(); 
-            break;
+            printf("Broken pipe\n");
+            exit(1);
         case SIGINT:
             STATS_DUMP();
             printf("Abort from SIGINT (ctrl+c), print out the current statistics.\n");

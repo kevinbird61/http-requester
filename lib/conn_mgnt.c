@@ -708,6 +708,38 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
 }
 
 conn_mgnt_t *
+create_conn_mgnt_non_blocking(
+    parsed_args_t *args)
+{
+    conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
+    mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
+    mgnt->args=args;
+    mgnt->num_gap=burst_length; // configurable
+
+    /* create socket lists */
+    mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
+    for(int i=0;i<args->conc;i++){
+        // create sockfd
+        mgnt->sockets[i].sockfd=create_tcp_conn_non_blocking(args->host, itoa(args->port));
+        mgnt->sockets[i].state_m=create_parsing_state_machine();
+        // reset state machine
+        reset_parsing_state_machine(mgnt->sockets[i].state_m);
+        if(mgnt->sockets[i].sockfd<0){
+            printf("Fail to create sockfd: %d\n", mgnt->sockets[i].sockfd);
+            // should we retry ? or using non-blocking to handle
+            exit(1);
+        }
+        // set total reqs (workload) of each sockfd
+        mgnt->sockets[i].unsent_req=(args->conn/args->conc);
+        mgnt->sockets[i].sent_req=0;
+    }
+    // append the rest workload to last sockfd
+    mgnt->sockets[args->conc-1].unsent_req+=(args->conn%args->conc);
+
+    return mgnt;
+}
+
+conn_mgnt_t *
 create_conn_mgnt(
     parsed_args_t *args)
 {
@@ -728,38 +760,6 @@ create_conn_mgnt(
         }
         // set total reqs (workload) of each sockfd
         mgnt->sockets[i].unsent_req=(args->conn/args->conc);
-    }
-    // append the rest workload to last sockfd
-    mgnt->sockets[args->conc-1].unsent_req+=(args->conn%args->conc);
-
-    return mgnt;
-}
-
-conn_mgnt_t *
-create_conn_mgnt_non_blocking(
-    parsed_args_t *args)
-{
-    conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
-    mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
-    mgnt->args=args;
-    mgnt->num_gap=burst_length; // configurable
-
-    /* create socket lists */
-    mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
-    for(int i=0;i<args->conc;i++){
-        // create sockfd
-        mgnt->sockets[i].sockfd=create_tcp_conn_non_blocking(args->host, itoa(args->port));
-        mgnt->sockets[i].state_m=create_parsing_state_machine();
-        // reset state machine
-        reset_parsing_state_machine(mgnt->sockets[i].state_m);
-        if(mgnt->sockets[i].sockfd<0){
-            printf("Fail to reate sockfd: %d\n", mgnt->sockets[i].sockfd);
-            // should we retry ? or using non-blocking to handle
-            exit(1);
-        }
-        // set total reqs (workload) of each sockfd
-        mgnt->sockets[i].unsent_req=(args->conn/args->conc);
-        mgnt->sockets[i].sent_req=0;
     }
     // append the rest workload to last sockfd
     mgnt->sockets[args->conc-1].unsent_req+=(args->conn%args->conc);
