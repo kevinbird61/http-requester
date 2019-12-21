@@ -7,6 +7,7 @@ int main(int argc, char *argv[]){
 
     // signal handler
     SIG_HANDLE(SIGINT);
+    SIG_HANDLE(SIGALRM);
     SIG_HANDLE(SIGSEGV);
     SIG_HANDLE(SIGPIPE);
 

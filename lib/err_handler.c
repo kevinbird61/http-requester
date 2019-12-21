@@ -18,17 +18,16 @@ int sock_sent_err_handler(
         case ECONNRESET: /* Connection reset by peer */
             puts("Sent ECONNRESET");
             break;
-        case ECONNREFUSED: /* Connection refuse, close program */
-            puts("Connection refused, close kb");
-            exit(1);
+        case ECONNREFUSED: { /* Connection refuse, close program */
+            struct _conn_t *conn=(struct _conn_t*)obj;
+            if(conn->retry>MAX_RETRY){
+                puts("Connection refused, close kb");
+                exit(1);
+            }
             break;
+        }
         case EAGAIN: /* Resource temporarily unavailable */ {
             puts("Sent Resource temporarily unavailable");
-            // conn_mgnt_t *mgnt=(conn_mgnt_t *)obj;
-            // cannot send, need to adjust the num_gap 
-            //printf("Sent EAGAIN: %d\n", mgnt->num_gap);
-            //mgnt->num_gap>>=1; // ÷2 
-            //mgnt->num_gap=(mgnt->num_gap==0)?1:mgnt->num_gap; // (+1, prevent 0)
             break;
         }
         default:
