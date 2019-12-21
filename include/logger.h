@@ -30,7 +30,8 @@ extern unsigned char log_visible;
  */
 #define LOG(loglevel, format, args...)              \
     do {                                            \
-    if(log_visible){                                \
+    /* only record when > log_visible */            \
+    if(loglevel <= log_visible){                    \
         char *userlog=parse_valist(format, ##args); \
         syslog(loglevel,                            \
             pthread_self(),                         \
@@ -45,6 +46,7 @@ extern unsigned char log_visible;
 typedef enum _log_level {
     /* only display on the screen */
     NORMAL=0,
+    DEBUG,
     INFO,
     SHOWONLY,
     /* log + show */
@@ -53,7 +55,6 @@ typedef enum _log_level {
     ERROR,
     /* reserved for log-only enum */
     LOGONLY,
-    DEBUG,
     LOG_LEVEL_MAXIMUM /* maximum */
 } log_level;
 

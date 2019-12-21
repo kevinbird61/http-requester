@@ -13,7 +13,7 @@ char *program=NULL;
  * - [x] `-p`, --port:      Specify target port number
  * - [x] `-m`, --method:    Specify method token
  * - [x] `--pipe`           Enable pipelining
- * - [x] `--log`            Enable logging
+ * - [x] `--log`            Enable logging with level support
  * - [x] `-b, --burst`      Control the num_gap (between send & recv), e.g pipelining size
  * - [x] `--fast`           Reduce the send() syscall
  * - [x] `-v, --verbose`    Output more debug information
@@ -30,7 +30,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [4]={"file", required_argument, NULL, 'f'},
         [5]={"method", required_argument, NULL, 'm'},
         [6]={"pipe", no_argument, NULL, 'i'},
-        [7]={"log", no_argument, NULL, 'l'},
+        [7]={"log", required_argument, NULL, 'l'},
         [8]={"burst", required_argument, NULL, 'b'},
         [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
         [10]={"verbose", no_argument, NULL, 'v'},
@@ -85,7 +85,7 @@ argparse(
         int this_option_optind=optind?optind:1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":liavhNb:u:p:m:c:n:f:t:", options, &option_index);
+        c=getopt_long(argc, argv, ":iavhNl:b:u:p:m:c:n:f:t:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
@@ -100,9 +100,12 @@ argparse(
                 break;
             case 'a':   // fast (cooperate with -b, burst length)
                 printf("Enable fast transmit (for http pipelining).\n");
+                (*this)->enable_pipe=1; /* using fast, also enable pipe */
                 fast=1;
                 break;
             case 'b':   // burst length
+                printf("Enable HTTP pipelining.\n");
+                (*this)->enable_pipe=1; /* also enable pipe */
                 burst_length=atoi(optarg);
                 burst_length=(burst_length<=0)?NUM_GAP:burst_length;
                 printf("Configure burst length = %d (for http pipelining).\n", burst_length);
@@ -169,8 +172,8 @@ argparse(
                 (*this)->flags|=SPE_METHOD;
                 break;
             case 'l':
-                printf("Enable logging.\n");
-                log_visible=1;
+                printf("Enable logging, level is %s\n", optarg); 
+                log_visible=atoi(optarg); /* set log-level */
                 break;
             case 'i':   // pipeline
                 printf("Enable HTTP pipelining.\n");
@@ -264,6 +267,7 @@ argparse(
     printf("%-50s: %d\n", "Number of threads", (*this)->thrd);
     printf("%-50s: %d\n", "Number of connections", (*this)->conc);
     printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
+    printf("%-50s: %d\n", "Max-requests size", burst_length);
     printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
     /*printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);*/
     struct urls *url_trav=(*this)->urls;

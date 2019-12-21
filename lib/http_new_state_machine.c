@@ -49,7 +49,7 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                     }
                     // need to adjust the offset of each response obj
                     update_res_header_idx(state_m->resp, state_m->last_fin_idx);
-                    LOG(NORMAL ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
+                    LOG(WARNING ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
                     state_m->buf_idx=state_m->data_size;
                     memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size);
                     // reset the rest and fin_idx
@@ -59,15 +59,15 @@ multi_bytes_http_parsing_state_machine_non_blocking(
 
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, MSG_DONTWAIT);
                 if(recvbytes>0){
-                    LOG(NORMAL, "RECV: %d bytes", recvbytes);
+                    LOG(WARNING, "RECV: %d bytes", recvbytes);
                     state_m->prev_rcv_len=recvbytes;
                     state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
                 } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
                     if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
-                        LOG(NORMAL, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        LOG(WARNING, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
                         break;
                     } else {
-                        LOG(NORMAL, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
+                        LOG(DEBUG, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
                         // reset state machine
                         reset_parsing_state_machine(state_m);
                         // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)
@@ -84,18 +84,18 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                 break;
             case RCODE_REDIRECT:
                 /* perform redirection, notify caller that need to abort the response and resend */
-                LOG(WARNING, "Require rediretion.");
+                LOG(INFO, "Require rediretion.");
                 // return control_var;
                 flag=0;
                 break;
             case RCODE_ERROR:
                 // print the error message instead of exit?
-                LOG(WARNING, "Parsing error occur.");
+                LOG(INFO, "Parsing error occur.");
                 flag=0;
                 break;
             case RCODE_FIN:
             case RCODE_NEXT_RESP:
-                LOG(WARNING, "Finish one respose.");
+                LOG(INFO, "Finish one respose.");
                 num_reqs--; // finish one response
                 fin_resp++;
                 /* increase stats */
@@ -197,7 +197,7 @@ multi_bytes_http_parsing_state_machine(
                     }
                     // need to adjust the offset of each response obj
                     update_res_header_idx(state_m->resp, state_m->last_fin_idx);
-                    LOG(NORMAL ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
+                    LOG(DEBUG ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
                     state_m->buf_idx=state_m->data_size;
                     memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size);
                     // reset the rest and fin_idx
@@ -216,15 +216,15 @@ multi_bytes_http_parsing_state_machine(
                 }*/
 
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
-                LOG(NORMAL, "RECV: %d bytes", recvbytes);
+                LOG(DEBUG, "RECV: %d bytes", recvbytes);
                 state_m->prev_rcv_len=recvbytes;
                 
                 if(recvbytes==0){ // handle the state that RX is empty and server has send fin
                     if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
-                        LOG(NORMAL, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        LOG(DEBUG, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
                         break;
                     } else {
-                        LOG(NORMAL, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
+                        LOG(DEBUG, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
                         // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)
                         control_var->rcode=RCODE_CLOSE; // server turn off the connection
                         flag=0;
@@ -407,7 +407,7 @@ http_resp_parser(
                         char *tmp;
                         tmp=malloc((state_m->parsed_len)*sizeof(char));
                         snprintf(tmp, state_m->parsed_len, "%s", state_m->buff+(state_m->buf_idx-state_m->parsed_len));
-                        LOG(DEBUG,  "[Reason Phrase: %s]", tmp);
+                        LOG(INFO,  "[Reason Phrase: %s]", tmp);
                         free(tmp);
                     }
                     state_m->p_state=next_http_state(state_m->p_state, '\r');
@@ -497,7 +497,7 @@ http_resp_parser(
                     if(http_h_status_check->content_len_dirty){
                         state_m->use_content_length=1;
                         state_m->content_length=atoi(state_m->buff+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
-                        LOG(NORMAL, "[Content length] size = %d", state_m->content_length);
+                        LOG(INFO, "[Content length] size = %d", state_m->content_length);
                         state_m->total_content_length=state_m->content_length;
                         if(state_m->content_length==0){
                             flag=0;
@@ -568,7 +568,7 @@ http_resp_parser(
                     {
                         case VER:
                             if((ret=encap_http_version(state_m->buff+(state_m->buf_idx-state_m->parsed_len))) > 1){ // current only support HTTP/1.1
-                                LOG(DEBUG, "[Version: %s]",  get_http_version_by_idx[ret]);
+                                LOG(INFO, "[Version: %s]",  get_http_version_by_idx[ret]);
                                 state_m->resp->http_ver=ret;
                             } else { // if not support, just terminate
                                 char *tmp=malloc((state_m->parsed_len)*sizeof(char));
@@ -585,7 +585,7 @@ http_resp_parser(
                         case CODE_OR_TOKEN:
                             if((ret=encap_http_status_code(atoi(state_m->buff+(state_m->buf_idx-state_m->parsed_len)))) > 0){
                                 state_m->resp->status_code=ret;
-                                LOG(DEBUG, "[Status code: %s]", get_http_status_code_by_idx[ret]);
+                                LOG(INFO, "[Status code: %s]", get_http_status_code_by_idx[ret]);
                             } else { // not support
                                 control_var->rcode=RCODE_NOT_SUPPORT;
                                 return control_var;
@@ -621,6 +621,28 @@ http_resp_parser(
                 } /* CHUNKED (if extension is valid) */
             default:
                 // append to readbuf
+                /* conformance check: https://tools.ietf.org/html/rfc7230#section-3.1 */
+                switch(state_m->p_state){
+                    case REASON_OR_RESOURCE: // in reason phrase
+                        if( !isWSP(state_m->buff[state_m->buf_idx-1]) && 
+                            !isVCHAR(state_m->buff[state_m->buf_idx-1]) &&
+                            !isOBS_TEXT(state_m->buff[state_m->buf_idx-1])){
+                                // error 
+                                printf("Invalid char: %d\n", state_m->buff[state_m->buf_idx-1]);
+                                puts("Illegal Reason Phrase");
+                                exit(1); 
+                            }
+                        break;
+                    case FIELD_NAME:
+                    case FIELD_VALUE:
+                        if( !isTCHAR(state_m->buff[state_m->buf_idx-1]) &&
+                            !isQSTR(state_m->buff[state_m->buf_idx-1])){
+                            // error 
+                            puts("Illegal Field Name/Value");
+                            printf("Invalid char: %d\n", state_m->buff[state_m->buf_idx-1]);
+                        }
+                        break;
+                }
                 break;
         }
     }

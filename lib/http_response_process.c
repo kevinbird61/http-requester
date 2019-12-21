@@ -20,7 +20,6 @@ http_res_header_status_t *
 create_http_header_status(char *readbuf)
 {
     http_res_header_status_t *http_header_status=calloc(1, sizeof(http_res_header_status_t));
-    // memset(http_header_status, 0x00, sizeof(http_res_header_status_t));
     // assign
     http_header_status->buff=readbuf;
 
@@ -39,7 +38,7 @@ insert_new_header_field_name(
     
     if(!(check_header>0)){
         /* if not found, then alloc the memory to print */
-        LOG(ERROR, "[Field-name] Not support `%s` currently",  strndup(status->buff+(idx-offset), offset-1));
+        LOG(WARNING, "[Field-name] Not support `%s` currently",  strndup(status->buff+(idx-offset), offset-1));
         return ERR_NOT_SUPPORT;
     }
     return ERR_NONE;
@@ -54,8 +53,8 @@ insert_new_header_field_value(
     if(status->curr_bit>0){
         /** TODO: check the current header with existed header. (check conformance here)
          */
-        LOG(DEBUG, "[Field-name: %s]", get_res_header_name_by_idx[status->curr_bit]);
-        LOG(DEBUG, "[Field-value: %s]", strndup(status->buff+(idx-offset), offset-1));
+        LOG(INFO, "[Field-name: %s]", get_res_header_name_by_idx[status->curr_bit]);
+        LOG(INFO, "[Field-value: %s]", strndup(status->buff+(idx-offset), offset-1));
         
         /* record content-length or transfer-encoding (chunked) here */
         if(status->transfer_encoding_dirty){
@@ -105,9 +104,7 @@ update_res_header_idx(
     for(int i=1;i<RES_HEADER_NAME_MAXIMUM;i++){
         if( (status->dirty_bit_align & ( ((u64)1)<<(i-1) )) ){
             // this field need to move 
-            // printf("Orig idx: %d ",status->field_value[i].idx);
             status->field_value[i].idx-=shift_offset;
-            // printf(", New idx: %d \n",status->field_value[i].idx);
         }
     }
 }

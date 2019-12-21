@@ -17,8 +17,12 @@
 #define isOCTET(x)      ((x>=0x00&&x<=0xFF)? 1: 0)                          // 8 bits of data
 #define isVCHAR(x)      ((x>=0x21&&x<=0x7E)? 1: 0)                          // visible (printing) characters
 #define isWSP(x)        ((x==SP||x==HTAB)? 1: 0)                            // whitespace
-
+#define isOBS_TEXT(x)   ((x>=0x80&&x<=0xFF)? 1: 0)
 // rfc7230
-#define isTCHAR(x)      ((isDIGIT(x)||isALPHA(x)||isVCHAR(x)|| ||x==0x21||(x>=0x23&&x<=0x27)||x==0x2A||x==0x2B||x==0x2D||x==0x2E||x==0x5E||x==0x5F||x==0x60||x==0x7C||x==0x7E)) 
+#define isTCHAR(x)      ((isDIGIT(x)||isALPHA(x)||isVCHAR(x)||x==0x21||(x>=0x23&&x<=0x27)||x==0x2A||x==0x2B||x==0x2D||x==0x2E||x==0x5E||x==0x5F||x==0x60||x==0x7C||x==0x7E)) 
+
+#define isQDTEXT(x)     ((isWSP(x)||isOBS_TEXT(x)||(x>=0x21)||(x<=0x27)||(x>=0x2A)||(x<=0x5B)||(x>=0x5D)||(x<=0x7E))? 1: 0)
+#define isQPAIR(x)      ((isOBS_TEXT(x)||(x==0x5C)||isVCHAR(x)||isWSP(x))? 1: 0)
+#define isQSTR(x)       ((x==DQUOTE||isQDTEXT(x)||isQPAIR(x))? 1: 0)
 
 #endif
