@@ -27,7 +27,11 @@ int sock_sent_err_handler(
             break;
         }
         case EAGAIN: /* Resource temporarily unavailable */ {
-            puts("Sent Resource temporarily unavailable");
+            // in non-blocking mode will have this errno,
+            // means that this operation (e.g. send) would block 
+            // may cause by sending too much data 
+            // => just let recv part to adjust the num_gap 
+            puts("Sent Resource temporarily unavailable"); 
             break;
         }
         default:

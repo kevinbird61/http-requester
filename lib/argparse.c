@@ -397,13 +397,13 @@ print_manual(
     printf("********************************************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
     printf("Author: Kevin Cyu (scyu@a10networks.com).\n");
-    printf("%s\n", a10logo);
+    // printf("%s\n", a10logo);
     printf("\n");
     printf("Usage: [sudo] %s\n", program);
     printf("\t-h: Print this helper function.\n");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of concurrent connections");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of total connections");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads, total requests will equivalent to thread_num*request_num");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of connections (per thread)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of requests (per thread), distribute to each connection");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
@@ -419,9 +419,13 @@ print_manual(
             if( (i!=REQ_HOST) ){
                 char *name=strdup(get_req_header_name_by_idx[i]);
                 to_lowercase(name);
-                printf("--%-20s <VALUE> : Request header field-value of `%s`\n", name, get_req_header_name_by_idx[i]);
+                // printf("--%-20s <VALUE> : Request header field-value of `%s`\n", name, get_req_header_name_by_idx[i]);
+                printf("--%-20s <VALUE>\n", name);
             }
         }
+        printf("[Example]-----------------------------------------------------------------------\n");
+        printf("%s -u http://httpd.apache.org -n 1000 -c 10 -t 1 -N\n", program);
+        printf("  : using 1 thread and open 10 connections to deliver 1000 requests with non-blocking mode.\n");
     }
     printf("********************************************************************************\n");
 }

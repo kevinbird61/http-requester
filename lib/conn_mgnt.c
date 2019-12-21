@@ -22,7 +22,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     printf("================================================================================\n");
     
     char *packed_req=NULL;
-    int packed_len=0;
+    int packed_len=0, leftover=0;
     // timeout
     int timeout=POLL_TIMEOUT;
 
@@ -113,10 +113,13 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     STATS_INC_PROCESS_TIME(this->thrd_num, t_end-t_start);
                     // printf("RCODE: %d\n", control_var->rcode);
                     // printf("POLLIN(%d/%d), rcode=%d, s=%d u=%d r=%d\n", all_fin, this->total_req, control_var->rcode, this->sockets[i].sent_req, this->sockets[i].unsent_req, this->sockets[i].rcvd_res);
+                    // test: using num_resp to adjust num_gap (in order to prevent sending too much) 
+                    // -> problem: non-blocking will make num_resp become 1, which disble pipeline 
+                    // this->num_gap=control_var->num_resp; 
                     this->sockets[i].rcvd_res+=control_var->num_resp;
                     all_fin+=control_var->num_resp;
                     this->sockets[i].unsent_req-=control_var->num_resp;
-                    this->sockets[i].sent_req=0; // reset
+                    this->sockets[i].sent_req-=control_var->num_resp; //0; // reset
 
                     switch(control_var->rcode){
                         case RCODE_POLL_DATA: // still have unfinished data (pipe)
@@ -126,11 +129,16 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             // not finish yet, need to open new connection
                             if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT ||
                                 get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
-                                printf("CLOSE-WAIT or CLOSE\n");
+                                // printf("CLOSE-WAIT or CLOSE (NUM_GAP: %d, Leftover: %d req)\n", this->num_gap, this->sockets[i].sent_req);
+                                if(this->sockets[i].sent_req!=0 && (this->num_gap > this->sockets[i].sent_req)){ // you sent too much
+                                    this->num_gap -= this->sockets[i].sent_req;
+                                }
+                                leftover=0; // need to reset leftover 
+                                // STATS_DUMP();
                                 close(this->sockets[i].sockfd); // do we need to wait ?
                                 this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, itoa(this->args->port));
                                 ufds[i].fd=this->sockets[i].sockfd;
-                                this->sockets[i].sent_req=0;
+                                this->sockets[i].sent_req=0; // new connection, set sent_req to 0
                                 this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                             }
                             break;
@@ -161,7 +169,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     ret--;
                     // able to sent
                     // check workload (unsent_req), and if there have any unanswer req (sent_req)
-                    if(this->sockets[i].unsent_req>0){ // send if there have unsent requests
+                    if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req==0){ // send if there have unsent requests, and there are no any unanswered req
                         if(this->args->enable_pipe){
                             // enable pipe 
                             if(this->sockets[i].unsent_req < this->num_gap && this->sockets[i].unsent_req>=0){
@@ -184,13 +192,19 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     
                                     // because is fast mode, we deliver all reqs in one send(), so its hard to handle DONWAIT
                                     int sentbytes=0;
-                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0)) < 0){
+                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
                                         // req not sent complete
                                         sock_sent_err_handler(&(this->sockets[i]));
+                                    } else {
+                                        // sentbytes > 0
+                                        /* using sendbytes to adjust the num_gap
+                                         * - FIXME: if we set the num_gap in recv ?
+                                         */
+                                        this->num_gap=sentbytes/strlen(http_request); 
+                                        leftover=sentbytes%strlen(http_request);
+                                        // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
+                                        this->sockets[i].sent_req=this->num_gap;
                                     }
-                                    /* the sendbytes, using sendbytes to adjust the num_gap */
-                                    this->num_gap=sentbytes/strlen(http_request); /* resize (FIXME: find a way to enlarge when send buffer is available again) */
-                                    this->sockets[i].sent_req=this->num_gap;
                                 }
                             } else if(this->sockets[i].unsent_req >= this->num_gap){
                                 if(!fast){
@@ -210,12 +224,16 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                         packed_len=this->num_gap;
                                     }
                                     int sentbytes=0;
-                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req, strlen(packed_req), 0)) < 0){
+                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
                                         // req sent not success
                                         sock_sent_err_handler(&(this->sockets[i]));
+                                    } else {
+                                        // sentbytes > 0
+                                        this->num_gap=sentbytes/strlen(http_request);
+                                        leftover=sentbytes%strlen(http_request);
+                                        // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
+                                        this->sockets[i].sent_req=this->num_gap;
                                     }
-                                    this->num_gap=sentbytes/strlen(http_request);
-                                    this->sockets[i].sent_req=this->num_gap;
                                 }
                             }
                         } else {
