@@ -13,7 +13,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     http_req_create_start_line(&http_request, this->args->method, this->args->path, HTTP_1_1);
     // header fields
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_HOST, this->args->host);
-    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_CONN, ((this->args->conn > 1)? "keep-alive": "close"));
+    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_CONN, ((this->total_req > 1)? "keep-alive": "close"));
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
@@ -26,8 +26,8 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     // timeout
     int timeout=POLL_TIMEOUT;
 
-    // record total connection
-    this->total_req=this->args->conn;
+    // record total connection (done within create func)
+    // this->total_req=this->args->conn;
 
     // using poll()
     struct pollfd ufds[this->args->conc];
@@ -94,7 +94,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     LOG(DEBUG, "POLLNVAL"); // FIXME: warning ?
                     // exit(1); // do we need to handle this problem ?
                 }
-                
+
                 /*printf("ret=%d (IN: %d/OUT: %d), (%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
                     ret, ufds[i].revents & POLLIN, ufds[i].revents & POLLOUT, all_fin, this->total_req,
                     this->sockets[i].sockfd, this->sockets[i].unsent_req,
@@ -314,7 +314,7 @@ conn_mgnt_run(conn_mgnt_t *this)
     http_req_create_start_line(&http_request, this->args->method, this->args->path, HTTP_1_1);
     // header fields
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_HOST, this->args->host);
-    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_CONN, ((this->args->conn > 1)? "keep-alive": "close"));
+    http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_CONN, ((this->total_req > 1)? "keep-alive": "close"));
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
@@ -331,7 +331,7 @@ conn_mgnt_run(conn_mgnt_t *this)
     state_machine_t *state_m=create_parsing_state_machine();
     state_m->thrd_num=(*this).thrd_num;
     // record total connection
-    this->total_req=this->args->conn;
+    // this->total_req=this->args->conn;
 
     if(this->args->enable_pipe){
         /* support pipeline */
@@ -729,6 +729,7 @@ create_conn_mgnt_non_blocking(
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=burst_length; // configurable
+    mgnt->total_req=args->conn;
 
     /* create socket lists */
     mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
@@ -744,11 +745,11 @@ create_conn_mgnt_non_blocking(
             exit(1);
         }
         // set total reqs (workload) of each sockfd
-        mgnt->sockets[i].unsent_req=(args->conn/args->conc);
+        mgnt->sockets[i].unsent_req=(mgnt->total_req/args->conc);
         mgnt->sockets[i].sent_req=0;
     }
     // append the rest workload to last sockfd
-    mgnt->sockets[args->conc-1].unsent_req+=(args->conn%args->conc);
+    mgnt->sockets[args->conc-1].unsent_req+=(mgnt->total_req%args->conc);
 
     return mgnt;
 }
@@ -761,6 +762,7 @@ create_conn_mgnt(
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=burst_length; // configurable
+    mgnt->total_req=args->conn;
 
     /* create socket lists */
     mgnt->sockets=calloc(args->conc, sizeof(struct _conn_t));
@@ -773,10 +775,10 @@ create_conn_mgnt(
             exit(1);
         }
         // set total reqs (workload) of each sockfd
-        mgnt->sockets[i].unsent_req=(args->conn/args->conc);
+        mgnt->sockets[i].unsent_req=(mgnt->total_req/args->conc);
     }
     // append the rest workload to last sockfd
-    mgnt->sockets[args->conc-1].unsent_req+=(args->conn%args->conc);
+    mgnt->sockets[args->conc-1].unsent_req+=(mgnt->total_req%args->conc);
 
     return mgnt;
 }
