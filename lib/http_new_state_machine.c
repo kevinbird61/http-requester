@@ -487,7 +487,7 @@ http_resp_parser(
                         LOG(DANGER, "Connection is terminated by %s's failure ...", state_m->resp->status_code<_500_INTERNAL_SERV_ERR?"client":"server");
                         LOG(ERROR, "Response from server : %s (%s)", get_http_status_code_by_idx[state_m->resp->status_code], get_http_reason_phrase_by_idx[state_m->resp->status_code]);
                         // return error code, we don't need the parse the rest of data
-                        control_var->rcode=RCODE_ERROR;
+                        control_var->rcode=state_m->resp->status_code<_500_INTERNAL_SERV_ERR? RCODE_CLIENT_ERR: RCODE_SERVER_ERR;
                         return control_var;
                     }
 

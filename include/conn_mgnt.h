@@ -14,7 +14,8 @@
 #include "conn.h"
 #include "http.h"
 
-#define MAX_RETRY           (5)     // wait 5 sec
+#define MAX_RETRY           (5)     // wait 5 sec (permit 5 retry time)
+#define RETRY_WAIT_TIME     (1)     // 4xx, or other error, wait 1 sec and create a new conn to retry
 #define NUM_GAP             (500)
 #define POLL_TIMEOUT        (1000)  // 1 sec (normal/start case)
 #define POLL_MAX_TIMEOUT    (16000) // 16 sec (will exit sending process)

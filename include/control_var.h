@@ -20,6 +20,8 @@ enum {
     RCODE_FIN,                  // finish parsing
     RCODE_CLOSE,                // connection is close-wait/close
     RCODE_REDIRECT,             // 3xx, require redirection
+    RCODE_CLIENT_ERR,           // 4xx
+    RCODE_SERVER_ERR,           // 5xx
     RCODE_NOT_SUPPORT,          // parsing error - not support
     RCODE_INCOMPLETE,           // parsing error - incomplete
     RCODE_ERROR,                // error
@@ -32,6 +34,8 @@ static char *rcode_str[]={
     [RCODE_FIN]=            "RCODE: Finish parsing",
     [RCODE_CLOSE]=          "RCODE: Connection state is close-wait/close",
     [RCODE_REDIRECT]=       "RCODE: Require redirection",
+    [RCODE_CLIENT_ERR]=     "RCODE: Client side error (4xx)",
+    [RCODE_SERVER_ERR]=     "RCODE: Server side error (5xx)",
     [RCODE_NOT_SUPPORT]=    "RCODE: Parsing error(Not support)",
     [RCODE_INCOMPLETE]=     "RCODE: Parsing error(Incomplete)",
     [RCODE_ERROR]=          "RCODE: Error",

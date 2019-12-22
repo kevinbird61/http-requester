@@ -49,15 +49,13 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
         if ( (ret=poll(ufds, this->args->conc, timeout) )>0 ) { // poll
             // reset timeout to 1 sec
             timeout=POLL_TIMEOUT;
-            /*LOG(NORMAL, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
-                all_fin, this->total_req,
-                this->sockets[i].sockfd, this->sockets[i].unsent_req,
-                this->sockets[i].sent_req, this->sockets[i].rcvd_res);*/
-            // for(int i=0;i<this->args->conc && ret;i++){
+            // LOG(DEBUG, "Work status (%d/%d) Sockfd(%d)", all_fin, this->total_req, this->sockets[i].sockfd);
+
+            // using ring-like sending model (not always start from 0, each node has equal change)
             while( ret > 0 ){
-                i%=this->args->conc;
+                i%=this->args->conc; // pick the connection 
                 if( ufds[i].revents & POLLERR ){
-                    /** An error has occurred on the device or stream. This flag is only valid in the revents bitmask; it shall be ignored in the events member.
+                    /** An error has occurred on the device or stream. (This flag is only valid in the revents bitmask; it shall be ignored in the events member)
                      * - remote device cannot connect (send RST to us), we need to wait
                      * - remote device close the connection
                      */
@@ -71,7 +69,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             sleep(this->sockets[i].retry);
                             if(this->sockets[i].retry>MAX_RETRY){
                                 this->total_req=0; // exit program
-                                LOG(DEBUG, "kb will close this sending process");
+                                LOG(DEBUG, "Close kb.");
                                 STATS_CONN(this); 
                                 STATS_DUMP();
                                 exit(1);
@@ -96,12 +94,19 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     LOG(DEBUG, "POLLNVAL"); // FIXME: warning ?
                     // exit(1); // do we need to handle this problem ?
                 }
+                
                 /*printf("ret=%d (IN: %d/OUT: %d), (%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
                     ret, ufds[i].revents & POLLIN, ufds[i].revents & POLLOUT, all_fin, this->total_req,
                     this->sockets[i].sockfd, this->sockets[i].unsent_req,
                     this->sockets[i].sent_req, this->sockets[i].rcvd_res);*/
                 // printf("NUM_GAP: %d\n", this->num_gap);
                 if ( ufds[i].revents & POLLIN ) {
+                    // record response `timestamp` only when "single connection", and then PUSH into response interval queue
+                    if(this->args->conc==1 && resp_intvl>0){ // single connection, and send() successfully
+                        resp_intvl=read_tsc()-resp_intvl;
+                        STATS_PUSH_RESP_INTVL(this->thrd_num, resp_intvl);
+                        resp_intvl=0; // reset
+                    }
                     ret--;
                     // able to recv
                     control_var_t *control_var;
@@ -124,7 +129,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                         case RCODE_POLL_DATA: // still have unfinished data (pipe)
                         case RCODE_FIN: // finish
                         case RCODE_CLOSE: // connection close, check the workload
-                        case RCODE_NOT_SUPPORT: // parsing not finished
+                        case RCODE_NOT_SUPPORT: // parsing not finished (suspend by incomplete packet), or parsing error
                             // not finish yet, need to open new connection
                             if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT ||
                                 get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
@@ -141,32 +146,36 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                             }
                             break;
-                        case RCODE_REDIRECT: // TODO: require redirection
+                        case RCODE_REDIRECT: // TODO: require redirection (need to update URL)
+                            // 1) need to close all current connection and create new one
+                            // 2) need to finish the rest of reqs with new URL
                             break;
-                        case RCODE_ERROR: // error occur, need to abort this connection (e.g. 400 Bad request)
-                            /** TODO: 4xx need to handle it, split these kinds of error out and handle them  */
+                        case RCODE_SERVER_ERR: // 5xx server side error
+                            LOG(DEBUG, "%s, close the program immediately.", rcode_str[control_var->rcode]);
+                            exit(1);
+                        case RCODE_CLIENT_ERR: // 4xx client side error 
+                            LOG(DEBUG, "%s", rcode_str[control_var->rcode]); 
+                        case RCODE_ERROR: // error occur, need to abort this connection
                             // not finish yet, need to open new connection
                             close(this->sockets[i].sockfd);
                             // need to wait a second 
-                            LOG(DEBUG, "Bad error occur"); // FIXME: warning ?
-                            sleep(1);
+                            LOG(DEBUG, "Close the connection and wait %d to create a new one.", RETRY_WAIT_TIME); // FIXME: warning ?
+                            sleep(RETRY_WAIT_TIME);
                             this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, itoa(this->args->port));
                             ufds[i].fd=this->sockets[i].sockfd;
                             this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                             this->sockets[i].sent_req=0;
                             reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
                             break;
-                        default: // other errors
+                        default: // TODO: other errors
                             LOG(DEBUG, "Error, code=%s", rcode_str[control_var->rcode]); // FIXME: warning ?
                             break;
                     }
-                    
                     //continue;
                 }
                 
-                if ( ufds[i].revents & POLLOUT ) {
+                if ( ufds[i].revents & POLLOUT ) { // able to sent
                     ret--;
-                    // able to sent
                     // check workload (unsent_req), and if there have any unanswer req (sent_req)
                     if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req==0){ // send if there have unsent requests, and there are no any unanswered req
                         if(this->args->enable_pipe){
@@ -259,11 +268,11 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*strlen(http_request));
                                     STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                 }
+                                // record request `timestamp` only when "single connection"
+                                if(this->args->conc==1){
+                                    resp_intvl=read_tsc();     
+                                }
                             }
-                            // record request `timestamp` only when "single connection"
-                            /*if(this->args->conc==1){
-                                resp_intvl=read_tsc();     
-                            }*/
                         } 
                     } // else => don't sent 
                 }
