@@ -38,6 +38,7 @@ int main(int argc, char *argv[]){
                     exit(1);
                 }
             }
+            // these protected obj can be handled when exception occur (e.g. SIGXXX) and close them elegantly
             SIG_PROTECT_CM(thrds[i].mgnt);
         }
         for(int i=0; i<args->thrd; i++){

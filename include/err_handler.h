@@ -4,7 +4,9 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <errno.h>
+
 #include "conn_mgnt.h"
+#include "logger.h"
 
 // handle errno
 int sock_sent_err_handler(void *obj);

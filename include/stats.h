@@ -59,6 +59,9 @@ typedef struct _statistics_t {
     u64 resp_intvl_min;
     u64 resp_intvl_median;
     float avg_resp_intvl_time;
+    /* request number */
+    u64 sent_bytes;
+    u64 sent_reqs;
     /* response number */
     u64 pkt_byte_cnt;                                       // bytes counts
     u64 hdr_size;
@@ -83,18 +86,27 @@ void stats_conn(void* cm);  // only available in conn_mgnt class
 // dump all statistics
 void stats_dump();
 
-// stats call
+/** stats API:
+ */
+// init 
 #define STATS_INIT()                                    stats_init()
+// time measurement
 #define STATS_TIME_START()                              (STATS.total_time=read_tsc())
 #define STATS_TIME_END()                                (STATS.total_time=(read_tsc()-STATS.total_time))
 #define STATS_PUSH_RESP_INTVL(thrd_num, intvl)          stats_push_resp_intvl(thrd_num, intvl)
+#define STATS_INC_PROCESS_TIME(thrd_num, time)          (PRIV_STATS[thrd_num].process_time+=time)
+// req
+#define STATS_INC_SENT_BYTES(thrd_num, bytes)           (PRIV_STATS[thrd_num].sent_bytes+=bytes)
+#define STATS_INC_SENT_REQS(thrd_num, reqs)             (PRIV_STATS[thrd_num].sent_reqs+=reqs)
+// resp
 #define STATS_INC_CODE(thrd_num, status_code)           stats_inc_code(thrd_num, status_code)
 #define STATS_INC_PKT_BYTES(thrd_num, size)             (PRIV_STATS[thrd_num].pkt_byte_cnt+=size)
 #define STATS_INC_HDR_BYTES(thrd_num, size)             (PRIV_STATS[thrd_num].hdr_size+=size)
 #define STATS_INC_BODY_BYTES(thrd_num, size)            (PRIV_STATS[thrd_num].body_size+=size)
 #define STATS_INC_RESP_NUM(thrd_num, cnt)               (PRIV_STATS[thrd_num].resp_cnt+=cnt)
-#define STATS_INC_PROCESS_TIME(thrd_num, time)          (PRIV_STATS[thrd_num].process_time+=time)
+// sync connection status
 #define STATS_CONN(conn_mgnt)                           (stats_conn(conn_mgnt))
+// print func
 #define STATS_DUMP()                                    stats_dump()
 
 #endif

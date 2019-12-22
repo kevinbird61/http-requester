@@ -111,7 +111,10 @@ stats_dump()
         for(int j=0; j<STATUS_CODE_MAXIMUM; j++){
             statistics.status_code_detail[j]+=priv_statistics[i].status_code_detail[j];
         }
-        // pkt,byte counts
+        // req pkt,byte counts
+        statistics.sent_bytes+=priv_statistics[i].sent_bytes;
+        statistics.sent_reqs+=priv_statistics[i].sent_reqs;
+        // resp pkt,byte counts
         statistics.pkt_byte_cnt+=priv_statistics[i].pkt_byte_cnt;
         statistics.hdr_size+=priv_statistics[i].hdr_size;
         statistics.body_size+=priv_statistics[i].body_size;
@@ -187,15 +190,25 @@ stats_dump()
         }
     } /* status code */
     printf("********************************************************************************\n");
-    // packet / byte counts
+    // req & resp packet / byte counts
+    printf("└─> Request info: \n");
+    printf("* %-30s: %lld\n", "Total sent bytes", statistics.sent_bytes);
+    printf("* %-30s: %lld\n", "Total sent requests", statistics.sent_reqs);
     if(statistics.resp_cnt>0){
-        printf("└─> Pkts: \n");
+        printf("└─> Response info: \n");
         printf("* %-30s: %lld\n", "Total recevied bytes", statistics.pkt_byte_cnt);
         printf("* %-30s: %lld\n", "Total response pkts", statistics.resp_cnt);
         printf("* %-30s: %lld\n", "Avg. bytes per pkt", statistics.pkt_byte_cnt/statistics.resp_cnt);
         printf("* %-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.resp_cnt);
         printf("* %-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.resp_cnt); 
     } /* packet, byte counts */
+    // calculate the wasted requests (if sent_reqs > resp_cnt)
+    // which means that those requests waste our bandwidth because of the connection close 
+    if(statistics.sent_reqs > statistics.resp_cnt){
+        printf("└─> Wasted : \n");
+        printf("* %-30s: %lld\n", "Wasted requests", statistics.sent_reqs-statistics.resp_cnt);
+        printf("* %-30s: %lld\n", "Wasted bytes (bandwidth)", (statistics.sent_bytes/statistics.sent_reqs)*(statistics.sent_reqs-statistics.resp_cnt));
+    }
     printf("********************************************************************************\n");
     // thrd info
     if(statistics.thrd_cnt>0){

@@ -71,30 +71,29 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             sleep(this->sockets[i].retry);
                             if(this->sockets[i].retry>MAX_RETRY){
                                 this->total_req=0; // exit program
-                                printf("kb will close this sending process\n");
+                                LOG(DEBUG, "kb will close this sending process");
                                 STATS_CONN(this); 
                                 STATS_DUMP();
                                 exit(1);
                             }
-                            printf("Resource Temporarily Unavailable. kb wait for %d sec.\n", this->sockets[i].retry);
+                            LOG(DEBUG, "Resource Temporarily Unavailable. kb wait for %d sec.", this->sockets[i].retry);
                             // break; // cannot use break because there may have POLLOUT EVENT
                         } else if(errno==EINPROGRESS){
                             // connect is establishing now, waiting
-                            puts("IN-PROGRESS");
+                            LOG(DEBUG, "[INPROGRESS] Connection is establishing now, please wait");
                         }
                     } else {
                         // remote device is unavailable
-                        printf("POLLERR\n");
-                        // all_fin=~0; // terminate the sending process
+                        LOG(DEBUG, "POLLERR"); // FIXME: error ?
                         exit(1); // FIXME
                     }
                 } else if( ufds[i].revents & POLLHUP ){
                     /* The device has been disconnected */
-                    printf("POLLHUP\n");
+                    LOG(DEBUG, "POLLHUP"); // FIXME: warning ?
                     // exit(1);
                 } else if( ufds[i].revents & POLLNVAL ){
                     /* The specified fd value is invalid. This flag is only valid in the revents member; it shall ignored in the events member. */
-                    printf("POLLNVAL\n");
+                    LOG(DEBUG, "POLLNVAL"); // FIXME: warning ?
                     // exit(1); // do we need to handle this problem ?
                 }
                 /*printf("ret=%d (IN: %d/OUT: %d), (%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d\n", 
@@ -149,7 +148,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             // not finish yet, need to open new connection
                             close(this->sockets[i].sockfd);
                             // need to wait a second 
-                            printf("Bad error occur\n");
+                            LOG(DEBUG, "Bad error occur"); // FIXME: warning ?
                             sleep(1);
                             this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, itoa(this->args->port));
                             ufds[i].fd=this->sockets[i].sockfd;
@@ -158,7 +157,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
                             break;
                         default: // other errors
-                            printf("Error, code=%s\n", rcode_str[control_var->rcode]);
+                            LOG(DEBUG, "Error, code=%s", rcode_str[control_var->rcode]); // FIXME: warning ?
                             break;
                     }
                     
@@ -182,6 +181,8 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                             sock_sent_err_handler(&(this->sockets[i]));
                                             break; // leave
                                         }
+                                        STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*strlen(http_request));
+                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
                                 } else {
                                     if(packed_len != this->sockets[i].unsent_req){
@@ -204,6 +205,9 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                         leftover=sentbytes%strlen(http_request);
                                         // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
                                         this->sockets[i].sent_req=this->num_gap;
+
+                                        STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
+                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
                                 }
                             } else if(this->sockets[i].unsent_req >= this->num_gap){
@@ -215,6 +219,8 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                             sock_sent_err_handler(&(this->sockets[i]));
                                             break; // leave 
                                         }
+                                        STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*strlen(http_request));
+                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
                                 } else { 
                                     // fast is enable, pack several send request together
@@ -233,6 +239,9 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                         leftover=sentbytes%strlen(http_request);
                                         // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
                                         this->sockets[i].sent_req=this->num_gap;
+                                        
+                                        STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
+                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
                                 }
                             }
@@ -242,14 +251,13 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 //if(send(this->sockets[i].sockfd, http_request, strlen(http_request), MSG_DONTWAIT) < 0){
                                 if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
                                     // req sent not success
-                                    // sock_sent_err_handler();
-                                    if(errno==EAGAIN){
-                                        /* not suppose to happen! (TX queue is full) */
-                                        printf("Can't sent!");
-                                    }
+                                    sock_sent_err_handler(&(this->sockets[i]));
+                                    break; // if errno happen, then we need to abort sending work (go to recv part)
                                 } else {
                                     this->sockets[i].sent_req++;
-                                    this->sockets[i].retry=0;
+                                    // this->sockets[i].retry=0;
+                                    STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*strlen(http_request));
+                                    STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                 }
                             }
                             // record request `timestamp` only when "single connection"
@@ -268,16 +276,13 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
         } else {
             // need to wait more time (no R/W available now)
             LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
-            printf("Waiting for available R/W ... (timeout=%d)\n", timeout); // need to adjust here?
-            timeout*=2; // exponentially increase
-            // check_tcp_conn_stat(this->sockets[i].sockfd); // check sockfd is invalid now (Bad file descriptor)
-            if(timeout > POLL_MAX_TIMEOUT){
-                // abort sending process 
-                printf("CLOSE sending process, we can't wait it anymore.\n");
+            LOG(DEBUG, "Waiting for available R/W ... (timeout=%d)", timeout); 
+            timeout*=2; // exponentially increase timeout (reset when ret>0)
+            if(timeout > POLL_MAX_TIMEOUT){ // wait until POLL_MAX_TIMEOUT
+                LOG(DEBUG, "CLOSE sending process, we can't wait it anymore.\n");
                 // FIXME: do we need to retry again ?
                 break;
             }
-            // check which socket has unfinished ? (e.g. unsent_req > 0)
         }
     }
 
