@@ -16,7 +16,7 @@ stats_init()
     statistics.resp_intvl_min=(u64)~0;
     cpuFreq=get_cpufreq();
 
-    for(int i=0; i<MAX_THREAD; i++){
+    for(int i=0; i<total_thrd_num; i++){ // total_thrd_num under argparse.h
         // priv statistics (for each thread)
         memset(&priv_statistics[i], 0x00, sizeof(stat_t));
         priv_statistics[i].resp_intvl_cnt=0;
@@ -98,6 +98,8 @@ stats_conn(
         PRIV_STATS[mgnt->thrd_num].retry_conn_num+=mgnt->sockets[i].retry_conn_num;
         PRIV_STATS[mgnt->thrd_num].workload+=mgnt->sockets[i].rcvd_res;
     }
+    // get max-request size
+    PRIV_STATS[mgnt->thrd_num].max_req_size=mgnt->num_gap;
 }
 
 void 
@@ -125,6 +127,7 @@ stats_dump()
         statistics.conn_num+=priv_statistics[i].conn_num;
         statistics.retry_conn_num+=priv_statistics[i].retry_conn_num;
         statistics.workload+=priv_statistics[i].workload;
+        statistics.max_req_size+=priv_statistics[i].max_req_size;
         // process time
         statistics.process_time+=priv_statistics[i].process_time;
 
@@ -216,6 +219,7 @@ stats_dump()
     if(statistics.thrd_cnt>0){
         printf("└─> Thread info: \n");
         printf("* %-30s: %d\n", "Number of threads", statistics.thrd_cnt);
+        printf("* %-30s: %f\n", "Avg. max-requests(burst len)", statistics.max_req_size/(float)statistics.thrd_cnt);
     }
     printf("********************************************************************************\n");
     // conn state
@@ -241,7 +245,7 @@ stats_dump()
     printf("└─> Time: \n");
     if(statistics.total_time>0){
         printf("* %-30s: %f\n", "Total execution time (sec.)", statistics.total_time/(float)cpuFreq );
-        printf("* %-30s: %f\n", "Throughput (pkt/sec.)", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %f\n", "Throughput (resp/sec.)", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
     }
     // processing time
     if(statistics.process_time>0){

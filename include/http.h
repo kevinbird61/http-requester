@@ -41,9 +41,9 @@ int http_handle_state_machine_ret(int ret, parsed_args_t *args, int *sockfd, voi
  */
 state_machine_t *create_parsing_state_machine();
 void reset_parsing_state_machine(state_machine_t *state_m);
-control_var_t *multi_bytes_http_parsing_state_machine(state_machine_t *state_m, int sockfd, u32 num_reqs);
-control_var_t *multi_bytes_http_parsing_state_machine_non_blocking(state_machine_t *state_m, int sockfd, u32 num_reqs);
-control_var_t *http_resp_parser(state_machine_t *state_m);
+control_var_t multi_bytes_http_parsing_state_machine(state_machine_t *state_m, int sockfd, u32 num_reqs);
+control_var_t multi_bytes_http_parsing_state_machine_non_blocking(state_machine_t *state_m, int sockfd, u32 num_reqs);
+control_var_t http_resp_parser(state_machine_t *state_m);
 
 /** http_request_process.c (http_req_header_status_t)
  *  - construct http request header object

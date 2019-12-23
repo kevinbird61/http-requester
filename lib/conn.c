@@ -107,6 +107,9 @@ create_tcp_conn_non_blocking(
         connect(sockfd, p->ai_addr, p->ai_addrlen);
         break;
     }
+
+    //free(res);
+    //free(p);
     
     return sockfd;
 }

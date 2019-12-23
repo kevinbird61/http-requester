@@ -22,6 +22,9 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     printf("================================================================================\n");
     
     char *packed_req=NULL;
+    if(this->args->enable_pipe){
+        packed_req=copy_str_n_times(http_request, this->num_gap);
+    }
     int packed_len=0, leftover=0;
     // timeout
     int timeout=POLL_TIMEOUT;
@@ -53,7 +56,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
 
             // using ring-like sending model (not always start from 0, each node has equal change)
             while( ret > 0 ){
-                i%=this->args->conc; // pick the connection 
+                i%=(this->args->conc); // pick the connection 
                 if( ufds[i].revents & POLLERR ){
                     /** An error has occurred on the device or stream. (This flag is only valid in the revents bitmask; it shall be ignored in the events member)
                      * - remote device cannot connect (send RST to us), we need to wait
@@ -109,23 +112,23 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     }
                     ret--;
                     // able to recv
-                    control_var_t *control_var;
+                    control_var_t control_var;
                     t_start=read_tsc();
-                    // control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
-                    control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, -1); // recv as much as you can
+                    control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
+                    // control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, -1); // recv as much as you can
                     t_end=read_tsc();
                     STATS_INC_PROCESS_TIME(this->thrd_num, t_end-t_start);
-                    // printf("RCODE: %d\n", control_var->rcode);
-                    // printf("POLLIN(%d/%d), rcode=%d, s=%d u=%d r=%d\n", all_fin, this->total_req, control_var->rcode, this->sockets[i].sent_req, this->sockets[i].unsent_req, this->sockets[i].rcvd_res);
+                    // printf("RCODE: %d\n", control_var.rcode);
+                    // printf("POLLIN(%d/%d), rcode=%d, s=%d u=%d r=%d\n", all_fin, this->total_req, control_var.rcode, this->sockets[i].sent_req, this->sockets[i].unsent_req, this->sockets[i].rcvd_res);
                     // test: using num_resp to adjust num_gap (in order to prevent sending too much) 
                     // -> problem: non-blocking will make num_resp become 1, which disble pipeline 
-                    // this->num_gap=control_var->num_resp; 
-                    this->sockets[i].rcvd_res+=control_var->num_resp;
-                    all_fin+=control_var->num_resp;
-                    this->sockets[i].unsent_req-=control_var->num_resp;
-                    this->sockets[i].sent_req-=control_var->num_resp; //0; // reset
+                    // this->num_gap=control_var.num_resp; 
+                    this->sockets[i].rcvd_res+=control_var.num_resp;
+                    all_fin+=control_var.num_resp;
+                    this->sockets[i].unsent_req-=control_var.num_resp;
+                    this->sockets[i].sent_req-=control_var.num_resp; //0; // reset
 
-                    switch(control_var->rcode){
+                    switch(control_var.rcode){
                         case RCODE_POLL_DATA: // still have unfinished data (pipe)
                         case RCODE_FIN: // finish
                         case RCODE_CLOSE: // connection close, check the workload
@@ -138,12 +141,16 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     this->num_gap -= this->sockets[i].sent_req;
                                 }
                                 leftover=0; // need to reset leftover 
+                                //max_req_size>>=1; // half
+                                // this->num_gap=max_req_size; // reset num_gap (potential issue: this req size might be too big too)
                                 // STATS_DUMP();
                                 close(this->sockets[i].sockfd); // do we need to wait ?
-                                this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, itoa(this->args->port));
+                                char *port=itoa(this->args->port);
+                                this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
                                 ufds[i].fd=this->sockets[i].sockfd;
                                 this->sockets[i].sent_req=0; // new connection, set sent_req to 0
                                 this->sockets[i].retry_conn_num++; // inc. the number of retry connection
+                                free(port);
                             }
                             break;
                         case RCODE_REDIRECT: // TODO: require redirection (need to update URL)
@@ -151,38 +158,50 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             // 2) need to finish the rest of reqs with new URL
                             break;
                         case RCODE_SERVER_ERR: // 5xx server side error
-                            LOG(DEBUG, "%s, close the program immediately.", rcode_str[control_var->rcode]);
+                            LOG(DEBUG, "%s, close the program immediately.", rcode_str[control_var.rcode]);
                             exit(1);
                         case RCODE_CLIENT_ERR: // 4xx client side error 
-                            LOG(DEBUG, "%s", rcode_str[control_var->rcode]); 
+                            LOG(DEBUG, "%s", rcode_str[control_var.rcode]); 
                         case RCODE_ERROR: // error occur, need to abort this connection
                             // not finish yet, need to open new connection
                             close(this->sockets[i].sockfd);
                             // need to wait a second 
                             LOG(DEBUG, "Close the connection and wait %d to create a new one.", RETRY_WAIT_TIME); // FIXME: warning ?
                             sleep(RETRY_WAIT_TIME);
-                            this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, itoa(this->args->port));
+                            char *port=itoa(this->args->port);
+                            this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
                             ufds[i].fd=this->sockets[i].sockfd;
                             this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                             this->sockets[i].sent_req=0;
+                            leftover=0; // we don't need to shift sending data for incomplete request
+                            //max_req_size>>=1; // half
+                            //this->num_gap=max_req_size; // reset num_gap (potential issue: this req size might be too big too)
                             reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
+                            free(port);
                             break;
                         default: // TODO: other errors
-                            LOG(DEBUG, "Error, code=%s", rcode_str[control_var->rcode]); // FIXME: warning ?
+                            LOG(DEBUG, "Error, code=%s", rcode_str[control_var.rcode]); // FIXME: warning ?
                             break;
                     }
-                    //continue;
+
+                    i++;
+                    continue;
                 }
                 
                 if ( ufds[i].revents & POLLOUT ) { // able to sent
                     ret--;
                     // check workload (unsent_req), and if there have any unanswer req (sent_req)
                     if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req==0){ // send if there have unsent requests, and there are no any unanswered req
+                    // if(this->sockets[i].unsent_req>0){
                         if(this->args->enable_pipe){
                             // enable pipe 
                             if(this->sockets[i].unsent_req < this->num_gap && this->sockets[i].unsent_req>=0){
+                                // int workload=(this->sockets[i].unsent_req-this->sockets[i].sent_req);
+                                int workload=this->sockets[i].unsent_req;
+
                                 if(!fast){ // non-fast mode
-                                    for(int j=0; j<this->sockets[i].unsent_req; j++){
+                                    // for(int j=0; j<this->sockets[i].unsent_req; j++){
+                                     for(int j=0; j<workload; j++){
                                         // send the requests
                                         this->sockets[i].sent_req++;
                                         if((send(this->sockets[i].sockfd, http_request, strlen(http_request), 0)) < 0){
@@ -194,15 +213,14 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                         STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
                                 } else {
-                                    if(packed_len != this->sockets[i].unsent_req){
-                                        free(packed_req);
-                                        packed_req=copy_str_n_times(http_request, this->sockets[i].unsent_req);
-                                        packed_len=this->sockets[i].unsent_req;
+                                    if(packed_len != workload ){
+                                        packed_len=workload;
                                     }
                                     
                                     // because is fast mode, we deliver all reqs in one send(), so its hard to handle DONWAIT
                                     int sentbytes=0;
-                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
+                                    // if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
+                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(http_request)*packed_len-leftover, 0)) < 0){
                                         // req not sent complete
                                         sock_sent_err_handler(&(this->sockets[i]));
                                     } else {
@@ -210,19 +228,26 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                         /* using sendbytes to adjust the num_gap
                                          * - FIXME: if we set the num_gap in recv ?
                                          */
-                                        this->num_gap=sentbytes/strlen(http_request); 
-                                        leftover=sentbytes%strlen(http_request);
+                                        // this->num_gap=sentbytes/strlen(http_request); 
+                                        if(leftover==0){ // init
+                                            leftover=sentbytes%strlen(http_request);
+                                        } else {
+                                            leftover=0; // reset
+                                        }
                                         // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
-                                        this->sockets[i].sent_req=this->num_gap;
-
+                                        this->num_gap=this->sockets[i].sent_req=sentbytes/strlen(http_request);//this->num_gap;
+                                        
                                         STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
                                         STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
                                 }
                             } else if(this->sockets[i].unsent_req >= this->num_gap){
+                                // int workload=(this->num_gap-this->sockets[i].sent_req);
+                                int workload=(this->num_gap);
+
                                 if(!fast){
                                     // if not, sent num_gap at one time
-                                    for(int j=0;j<this->num_gap;j++){
+                                    for(int j=0;j<workload;j++){
                                         this->sockets[i].sent_req++;
                                         if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
                                             sock_sent_err_handler(&(this->sockets[i]));
@@ -233,22 +258,24 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     }
                                 } else { 
                                     // fast is enable, pack several send request together
-                                    if(packed_len != this->num_gap){
-                                        free(packed_req);
-                                        packed_req=copy_str_n_times(http_request, this->num_gap);
-                                        packed_len=this->num_gap;
+                                    if(packed_len != workload){
+                                        packed_len=workload;
                                     }
                                     int sentbytes=0;
-                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
+                                    // if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
+                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(http_request)*packed_len-leftover, 0)) < 0){
                                         // req sent not success
                                         sock_sent_err_handler(&(this->sockets[i]));
                                     } else {
                                         // sentbytes > 0
-                                        this->num_gap=sentbytes/strlen(http_request);
-                                        leftover=sentbytes%strlen(http_request);
+                                        // this->num_gap=sentbytes/strlen(http_request);
+                                        if(leftover==0){ // init
+                                            leftover=sentbytes%strlen(http_request);
+                                        } else {
+                                            leftover=0; // reset
+                                        }
                                         // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
-                                        this->sockets[i].sent_req=this->num_gap;
-                                        
+                                        this->num_gap=this->sockets[i].sent_req=sentbytes/strlen(http_request);//this->num_gap;
                                         STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
                                         STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                     }
@@ -286,7 +313,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
             // need to wait more time (no R/W available now)
             LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
             LOG(DEBUG, "Waiting for available R/W ... (timeout=%d)", timeout); 
-            timeout*=2; // exponentially increase timeout (reset when ret>0)
+            timeout*=2; // increase timeout (reset when ret>0)
             if(timeout > POLL_MAX_TIMEOUT){ // wait until POLL_MAX_TIMEOUT
                 LOG(DEBUG, "CLOSE sending process, we can't wait it anymore.\n");
                 // FIXME: do we need to retry again ?
@@ -299,8 +326,16 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     STATS_CONN(this); 
     
     /* free */
+    if(packed_req!=NULL){ free(packed_req); }
     free(http_request);
+    /*for(int i=0;i<this->args->conc;i++){
+        free(this->sockets[i].state_m->resp);
+        free(this->sockets[i].state_m->buff);
+        free(this->sockets[i].state_m);
+        free(&this->sockets[i]);
+    }*/
     free(this); // conn_mgnt obj
+
     /* finish: need to print all the statistics again */
     return 0; 
 }
@@ -442,7 +477,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                     for(int i=0;i<this->args->conc;i++){
                         // check each one if there have any available rcv or not
                         if ( ufds[i].revents & POLLIN ) {
-                            control_var_t *control_var;
+                            control_var_t control_var;
                             t_start=read_tsc();
                             control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
                             t_end=read_tsc();
@@ -451,18 +486,18 @@ conn_mgnt_run(conn_mgnt_t *this)
                              *  - if you tend to finish all `burst_length` recv at one time, it will block the following connections 
                              *  - if we always start from first one, it will always let first connection finished, while let the rest keep waiting (sometimes it will timeout)
                              */
-                            this->sockets[i].rcvd_res+=control_var->num_resp;
-                            workload-=control_var->num_resp;
-                            all_fin+=control_var->num_resp;
-                            this->sockets[i].unsent_req+=(this->sockets[i].sent_req-control_var->num_resp);
-                            this->sockets[i].sent_req-=control_var->num_resp;
+                            this->sockets[i].rcvd_res+=control_var.num_resp;
+                            workload-=control_var.num_resp;
+                            all_fin+=control_var.num_resp;
+                            this->sockets[i].unsent_req+=(this->sockets[i].sent_req-control_var.num_resp);
+                            this->sockets[i].sent_req-=control_var.num_resp;
 
                             // check control_var's ret, if no error, then we can increase counter
                             // - using control->num_resp as the response we have finished
                             // - this part need to handle error when there using http pipelining 
-                            // - in some case, control_var->num_resp != sent_req (need to retransmit)
+                            // - in some case, control_var.num_resp != sent_req (need to retransmit)
                             //      e.g. using very big number of --burst (pipeline size)
-                            switch(control_var->rcode){
+                            switch(control_var.rcode){
                                 case RCODE_POLL_DATA: // still have unfinished data (pipe)
                                 case RCODE_FIN: // finish
                                 case RCODE_CLOSE: // connection close, check the workload
@@ -479,7 +514,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                                 case RCODE_REDIRECT: // TODO: require redirection
                                     break;
                                 default: // other errors
-                                    printf("Error, code=%s\n", rcode_str[control_var->rcode]);
+                                    printf("Error, code=%s\n", rcode_str[control_var.rcode]);
                                     exit(1);
                                     break;
                             }
@@ -557,19 +592,19 @@ conn_mgnt_run(conn_mgnt_t *this)
                     for(int i=0;i<this->args->conc;i++){
                         // check each one if there have any available rcv or not
                         if ( ufds[i].revents & POLLIN ) {
-                            control_var_t *control_var;
+                            control_var_t control_var;
                             t_start=read_tsc();
                             control_var=multi_bytes_http_parsing_state_machine(state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
                             t_end=read_tsc();
                             // store into stats
                             STATS_INC_PROCESS_TIME(this->thrd_num, t_end-t_start);
                             // check control_var's ret, if no error, then we can increase counter
-                            this->sockets[i].rcvd_res+=control_var->num_resp;
-                            workload-=control_var->num_resp; // decrease the worload
-                            all_fin+=control_var->num_resp; 
-                            this->sockets[i].unsent_req+=(this->sockets[i].sent_req-control_var->num_resp);
-                            this->sockets[i].sent_req-=control_var->num_resp; 
-                            switch(control_var->rcode){
+                            this->sockets[i].rcvd_res+=control_var.num_resp;
+                            workload-=control_var.num_resp; // decrease the worload
+                            all_fin+=control_var.num_resp; 
+                            this->sockets[i].unsent_req+=(this->sockets[i].sent_req-control_var.num_resp);
+                            this->sockets[i].sent_req-=control_var.num_resp; 
+                            switch(control_var.rcode){
                                 case RCODE_POLL_DATA: // ?
                                 case RCODE_FIN:
                                     // finish
@@ -590,7 +625,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                                     break;
                                 default:
                                     // other errors
-                                    printf("Error=%s\n", rcode_str[control_var->rcode]);
+                                    printf("Error=%s\n", rcode_str[control_var.rcode]);
                                     exit(1);
                                     break;
                             }
@@ -703,7 +738,7 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
                 exit(1);
             }
             // call recv
-            control_var_t *control_var;
+            control_var_t control_var;
             control_var=multi_bytes_http_parsing_state_machine(state_m, sockfd, sent_req);
             // TODO: handle control_var
             // - dealing with connection close (open another new connection to send rest reqs) ... 
@@ -715,7 +750,7 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
             // send one
             send(sockfd, http_request, strlen(http_request), 0);
             // recv one
-            control_var_t *control_var;
+            control_var_t control_var;
             control_var=multi_bytes_http_parsing_state_machine(state_m, sockfd, 1);
         }
     }

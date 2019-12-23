@@ -6,14 +6,13 @@
 int 
 http_req_obj_create(http_req_header_status_t **req)
 {
-    http_req_header_status_t *http_req=calloc(1, sizeof(http_req_header_status_t));
+    *req=calloc(1, sizeof(http_req_header_status_t));
     // assign dynamic 2d array (e.g. string array)
-    http_req->field_value=calloc(REQ_HEADER_NAME_MAXIMUM, sizeof(u8 *));
+    (*req)->field_value=calloc(REQ_HEADER_NAME_MAXIMUM, sizeof(u8 *));
     for(int i=0;i<REQ_HEADER_NAME_MAXIMUM;i++){
         // default length = 255
-        http_req->field_value[i]=calloc(DEFAULT_FIELD_VAL_LEN, sizeof(char));
+        (*req)->field_value[i]=calloc(DEFAULT_FIELD_VAL_LEN, sizeof(char));
     }
-    *req=http_req;
 }
 
 int 

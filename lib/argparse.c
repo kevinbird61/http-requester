@@ -1,6 +1,8 @@
 #include "argparse.h"
 
 u8 verbose=0; // default is false
+int total_thrd_num=1000; // default is 1000
+int max_req_size=NUM_GAP;
 char *program=NULL;
 /* option we support:
  * - [x] `-h`:              Print helper function
@@ -54,6 +56,7 @@ create_argparse()
             options[(NUM_PARAMS-2)+i].has_arg=required_argument;
             options[(NUM_PARAMS-2)+i].flag=NULL;
             options[(NUM_PARAMS-2)+i].val=0;
+            free(name);
         }
     }
 
@@ -108,6 +111,7 @@ argparse(
                 (*this)->enable_pipe=1; /* also enable pipe */
                 burst_length=atoi(optarg);
                 burst_length=(burst_length<=0)?NUM_GAP:burst_length;
+                max_req_size=burst_length;
                 printf("Configure burst length = %d (for http pipelining).\n", burst_length);
                 break;
             case 'N':   // using non-blocking
@@ -258,9 +262,11 @@ argparse(
     }
     if(!((*this)->flags&SPE_THRD)){ // if not set, using default value
         (*this)->thrd=1;
+        total_thrd_num=1;
     } else {
         // check upperbound
         (*this)->thrd=((*this)->thrd>MAX_THREAD)? MAX_THREAD: (*this)->thrd;
+        total_thrd_num=(*this)->thrd;
     }
 
     printf("================================================================================\n");
@@ -386,6 +392,9 @@ update_url_info_rand(
         default:
             exit(1);
     }
+
+    free(url_trav);
+
     return USE_URL;
 }
 

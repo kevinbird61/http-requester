@@ -50,6 +50,7 @@ typedef struct _statistics_t {
     int conn_num;
     int retry_conn_num;
     int workload;
+    int max_req_size;
     /* time */
     u64 total_time;                                         // program execution time
     u64 process_time;                                       // handle response (from "recv" to "finish parsing") 

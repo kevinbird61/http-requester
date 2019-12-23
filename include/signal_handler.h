@@ -39,6 +39,7 @@ static inline void sig_handler(int signal){
             exit(1);
         }
         case SIGSEGV: /* segmentation fault */
+            perror("SIGSEGV:");
             printf("File: %s, Line: %d\n", __FILE__, __LINE__);
             exit(1);
         default:

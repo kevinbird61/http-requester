@@ -54,5 +54,9 @@ int main(int argc, char *argv[]){
     STATS_TIME_END();
     // dump the statistics
     STATS_DUMP();
+
+    free(args);
+    free(thrds);
+
     return 0;
 }
