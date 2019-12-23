@@ -23,18 +23,21 @@ static inline void sig_handler(int signal){
             STATS_DUMP(); 
             printf("Broken pipe\n");
             exit(1);
-        case SIGINT:
-            STATS_DUMP();
-            printf("Abort from SIGINT (ctrl+c), print out the current statistics.\n");
+        case SIGINT:{
             /* Release all protected obj */
             int free_cm=0;
             while(protect_conn_mgnt!=NULL){
+                STATS_CONN((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj); // store all conn stats from each conn_mgnt
                 free(protect_conn_mgnt->protect_obj);
                 protect_conn_mgnt=protect_conn_mgnt->next;
                 free_cm++;
             }
+            STATS_TIME_END(); // calculate total execution time (otherwise will get wrong result: only calculate the starting timestamp)
+            STATS_DUMP(); // print statistics
+            printf("Abort from SIGINT (ctrl+c), print out the current statistics.\n");
             printf("Release %d conn_mgnt gracefully.\n", free_cm);
             exit(1);
+        }
         case SIGSEGV: /* segmentation fault */
             printf("File: %s, Line: %d\n", __FILE__, __LINE__);
             exit(1);

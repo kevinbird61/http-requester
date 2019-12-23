@@ -73,6 +73,7 @@ typedef struct _statistics_t {
 extern struct _resp_intvl_t resp_intvl_queue[];             // record all the response interval (only available when using single connection, non-pipeline mode)
 extern stat_t statistics;
 extern stat_t priv_statistics[];
+static unsigned int cpuFreq;
 
 // reset/init
 void stats_init();

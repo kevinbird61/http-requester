@@ -6,6 +6,7 @@
 stat_t statistics;
 stat_t priv_statistics[MAX_THREAD];
 struct _resp_intvl_t resp_intvl_queue[MAX_THREAD];
+static unsigned int cpuFreq;
 
 void 
 stats_init()
@@ -13,6 +14,7 @@ stats_init()
     memset(&statistics, 0x00, sizeof(stat_t));
     statistics.resp_intvl_max=-1;
     statistics.resp_intvl_min=(u64)~0;
+    cpuFreq=get_cpufreq();
 
     for(int i=0; i<MAX_THREAD; i++){
         // priv statistics (for each thread)
@@ -235,25 +237,25 @@ stats_dump()
         }*/
     }
     printf("********************************************************************************\n");
-    // time 
+    // time
     printf("└─> Time: \n");
-    unsigned int cpuMHZ=get_cpufreq();
     if(statistics.total_time>0){
-        printf("* %-30s: %f\n", "Total execution time (sec.)", statistics.total_time/(float)cpuMHZ);
+        printf("* %-30s: %f\n", "Total execution time (sec.)", statistics.total_time/(float)cpuFreq );
+        printf("* %-30s: %f\n", "Throughput (pkt/sec.)", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
     }
     // processing time
     if(statistics.process_time>0){
-        printf("* %-30s: %f\n", "Avg. parsing time (sec./thrd)", statistics.process_time/((float)cpuMHZ*statistics.thrd_cnt));
-        printf("* %-30s: %f\n", "Avg. parsing time (sec./conn)", statistics.process_time/((float)cpuMHZ*statistics.conn_num));
+        printf("* %-30s: %f\n", "Avg. parsing time (sec./thrd)", statistics.process_time/((float)cpuFreq*statistics.thrd_cnt));
+        printf("* %-30s: %f\n", "Avg. parsing time (sec./conn)", statistics.process_time/((float)cpuFreq*statistics.conn_num));
     }
     printf("********************************************************************************\n");
     // response time interval
     printf("└─> Response interval: (Only enable when using `single conn + non-pipeline`)\n");
     if(statistics.resp_intvl_cnt>0){
         printf("* %-30s: %lld\n", "# of response intvl", statistics.resp_intvl_cnt);
-        printf("* %-30s: %f\n", "Avg. response time (sec.)", statistics.avg_resp_intvl_time/(double)cpuMHZ*statistics.thrd_cnt);
-        printf("* %-30s: %f\n", "MAX resp. intvl (sec.)", statistics.resp_intvl_max/(float)cpuMHZ);
-        printf("* %-30s: %f\n", "MIN resp. intvl (sec.)", statistics.resp_intvl_min/(float)cpuMHZ);
+        printf("* %-30s: %f\n", "Avg. response time (sec.)", statistics.avg_resp_intvl_time/((float)cpuFreq));
+        printf("* %-30s: %f\n", "MAX resp. intvl (sec.)", statistics.resp_intvl_max/(float)cpuFreq);
+        printf("* %-30s: %f\n", "MIN resp. intvl (sec.)", statistics.resp_intvl_min/(float)cpuFreq);
     }
     printf("================================================================================\n");
 }

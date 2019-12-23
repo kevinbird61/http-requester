@@ -5,8 +5,8 @@ char *program=NULL;
 /* option we support:
  * - [x] `-h`:              Print helper function
  * - [x] `-t`, --thread:    Specify number of threads
- * - [x] `-c`, --conc:      Specify number of concurrent connections.
- * - [x] `-n`, --conn:      Specify number of total connections. 
+ * - [x] `-c`, --conc:      Specify number of connections.
+ * - [x] `-n`, --conn:      Specify number of requests. 
  *                      (So there will need to execute `conn/conc` times to finish all connections)
  * - [x] `-f`, --file:      Specify input file with HTTP request header template (use to setup those HTTP connections)
  * - [x] `-u`, --url:       Specify URL (if --file & --url both exist, url will override the duplicated part in template file)
@@ -408,9 +408,10 @@ print_manual(
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'm', "method", "METHOD", "Specify method token");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'l', "log", "LEVEL", "Enable logging (0~7)"); 
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500)");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Packed several http requests together for HTTP pipelining (default is false)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500), enable pipe too.");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Packed several http requests together for HTTP pipelining (default is false), enable pipe too.");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'N', "nonblk", " ", "Enable non-blocking connect, send and recv.");
 
     if(detail){
