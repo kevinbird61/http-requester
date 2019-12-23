@@ -28,6 +28,8 @@ int sock_sent_err_handler(
             // may cause by sending too much data 
             // => just let recv part to adjust the num_gap 
             LOG(DEBUG, "Sent: resource temporarily unavailable"); 
+            // struct _conn_t *conn=(struct _conn_t*)obj;
+            // max_req_size/=2;
             break;
         }
         default:

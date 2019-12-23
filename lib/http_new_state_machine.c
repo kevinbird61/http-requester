@@ -58,7 +58,7 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                     state_m->last_fin_idx=0; 
                 }
 
-                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, MSG_DONTWAIT);
+                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
                 if(recvbytes>0){
                     LOG(WARNING, "RECV: %d bytes", recvbytes);
                     state_m->prev_rcv_len=recvbytes;

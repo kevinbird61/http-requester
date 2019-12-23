@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include "argparse.h"
 #include "conn_mgnt.h"
 #include "logger.h"
 

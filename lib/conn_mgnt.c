@@ -25,7 +25,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     if(this->args->enable_pipe){
         packed_req=copy_str_n_times(http_request, this->num_gap);
     }
-    int packed_len=0, leftover=0;
+    int packed_len=0, leftover=0, request_size=strlen(http_request);
     // timeout
     int timeout=POLL_TIMEOUT;
 
@@ -52,7 +52,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
         if ( (ret=poll(ufds, this->args->conc, timeout) )>0 ) { // poll
             // reset timeout to 1 sec
             timeout=POLL_TIMEOUT;
-            // LOG(DEBUG, "Work status (%d/%d) Sockfd(%d)", all_fin, this->total_req, this->sockets[i].sockfd);
+            //LOG(DEBUG, "Work status (%d/%d) Sockfd(%d), ret=%d (R:%d)(W:%d)", all_fin, this->total_req, this->sockets[i].sockfd, ret, ret&POLLIN, ret&POLLOUT);
 
             // using ring-like sending model (not always start from 0, each node has equal change)
             while( ret > 0 ){
@@ -113,9 +113,11 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     ret--;
                     // able to recv
                     control_var_t control_var;
+                    
+recv_again:
                     t_start=read_tsc();
-                    control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
-                    // control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, -1); // recv as much as you can
+                    // control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, this->sockets[i].sent_req);
+                    control_var=multi_bytes_http_parsing_state_machine_non_blocking(this->sockets[i].state_m, this->sockets[i].sockfd, -1); // recv as much as you can
                     t_end=read_tsc();
                     STATS_INC_PROCESS_TIME(this->thrd_num, t_end-t_start);
                     // printf("RCODE: %d\n", control_var.rcode);
@@ -123,14 +125,20 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     // test: using num_resp to adjust num_gap (in order to prevent sending too much) 
                     // -> problem: non-blocking will make num_resp become 1, which disble pipeline 
                     // this->num_gap=control_var.num_resp; 
+                    //printf("Parsed resp: %d, sent_req: %d\n", control_var.num_resp, this->sockets[i].sent_req);
                     this->sockets[i].rcvd_res+=control_var.num_resp;
                     all_fin+=control_var.num_resp;
                     this->sockets[i].unsent_req-=control_var.num_resp;
-                    this->sockets[i].sent_req-=control_var.num_resp; //0; // reset
-
+                    this->sockets[i].sent_req-=control_var.num_resp;
+                    this->sockets[i].sent_req=(this->sockets[i].sent_req<0)? 0: this->sockets[i].sent_req;
+                    
                     switch(control_var.rcode){
                         case RCODE_POLL_DATA: // still have unfinished data (pipe)
                         case RCODE_FIN: // finish
+                            if(this->sockets[i].sent_req > (this->num_gap/2)){ // or > num_gap/2 
+                                goto recv_again;
+                            }
+                            break;
                         case RCODE_CLOSE: // connection close, check the workload
                         case RCODE_NOT_SUPPORT: // parsing not finished (suspend by incomplete packet), or parsing error
                             // not finish yet, need to open new connection
@@ -138,12 +146,9 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
                                 // printf("CLOSE-WAIT or CLOSE (NUM_GAP: %d, Leftover: %d req)\n", this->num_gap, this->sockets[i].sent_req);
                                 if(this->sockets[i].sent_req!=0 && (this->num_gap > this->sockets[i].sent_req)){ // you sent too much
-                                    this->num_gap -= this->sockets[i].sent_req;
+                                    this->num_gap/=2;
                                 }
                                 leftover=0; // need to reset leftover 
-                                //max_req_size>>=1; // half
-                                // this->num_gap=max_req_size; // reset num_gap (potential issue: this req size might be too big too)
-                                // STATS_DUMP();
                                 close(this->sockets[i].sockfd); // do we need to wait ?
                                 char *port=itoa(this->args->port);
                                 this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
@@ -174,8 +179,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             this->sockets[i].retry_conn_num++; // inc. the number of retry connection
                             this->sockets[i].sent_req=0;
                             leftover=0; // we don't need to shift sending data for incomplete request
-                            //max_req_size>>=1; // half
-                            //this->num_gap=max_req_size; // reset num_gap (potential issue: this req size might be too big too)
+                            this->num_gap/=2; // reset num_gap (potential issue: this req size might be too big too)
                             reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
                             free(port);
                             break;
@@ -183,7 +187,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             LOG(DEBUG, "Error, code=%s", rcode_str[control_var.rcode]); // FIXME: warning ?
                             break;
                     }
-
+                    
                     i++;
                     continue;
                 }
@@ -191,96 +195,51 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                 if ( ufds[i].revents & POLLOUT ) { // able to sent
                     ret--;
                     // check workload (unsent_req), and if there have any unanswer req (sent_req)
-                    if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req==0){ // send if there have unsent requests, and there are no any unanswered req
-                    // if(this->sockets[i].unsent_req>0){
-                        if(this->args->enable_pipe){
-                            // enable pipe 
-                            if(this->sockets[i].unsent_req < this->num_gap && this->sockets[i].unsent_req>=0){
-                                // int workload=(this->sockets[i].unsent_req-this->sockets[i].sent_req);
-                                int workload=this->sockets[i].unsent_req;
-
-                                if(!fast){ // non-fast mode
-                                    // for(int j=0; j<this->sockets[i].unsent_req; j++){
-                                     for(int j=0; j<workload; j++){
-                                        // send the requests
-                                        this->sockets[i].sent_req++;
-                                        if((send(this->sockets[i].sockfd, http_request, strlen(http_request), 0)) < 0){
-                                            // handle errno
-                                            sock_sent_err_handler(&(this->sockets[i]));
-                                            break; // leave
-                                        }
-                                        STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*strlen(http_request));
-                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
+                    // if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req==0){ // send if there have unsent requests, and there are no any unanswered req
+                    if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req < this->num_gap){
+                        if(this->args->enable_pipe){ // enable pipe 
+                            int workload=(this->sockets[i].unsent_req < this->num_gap)? (this->sockets[i].unsent_req): (this->num_gap);
+                            //printf("Workload: %d, Sent_req: %d, NUM_GAP: %d\n", workload, this->sockets[i].sent_req, this->num_gap);
+                            workload=this->num_gap-this->sockets[i].sent_req;
+                            
+                            //printf("Need to sent workload is: %d\n", workload);
+                            if(!fast){ // non-fast mode
+                                for(int j=0; j<workload; j++){
+                                    // send the requests
+                                    this->sockets[i].sent_req++;
+                                    if((send(this->sockets[i].sockfd, http_request, request_size, 0)) < 0){
+                                        // handle errno
+                                        sock_sent_err_handler(&(this->sockets[i]));
+                                        break; // leave
                                     }
+                                    STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*request_size);
+                                    STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
+                                }
+                            } else {
+                                // because is fast mode, we deliver all reqs in one send(), so its hard to handle DONWAIT
+                                int sentbytes=0, sent_req=0;
+                                // if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
+                                if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, (request_size*workload)-leftover, 0)) < 0){
+                                // if( (sentbytes=send(this->sockets[i].sockfd, packed_req, (request_size*workload), 0)) < 0){
+                                    // req not sent complete
+                                    sock_sent_err_handler(&(this->sockets[i]));
+                                } else if(sentbytes==0) {
+                                    // do we need to adjust num_gap again in here?
                                 } else {
-                                    if(packed_len != workload ){
-                                        packed_len=workload;
-                                    }
+                                    // sentbytes > 0
+                                    /* using sendbytes to adjust the num_gap
+                                        * - FIXME: if we set the num_gap in recv ?
+                                        */
+                                    leftover=(sentbytes-(request_size-leftover))%request_size;
+                                    sent_req=(sentbytes-(request_size-leftover))/request_size;
+                                    this->sockets[i].sent_req+=sent_req;
                                     
-                                    // because is fast mode, we deliver all reqs in one send(), so its hard to handle DONWAIT
-                                    int sentbytes=0;
-                                    // if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
-                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(http_request)*packed_len-leftover, 0)) < 0){
-                                        // req not sent complete
-                                        sock_sent_err_handler(&(this->sockets[i]));
-                                    } else {
-                                        // sentbytes > 0
-                                        /* using sendbytes to adjust the num_gap
-                                         * - FIXME: if we set the num_gap in recv ?
-                                         */
-                                        // this->num_gap=sentbytes/strlen(http_request); 
-                                        if(leftover==0){ // init
-                                            leftover=sentbytes%strlen(http_request);
-                                        } else {
-                                            leftover=0; // reset
-                                        }
-                                        // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
-                                        this->num_gap=this->sockets[i].sent_req=sentbytes/strlen(http_request);//this->num_gap;
-                                        
-                                        STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
-                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
-                                    }
+                                    STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
+                                    STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
                                 }
-                            } else if(this->sockets[i].unsent_req >= this->num_gap){
-                                // int workload=(this->num_gap-this->sockets[i].sent_req);
-                                int workload=(this->num_gap);
-
-                                if(!fast){
-                                    // if not, sent num_gap at one time
-                                    for(int j=0;j<workload;j++){
-                                        this->sockets[i].sent_req++;
-                                        if(send(this->sockets[i].sockfd, http_request, strlen(http_request), 0) < 0){
-                                            sock_sent_err_handler(&(this->sockets[i]));
-                                            break; // leave 
-                                        }
-                                        STATS_INC_SENT_BYTES(this->thrd_num, this->sockets[i].sent_req*strlen(http_request));
-                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
-                                    }
-                                } else { 
-                                    // fast is enable, pack several send request together
-                                    if(packed_len != workload){
-                                        packed_len=workload;
-                                    }
-                                    int sentbytes=0;
-                                    // if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(packed_req)-leftover, 0)) < 0){
-                                    if( (sentbytes=send(this->sockets[i].sockfd, packed_req+leftover, strlen(http_request)*packed_len-leftover, 0)) < 0){
-                                        // req sent not success
-                                        sock_sent_err_handler(&(this->sockets[i]));
-                                    } else {
-                                        // sentbytes > 0
-                                        // this->num_gap=sentbytes/strlen(http_request);
-                                        if(leftover==0){ // init
-                                            leftover=sentbytes%strlen(http_request);
-                                        } else {
-                                            leftover=0; // reset
-                                        }
-                                        // printf("Sent: %d, Leftover: %d, max-request: %d\n", sentbytes, leftover, this->num_gap);
-                                        this->num_gap=this->sockets[i].sent_req=sentbytes/strlen(http_request);//this->num_gap;
-                                        STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
-                                        STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
-                                    }
-                                }
+                                //printf("Sent: %d, Sent_req: %d\n", sentbytes, this->sockets[i].sent_req);
                             }
+                        
                         } else {
                             // non-pipe
                             if(this->sockets[i].sent_req==0 && this->sockets[i].unsent_req>0){
@@ -301,7 +260,9 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 }
                             }
                         } 
-                    } // else => don't sent 
+                    } else { // else => don't sent (unsent_req < 0)
+                        
+                    }
                 }
                 i++;
             }
