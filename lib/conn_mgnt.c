@@ -231,11 +231,11 @@ recv_again:
                                         * - FIXME: if we set the num_gap in recv ?
                                         */
                                     leftover=(sentbytes-(request_size-leftover))%request_size;
-                                    sent_req=(sentbytes-(request_size-leftover))/request_size;
+                                    sent_req=(sentbytes)/request_size;
                                     this->sockets[i].sent_req+=sent_req;
                                     
                                     STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
-                                    STATS_INC_SENT_REQS(this->thrd_num, this->sockets[i].sent_req);
+                                    STATS_INC_SENT_REQS(this->thrd_num, sent_req);
                                 }
                                 //printf("Sent: %d, Sent_req: %d\n", sentbytes, this->sockets[i].sent_req);
                             }
