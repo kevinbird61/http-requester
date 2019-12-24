@@ -17,6 +17,9 @@
 #define MAX_RETRY           (5)     // wait 5 sec (permit 5 retry time)
 #define RETRY_WAIT_TIME     (1)     // 4xx, or other error, wait 1 sec and create a new conn to retry
 #define NUM_GAP             (100)   // max-request size
+#define MIN_NUM_GAP         (5)     // min-request size
+#define DEC_RATE_NUMERAT    (9)     // decrease rate = (MAX-request size)*(DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)
+#define DEC_RATE_DENOMIN    (10)    // 
 #define POLL_TIMEOUT        (1000)  // 1 sec (normal/start case)
 #define POLL_MAX_TIMEOUT    (16000) // 16 sec (will exit sending process)
 

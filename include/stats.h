@@ -46,7 +46,7 @@ typedef struct _statistics_t {
     int status_code_detail[STATUS_CODE_MAXIMUM];
     /* connection status */
     struct _conn_t *sockets;
-    int thrd_cnt; 
+    u32 thrd_cnt; 
     int conn_num;
     int retry_conn_num;
     int workload;
@@ -95,6 +95,9 @@ void stats_dump();
 // time measurement
 #define STATS_TIME_START()                              (STATS.total_time=read_tsc())
 #define STATS_TIME_END()                                (STATS.total_time=(read_tsc()-STATS.total_time))
+#define STATS_THR_INIT(thrd_num, thrd_id)               (PRIV_STATS[thrd_num].thrd_cnt=thrd_id) /* using thrd_cnt to record thrd_id */
+#define STATS_THR_TIME_START(thrd_num)                  (PRIV_STATS[thrd_num].total_time=read_tsc())
+#define STATS_THR_TIME_END(thrd_num)                    (PRIV_STATS[thrd_num].total_time=(read_tsc()-PRIV_STATS[thrd_num].total_time))
 #define STATS_PUSH_RESP_INTVL(thrd_num, intvl)          stats_push_resp_intvl(thrd_num, intvl)
 #define STATS_INC_PROCESS_TIME(thrd_num, time)          (PRIV_STATS[thrd_num].process_time+=time)
 // req

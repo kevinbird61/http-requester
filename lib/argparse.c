@@ -15,6 +15,7 @@ char *program=NULL;
  * - [x] `-p`, --port:      Specify target port number
  * - [x] `-m`, --method:    Specify method token
  * - [x] `--pipe`           Enable pipelining
+ * - [x] `-v, --verbose`    Enable verbose printing
  * - [x] `--log`            Enable logging with level support
  * - [x] `-b, --burst`      Control the num_gap (between send & recv), e.g pipelining size
  * - [x] `--fast`           Reduce the send() syscall
@@ -76,7 +77,7 @@ argparse(
     int argc, 
     char **argv)
 {
-    int c;
+    int c, help=0;
     int digit_optind=0;
     log_visible=0;
     (*this)->use_non_block=0;
@@ -180,7 +181,7 @@ argparse(
                 log_visible=atoi(optarg); /* set log-level */
                 break;
             case 'i':   // pipeline
-                printf("Enable HTTP pipelining.\n");
+                printf("Enable aggressive HTTP pipelining.\n");
                 (*this)->enable_pipe=1;
                 break;
             case '?':
@@ -218,9 +219,14 @@ argparse(
                 exit(1);
             case 'h':
             default:
-                print_manual(1);
-                exit(1);
+                help=1;
+                break;
         }
+    }
+
+    if(help){
+        print_manual(verbose);
+        exit(1);
     }
 
     // print the system parameters 
@@ -406,21 +412,25 @@ print_manual(
     printf("********************************************************************************\n");
     printf("A HTTP/1.1 requester which conform with RFC7230.\n");
     printf("Author: Kevin Cyu (scyu@a10networks.com).\n");
-    // printf("%s\n", a10logo);
+#ifdef RELEASE
+    printf("%s\n", a10logo);
+#endif
     printf("\n");
     printf("Usage: [sudo] %s\n", program);
-    printf("\t-h: Print this helper function.\n");
+    // printf("\t-h: Print this helper function.\n");
+    printf("\t-%-2c    %-7s %-7s: %s.\n", 'h', "", "", "Print this helper function");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads, total requests will distribute to each thread");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of connections (per thread)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of requests (per thread), distribute to each connection");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (if --file & --url both exist, url will override the duplicated part in template file)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (URL's priority > Template's)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'm', "method", "METHOD", "Specify method token");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'l', "log", "LEVEL", "Enable logging (0~7)"); 
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'v', "verbose", " ", "Enable verbose printing (using `-h -v` to print more helper info)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500), enable pipe too.");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Packed several http requests together for HTTP pipelining (default is false), enable pipe too.");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Enable aggressive HTTP pipelining (default is false), enable pipe too.");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'N', "nonblk", " ", "Enable non-blocking connect, send and recv.");
 
     if(detail){

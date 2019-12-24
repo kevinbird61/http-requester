@@ -1,8 +1,8 @@
 #ifndef __TYPES__
 #define __TYPES__
 
-#define RECV_BUFF_SCALE     (20)        /* scale x chunk_size = TOTAL_RECV_BUFF */
-#define CHUNK_SIZE          (4096)
+#define RECV_BUFF_SCALE     (10)        /* scale x chunk_size = TOTAL_RECV_BUFF */
+#define CHUNK_SIZE          (8192)
 
 #include "abnf.h"
 #include "control_var.h"

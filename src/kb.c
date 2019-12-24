@@ -34,6 +34,7 @@ int main(int argc, char *argv[]){
             } else { // not support
                 exit(1);
             }
+            
         } else { // 
             thrds[i].mgnt=create_conn_mgnt(args);
             thrds[i].mgnt->thrd_num=i;
@@ -43,6 +44,7 @@ int main(int argc, char *argv[]){
                 exit(1);
             }
         }
+        STATS_THR_INIT(i, (u32)thrds[i].tid);
         // these protected obj can be handled when exception occur (e.g. SIGXXX) and close them elegantly
         SIG_PROTECT_CM(thrds[i].mgnt);
     }

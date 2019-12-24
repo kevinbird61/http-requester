@@ -28,6 +28,7 @@ static inline void sig_handler(int signal){
             int free_cm=0;
             while(protect_conn_mgnt!=NULL){
                 STATS_CONN((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj); // store all conn stats from each conn_mgnt
+                STATS_THR_TIME_END(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num); // calculate for end time of each thread
                 free(protect_conn_mgnt->protect_obj);
                 protect_conn_mgnt=protect_conn_mgnt->next;
                 free_cm++;
