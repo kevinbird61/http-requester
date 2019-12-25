@@ -14,6 +14,9 @@ multi_bytes_http_parsing_state_machine_non_blocking(
     control_var_t control_var;
     /* Parse the data, and store the result into respones objs */
     while(flag){
+        /*if(fin_resp==1)
+            printf("NON-BLOCKING while\n");*/
+
         // call parser (store the state and response obj into state_machine's instance)
         control_var=http_resp_parser(state_m);
 recv_again:
@@ -21,9 +24,13 @@ recv_again:
         {
             case RCODE_POLL_DATA:
                 // if not enough, keep polling 
-                if(num_reqs<=0){ // finish all response
-                    flag=0;
-                    break;
+                if(num_reqs==0){ // finish all response
+                    // LOG(DEBUG, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
+                    control_var.num_resp=fin_resp;
+                    control_var.rcode=RCODE_FIN;
+                    return control_var;
+                    //flag=0;
+                    //break;
                 }
                 /* require another recv() to poll new data */
                 // check upperbound & move (prevent using too many realloc, and too much buff length)
@@ -54,7 +61,7 @@ recv_again:
                     state_m->last_fin_idx=0; 
                 }
 
-                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
+                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, MSG_DONTWAIT);
                 if(recvbytes>0){
                     LOG(WARNING, "RECV: %d bytes", recvbytes);
                     state_m->prev_rcv_len=recvbytes;
@@ -72,13 +79,13 @@ recv_again:
                         flag=0;
                         break;
                     }
-                } else { // don't hang in here, turn back
+                } else { 
                     // -1
-                    LOG(DEBUG, "ERROR RECV: %d bytes, num_reqs: %d, fin_resp: %d", recvbytes, num_reqs, fin_resp);
-                    if(num_reqs>0){
-                        goto recv_again;
-                    } else {
-                        // FIXME:
+                    // LOG(NORMAL, "ERROR RECV: %d bytes, num_reqs: %d, fin_resp: %d, %d", recvbytes, num_reqs, fin_resp, control_var.rcode);
+                    if(num_reqs>0){ // not recv all resp, but don't hang in here, turn back (don't block)
+                        flag=0;
+                        break;
+                    } else { // close invalid connection
                         control_var.num_resp=fin_resp;
                         control_var.rcode=RCODE_FIN;
                         return control_var;
@@ -108,7 +115,7 @@ recv_again:
                 flag=0;
                 break;
             case RCODE_FIN:
-                num_reqs--; // finish one response
+                /*num_reqs--; // finish one response
                 fin_resp++;
                 if(num_reqs<=0){ // check if we have finished all response or not
                     LOG(DEBUG, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
@@ -116,7 +123,7 @@ recv_again:
                     control_var.rcode=RCODE_FIN;
                     return control_var;
                 }
-                break;
+                break;*/
             case RCODE_NEXT_RESP:
                 LOG(INFO, "Finish one respose.");
                 num_reqs--; // finish one response
@@ -127,6 +134,12 @@ recv_again:
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
                 STATS_INC_RESP_NUM(state_m->thrd_num, 1);
                 STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
+                if(num_reqs<=0){ // check if we have finished all response or not
+                    LOG(DEBUG, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
+                    control_var.num_resp=fin_resp;
+                    control_var.rcode=RCODE_FIN;
+                    return control_var;
+                }
                 /* update fin_idx */
                 state_m->last_fin_idx=state_m->buf_idx;
 
@@ -152,7 +165,8 @@ recv_again:
                 /* FIXME: do we need to recover from this kind of error? */
                 state_m->buf_idx=state_m->last_fin_idx;
                 state_m->parsed_len=0;
-                goto recv_again;
+                // goto recv_again;
+                break;
             default:
                 LOG(ERROR, "Unknown: %d", control_var.rcode);
                 flag=0;
@@ -341,6 +355,7 @@ http_resp_parser(
     control_var_t control_var;
 
     while(flag){
+        // LOG(NORMAL, "PARSER while");
         // store legal char
         state_m->buf_idx++;
         state_m->parsed_len++;

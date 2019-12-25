@@ -20,9 +20,9 @@ static struct _protect_t* protect_conn_mgnt; // conn_mgnt list
 static inline void sig_handler(int signal){
     switch(signal){
         case SIGPIPE: /* Broken pipe: write to pipe with no reader */
-            STATS_DUMP(); 
-            printf("Broken pipe\n");
-            exit(1);
+            //STATS_DUMP(); 
+            //printf("Broken pipe\n"); // may cause by non-blocking 
+            break;
         case SIGINT:{
             /* Release all protected obj */
             int free_cm=0;
@@ -44,6 +44,7 @@ static inline void sig_handler(int signal){
             printf("File: %s, Line: %d\n", __FILE__, __LINE__);
             exit(1);
         default:
+            perror("UNKNOWN:");
             break;
     }
 }

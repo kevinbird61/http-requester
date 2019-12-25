@@ -10,16 +10,16 @@ int sock_sent_err_handler(
     // printf("Errno: %d\n", errno);
     switch(errno){
         case EINTR: /* A signal occurred before any data was transmitted */
-            LOG(DEBUG, "Sent: interrupted(EINTR)");
+            LOG(NORMAL, "Sent: interrupted(EINTR)");
             break;
         case EPIPE: /* Broken pipe (client or server side close its socket) */
-            LOG(DEBUG, "Sent: broken pipe");
+            LOG(NORMAL, "Sent: broken pipe");
             break;
         case ECONNRESET: /* Connection reset by peer */
-            LOG(DEBUG, "Sent: connection reset by peer");
+            LOG(NORMAL, "Sent: connection reset by peer");
             goto close_check;
         case ECONNREFUSED: { /* Connection refuse, close program */
-            LOG(DEBUG, "Sent: connection refused");
+            LOG(NORMAL, "Sent: connection refused");
             goto close_check;
         }
         case EAGAIN: /* Resource temporarily unavailable */ {
@@ -27,20 +27,20 @@ int sock_sent_err_handler(
             // means that this operation (e.g. send) would block 
             // may cause by sending too much data 
             // => just let recv part to adjust the num_gap 
-            LOG(DEBUG, "Sent: resource temporarily unavailable"); 
+            LOG(NORMAL, "Sent: resource temporarily unavailable"); 
             // struct _conn_t *conn=(struct _conn_t*)obj;
             // max_req_size/=2;
             break;
         }
         default:
-            LOG(DEBUG, "Other socket sent errno: %d", errno);
+            LOG(NORMAL, "Other socket sent errno: %d", errno);
             break;
     }
 
 close_check: {// terminate 
     struct _conn_t *conn=(struct _conn_t*)obj;
     if(conn->retry > MAX_RETRY){
-        LOG(DEBUG, "Cannot retry anymore, close kb");
+        LOG(NORMAL, "Cannot retry anymore, close kb");
         exit(1);
     }
     return 0;
@@ -51,10 +51,10 @@ int sock_recv_err_handler()
 {
     switch(errno){
         case EINTR:
-            LOG(DEBUG, "Recv: EINTR");
+            LOG(NORMAL, "Recv: EINTR");
             break;
         case ENOMEM: /* Could not allocate memory for recvmsg(). */
-            LOG(DEBUG, "Recv: ENOMEM");
+            LOG(NORMAL, "Recv: ENOMEM");
             break;
         default:
             break;

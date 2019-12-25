@@ -105,8 +105,7 @@ stats_conn(
 void 
 stats_dump()
 {
-    // sum up all threads' statistics
-    // for(int i=0; i<MAX_THREAD; i++){
+    /************************************ sum up all threads' statistics ************************************/
     for(int i=0; i<total_thrd_num; i++){
         // status code
         for(int j=0; j<5; j++){
@@ -154,12 +153,13 @@ stats_dump()
         }
     }
 
+    /************************************ print all statistics ************************************/
     printf("Statistics======================================================================\n");
     // status code
     printf("└─> Status Code:\n");
     for(int i=0; i<5; i++){
         printf("    [%dxx]: %d\n", i+1, statistics.status_code[i]);
-        if(verbose){
+        if(verbose){ // only print this ugly detail log when enable verbose mode
             int j;
             switch(i){
                 case 0:

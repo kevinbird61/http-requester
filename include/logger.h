@@ -45,7 +45,7 @@ extern unsigned char log_visible;
 
 typedef enum _log_level {
     /* only display on the screen */
-    NORMAL=0,
+    NORMAL=1,
     DEBUG,
     INFO,
     SHOWONLY,
