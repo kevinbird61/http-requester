@@ -18,6 +18,7 @@
 #define RETRY_WAIT_TIME     (1)     // 4xx, or other error, wait 1 sec and create a new conn to retry
 #define NUM_GAP             (100)   // max-request size
 #define MIN_NUM_GAP         (5)     // min-request size
+#define MAX_SENT_REQ        (1000)  // how many sent_req (unanswered reqs) allow
 #define DEC_RATE_NUMERAT    (9)     // decrease rate = (MAX-request size)*(DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)
 #define DEC_RATE_DENOMIN    (10)    // 
 #define POLL_TIMEOUT        (1000)  // 1 sec (normal/start case)
@@ -41,6 +42,7 @@ struct _conn_t {
     int             sockfd;         // socket fd
     int             unsent_req;     // unfinished req
     int             sent_req;       // unanswered req
+    int             leftover;
     int             rcvd_res;       // received resp
     int             retry_conn_num; // retry connection number (create a new sockfd)
     int             retry;          // (reserved)

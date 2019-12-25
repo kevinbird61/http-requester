@@ -10,37 +10,41 @@ int sock_sent_err_handler(
     // printf("Errno: %d\n", errno);
     switch(errno){
         case EINTR: /* A signal occurred before any data was transmitted */
-            LOG(NORMAL, "Sent: interrupted(EINTR)");
+            LOG(0, "Sent: interrupted(EINTR)");
             break;
         case EPIPE: /* Broken pipe (client or server side close its socket) */
-            LOG(NORMAL, "Sent: broken pipe");
+            LOG(0, "Sent: broken pipe");
+            /* need to create a new connection here? */
             break;
         case ECONNRESET: /* Connection reset by peer */
-            LOG(NORMAL, "Sent: connection reset by peer");
+            LOG(0, "Sent: connection reset by peer");
             goto close_check;
+            //break;
         case ECONNREFUSED: { /* Connection refuse, close program */
-            LOG(NORMAL, "Sent: connection refused");
+            LOG(0, "Sent: connection refused");
             goto close_check;
+            //break;
         }
         case EAGAIN: /* Resource temporarily unavailable */ {
             // in non-blocking mode will have this errno,
             // means that this operation (e.g. send) would block 
             // may cause by sending too much data 
             // => just let recv part to adjust the num_gap 
-            LOG(NORMAL, "Sent: resource temporarily unavailable"); 
+            LOG(0, "Sent: resource temporarily unavailable"); 
             // struct _conn_t *conn=(struct _conn_t*)obj;
             // max_req_size/=2;
             break;
         }
         default:
-            LOG(NORMAL, "Other socket sent errno: %d", errno);
+            LOG(0, "Other socket sent errno: %d", errno);
             break;
     }
 
 close_check: {// terminate 
     struct _conn_t *conn=(struct _conn_t*)obj;
     if(conn->retry > MAX_RETRY){
-        LOG(NORMAL, "Cannot retry anymore, close kb");
+        // LOG(NORMAL, "Cannot retry anymore, close kb");
+        printf("Cannot retry anymore, close kb");
         exit(1);
     }
     return 0;
@@ -67,7 +71,7 @@ int poll_err_handler(void *obj)
     LOG(DEBUG, "POLL: Errno=%d", errno);
     switch(errno){
         case EAGAIN:{    // The allocation of internal data structures failed but a subsequent request may succeed.
-            conn_mgnt_t *mgnt=(conn_mgnt_t *)obj;
+            //conn_mgnt_t *mgnt=(conn_mgnt_t *)obj;
             /* TODO */
             break;
         }

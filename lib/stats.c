@@ -154,7 +154,7 @@ stats_dump()
     }
 
     /************************************ print all statistics ************************************/
-    printf("Statistics======================================================================\n");
+    printf("Statistics (using `-v` to enable verbose mode)==================================\n");
     // status code
     printf("└─> Status Code:\n");
     for(int i=0; i<5; i++){

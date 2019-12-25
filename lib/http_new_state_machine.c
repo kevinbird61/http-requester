@@ -68,7 +68,8 @@ recv_again:
                     state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
                 } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
                     if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
-                        LOG(WARNING, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        LOG(NORMAL, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        //continue;
                         break;
                     } else {
                         LOG(DEBUG, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
@@ -85,7 +86,7 @@ recv_again:
                     if(num_reqs>0){ // not recv all resp, but don't hang in here, turn back (don't block)
                         flag=0;
                         break;
-                    } else { // close invalid connection
+                    } else { // num_reqs<=0, 
                         control_var.num_resp=fin_resp;
                         control_var.rcode=RCODE_FIN;
                         return control_var;
@@ -115,15 +116,6 @@ recv_again:
                 flag=0;
                 break;
             case RCODE_FIN:
-                /*num_reqs--; // finish one response
-                fin_resp++;
-                if(num_reqs<=0){ // check if we have finished all response or not
-                    LOG(DEBUG, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
-                    control_var.num_resp=fin_resp;
-                    control_var.rcode=RCODE_FIN;
-                    return control_var;
-                }
-                break;*/
             case RCODE_NEXT_RESP:
                 LOG(INFO, "Finish one respose.");
                 num_reqs--; // finish one response
@@ -160,12 +152,24 @@ recv_again:
                 state_m->curr_chunked_size=0;
                 state_m->parsed_len=0; // prevent from reading wrong starting point
                 break;
-            case RCODE_NOT_SUPPORT: /* cautious: this case could be caused by parsing error. */
-                LOG(WARNING, "Not support.");
+            case RCODE_NOT_SUPPORT: 
+                /* cautious: this case could be caused by parsing error. 
+                 * but mostly it will cause by non-blocking recv (which means 
+                 * that still need to check if there still need to poll another
+                 * data)
+                 */
+                LOG(NORMAL, "Not support."); // huge burst will hang up here
                 /* FIXME: do we need to recover from this kind of error? */
-                state_m->buf_idx=state_m->last_fin_idx;
                 state_m->parsed_len=0;
-                // goto recv_again;
+                if(state_m->buf_idx < state_m->data_size){ // still have other data, which means that parsing error 
+                    flag=0;
+                    control_var.rcode=RCODE_ERROR; // or using RCODE_ERROR
+                } else {
+                    // require another data (keep parsing)
+                    state_m->buf_idx=state_m->last_fin_idx;
+                    control_var.rcode=RCODE_POLL_DATA;
+                    goto recv_again; /* receive as more as it can */
+                }
                 break;
             default:
                 LOG(ERROR, "Unknown: %d", control_var.rcode);
