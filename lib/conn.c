@@ -69,7 +69,7 @@ create_tcp_conn(
     }
 
     // logging
-    LOG(INFO, "[Success][client, port=%d]: connecting to %s:%d", ntohs(sin.sin_port), s, ntohs( ((struct sockaddr_in*)p->ai_addr)->sin_port) );
+    LOG(KB, "[Success][client, port=%d]: connecting to %s:%d", ntohs(sin.sin_port), s, ntohs( ((struct sockaddr_in*)p->ai_addr)->sin_port) );
     freeaddrinfo(res);
 
     return sockfd;

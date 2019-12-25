@@ -74,29 +74,29 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             // Resource Temporarily Unavailable (RST), wait first
                             this->sockets[i].retry++;
                             if(this->sockets[i].retry>MAX_RETRY){
-                                LOG(DEBUG, "Close kb.");
+                                LOG(KB_CM, "Close kb.");
                                 goto end;
                             }
                             sleep(this->sockets[i].retry);
-                            LOG(NORMAL, "Resource Temporarily Unavailable. kb wait for `%d` sec.", this->sockets[i].retry);
+                            LOG(KB_CM, "Resource Temporarily Unavailable. kb wait for `%d` sec.", this->sockets[i].retry);
                         } else if(errno==EINPROGRESS){
                             // connect is establishing now, go to next connection
-                            LOG(DEBUG, "[INPROGRESS] Connection is establishing now, please wait");
+                            LOG(KB_CM, "[INPROGRESS] Connection is establishing now, please wait");
                         } 
                     } else {
                         // remote device is unavailable, create a new one
-                        LOG(DEBUG, "POLLERR");
+                        LOG(KB_CM, "POLLERR");
                         this->sockets[i].retry++;
                         goto close_and_create;
                     }
                 } else if( ufds[i].revents & POLLHUP ){
                     /* The device has been disconnected */
-                    LOG(DEBUG, "POLLHUP"); // create a new one for it
+                    LOG(KB_CM, "POLLHUP"); // create a new one for it
                     this->sockets[i].retry++;
                     goto close_and_create;
                 } else if( ufds[i].revents & POLLNVAL ){
                     /* The specified fd value is invalid. This flag is only valid in the revents member; it shall ignored in the events member. */
-                    LOG(DEBUG, "POLLNVAL");
+                    LOG(KB_CM, "POLLNVAL");
                     goto end; // invalid, close the program
                 }
 
@@ -138,7 +138,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                     int prev_num_gap=this->num_gap;
                                     this->num_gap=((this->num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN));
                                     this->num_gap=((this->num_gap< MIN_NUM_GAP)? MIN_NUM_GAP: this->num_gap); // min-pipe size
-                                    LOG(NORMAL, "(%d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, prev_num_gap, this->num_gap);
+                                    LOG(KB_CM, "(%d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, prev_num_gap, this->num_gap);
                                 }
 
                                 close(this->sockets[i].sockfd); // do we need to wait ?
@@ -153,7 +153,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 continue;
                             } else {
                                 /* connection is still established (recvbytes==0, and buf_idx==data_size) */
-                                LOG(NORMAL, "(%d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", this->thrd_num, all_fin, this->total_req,
+                                LOG(KB_CM, "(%d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", this->thrd_num, all_fin, this->total_req,
                                     this->sockets[i].sent_req,  this->sockets[i].unsent_req,  this->sockets[i].rcvd_res,
                                     this->num_gap);
                             }
@@ -163,20 +163,20 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             // 2) need to finish the rest of reqs with new URL
                             break;
                         case RCODE_SERVER_ERR: // 5xx server side error (Do we need to retry in pipeline mode?)
-                            LOG(DEBUG, "%s, close the program immediately.", rcode_str[control_var.rcode]);
+                            LOG(KB_CM, "%s, close the program immediately.", rcode_str[control_var.rcode]);
                             goto end;
                         case RCODE_CLIENT_ERR: // 4xx client side error 
-                            LOG(DEBUG, "%s", rcode_str[control_var.rcode]); 
+                            LOG(KB_CM, "%s", rcode_str[control_var.rcode]); 
                         case RCODE_ERROR: {// error occur, need to abort this connection
                             int prev_num_gap=this->num_gap;
                             this->num_gap=((this->num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)); // decrease max_req_size, and reset num_gap (burst length)
                             this->num_gap=((this->num_gap<MIN_NUM_GAP)? MIN_NUM_GAP: this->num_gap); // min-pipe size
-                            LOG(NORMAL, "(%d) ERROR-RESIZE, from %d to %d.", this->thrd_num, prev_num_gap, this->num_gap);
+                            LOG(KB_CM, "(%d) ERROR-RESIZE, from %d to %d.", this->thrd_num, prev_num_gap, this->num_gap);
 close_and_create:
                             // not finish yet, need to open new connection
                             close(this->sockets[i].sockfd);
                             // need to wait a second 
-                            LOG(NORMAL, "Close the connection (%d) and wait `%d sec.` to create a new one.", this->sockets[i].sockfd, RETRY_WAIT_TIME); // FIXME: warning ?
+                            LOG(KB_CM, "Close the connection (%d) and wait `%d sec.` to create a new one.", this->sockets[i].sockfd, RETRY_WAIT_TIME); // FIXME: warning ?
                             sleep(RETRY_WAIT_TIME); // sleep will hang the user that using huge burst length
                             char *port=itoa(this->args->port);
                             this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
@@ -191,7 +191,7 @@ close_and_create:
                         }
                         case RCODE_NOT_SUPPORT: // parsing not finished (suspend by incomplete packet), or parsing error
                         default: // TODO: other errors
-                            LOG(DEBUG, "Error, code=%s", rcode_str[control_var.rcode]); // FIXME: warning ?
+                            LOG(KB_CM, "Error, code=%s", rcode_str[control_var.rcode]); // FIXME: warning ?
                             close(this->sockets[i].sockfd);
                             exit(1);
                     }
@@ -278,11 +278,11 @@ close_and_create:
             break;
         } else {
             // need to wait more time (no R/W available now)
-            LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
-            LOG(DEBUG, "Waiting for available R/W ... (timeout=%d)", timeout); 
+            LOG(KB_CM, "Timeout occurred! No data after waiting seconds.");
+            LOG(KB_CM, "Waiting for available R/W ... (timeout=%d)", timeout); 
             timeout*=2; // increase timeout (reset when ret>0)
             if(timeout > POLL_MAX_TIMEOUT){ // wait until POLL_MAX_TIMEOUT
-                LOG(DEBUG, "CLOSE sending process, we can't wait it anymore.\n");
+                LOG(KB_CM, "CLOSE sending process, we can't wait it anymore.\n");
                 // FIXME: do we need to retry again ?
                 break;
             }
@@ -290,7 +290,7 @@ close_and_create:
     }
 
 end:
-    LOG(NORMAL, "Thrd %d has finished.", this->thrd_num);
+    LOG(KB_CM, "Thrd %d has finished.", this->thrd_num);
     STATS_THR_TIME_END(this->thrd_num); // end time of thrd
     // store the connection status into statistics.
     STATS_CONN(this); 
@@ -326,9 +326,9 @@ conn_mgnt_run(conn_mgnt_t *this)
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
-    printf("HTTP request:*******************************************************************\n");
-    printf("%s\n", http_request);
-    printf("================================================================================\n");
+    //printf("HTTP request:*******************************************************************\n");
+    //printf("%s\n", http_request);
+    //printf("================================================================================\n");
     
     char *packed_req=NULL;
     if(this->args->enable_pipe){
@@ -357,7 +357,7 @@ conn_mgnt_run(conn_mgnt_t *this)
             // each socket send num_gap at one time
             for(int i=0;i<this->args->conc;i++){
                 // each sockfd's status
-                LOG(DEBUG, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
+                LOG(KB_CM, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
                     all_fin, this->total_req,
                     this->sockets[i].sockfd, this->sockets[i].unsent_req,
                     this->sockets[i].sent_req, this->sockets[i].rcvd_res);
@@ -442,15 +442,15 @@ conn_mgnt_run(conn_mgnt_t *this)
                                 case RCODE_REDIRECT: // TODO: require redirection
                                     break;
                                 case RCODE_SERVER_ERR: // 5xx server side error
-                                    LOG(DEBUG, "%s, close the program immediately.", rcode_str[control_var.rcode]);
+                                    LOG(KB_CM, "%s, close the program immediately.", rcode_str[control_var.rcode]);
                                     exit(1);
                                 case RCODE_CLIENT_ERR: // 4xx client side error 
-                                    LOG(DEBUG, "%s", rcode_str[control_var.rcode]); 
+                                    LOG(KB_CM, "%s", rcode_str[control_var.rcode]); 
                                 case RCODE_ERROR: // error occur, need to abort this connection
                                     // not finish yet, need to open new connection
                                     close(this->sockets[i].sockfd);
                                     // need to wait a second 
-                                    LOG(DEBUG, "Close the connection and wait %d to create a new one.", RETRY_WAIT_TIME); // FIXME: warning ?
+                                    LOG(KB_CM, "Close the connection and wait %d to create a new one.", RETRY_WAIT_TIME); // FIXME: warning ?
                                     if(this->sockets[i].unsent_req<=0){ // finish
                                         continue;
                                     }
@@ -474,7 +474,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                     perror("poll");
                 } else {
                     // need to wait more time
-                    LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
+                    LOG(KB_CM, "Timeout occurred! No data after waiting seconds.");
                     // check which socket has unfinished (e.g. unsent_req > 0)
                     /** FIXME: need to set the retry-retry limitation */
                     for(int i=0; i<this->args->conc; i++){
@@ -508,7 +508,7 @@ conn_mgnt_run(conn_mgnt_t *this)
             // workload in current iteration
             u32 workload=0;
             for(int i=0;i<this->args->conc;i++){
-                LOG(DEBUG, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
+                LOG(KB_CM, "(%d/%d) Sockfd(%d): unsent_req=%d, sent_req=%d, rcvd_res=%d", 
                         all_fin, this->total_req,
                         this->sockets[i].sockfd, this->sockets[i].unsent_req,
                         this->sockets[i].sent_req, this->sockets[i].rcvd_res);
@@ -586,7 +586,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                     perror("poll");
                 } else {
                     // need to wait more time
-                    LOG(WARNING, "Timeout occurred! No data after waiting seconds.");
+                    LOG(KB_CM, "Timeout occurred! No data after waiting seconds.");
                     // check which socket has unfinished (e.g. unsent_req > 0)
                     /** FIXME: need to set the retry-retry limitation */
                     for(int i=0; i<this->args->conc; i++){
@@ -640,9 +640,9 @@ conn_mgnt_run_blocking(conn_mgnt_t *this)
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
-    printf("HTTP request:*******************************************************************\n");
-    printf("%s\n", http_request);
-    printf("================================================================================\n");
+    //printf("HTTP request:*******************************************************************\n");
+    //printf("%s\n", http_request);
+    //printf("================================================================================\n");
     
     /* create sock */
     int sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));

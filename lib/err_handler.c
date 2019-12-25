@@ -10,18 +10,18 @@ int sock_sent_err_handler(
     // printf("Errno: %d\n", errno);
     switch(errno){
         case EINTR: /* A signal occurred before any data was transmitted */
-            LOG(0, "Sent: interrupted(EINTR)");
+            LOG(KB_EH, "Sent: interrupted(EINTR)");
             break;
         case EPIPE: /* Broken pipe (client or server side close its socket) */
-            LOG(0, "Sent: broken pipe");
+            LOG(KB_EH, "Sent: broken pipe");
             /* need to create a new connection here? */
             break;
         case ECONNRESET: /* Connection reset by peer */
-            LOG(0, "Sent: connection reset by peer");
+            LOG(KB_EH, "Sent: connection reset by peer");
             goto close_check;
             //break;
         case ECONNREFUSED: { /* Connection refuse, close program */
-            LOG(0, "Sent: connection refused");
+            LOG(KB_EH, "Sent: connection refused");
             goto close_check;
             //break;
         }
@@ -30,13 +30,13 @@ int sock_sent_err_handler(
             // means that this operation (e.g. send) would block 
             // may cause by sending too much data 
             // => just let recv part to adjust the num_gap 
-            LOG(0, "Sent: resource temporarily unavailable"); 
+            LOG(KB_EH, "Sent: resource temporarily unavailable"); 
             // struct _conn_t *conn=(struct _conn_t*)obj;
             // max_req_size/=2;
             break;
         }
         default:
-            LOG(0, "Other socket sent errno: %d", errno);
+            LOG(KB_EH, "Other socket sent errno: %d", errno);
             break;
     }
 
@@ -55,10 +55,10 @@ int sock_recv_err_handler()
 {
     switch(errno){
         case EINTR:
-            LOG(NORMAL, "Recv: EINTR");
+            LOG(KB_EH, "Recv: EINTR");
             break;
         case ENOMEM: /* Could not allocate memory for recvmsg(). */
-            LOG(NORMAL, "Recv: ENOMEM");
+            LOG(KB_EH, "Recv: ENOMEM");
             break;
         default:
             break;
@@ -68,7 +68,7 @@ int sock_recv_err_handler()
 int poll_err_handler(void *obj)
 {
     // need to handle: https://linux.die.net/man/3/poll, http://man7.org/linux/man-pages/man2/poll.2.html
-    LOG(DEBUG, "POLL: Errno=%d", errno);
+    LOG(KB_EH, "POLL: Errno=%d", errno);
     switch(errno){
         case EAGAIN:{    // The allocation of internal data structures failed but a subsequent request may succeed.
             //conn_mgnt_t *mgnt=(conn_mgnt_t *)obj;

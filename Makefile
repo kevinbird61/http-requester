@@ -1,6 +1,10 @@
 CC:=gcc
+VER_MAJOR=1
+VER_MINOR=0
+VER_PATCH=0
+DFLAGS= -DVER_MAJ=$(VER_MAJOR) -DVER_MIN=$(VER_MINOR) -DVER_PAT=$(VER_PATCH)
 LDFLAGS:=-static
-CFLAGS:=-fPIC -std=gnu99
+CFLAGS:=-fPIC -g3 -std=gnu99
 LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
@@ -23,7 +27,7 @@ release: $(RELEASE)
 	gcc -o $(STATIC_BUILD) src/kb.c $(LIBS) -L. -lhttp_requester $(CFLAGS) -lpthread
 
 %.o: lib/%.c 
-	$(CC) $(CFLAGS) -c $^ $(LIBS) -lpthread
+	$(CC) $(CFLAGS) $(DFLAGS) -c $^ $(LIBS) -lpthread 
 
 %.exe: src/%.c $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS) -lpthread

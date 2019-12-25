@@ -3,13 +3,12 @@
 unsigned char log_visible=0;
 
 char *log_level_str[]={
-    [NORMAL]="NORMAL",
-    [SHOWONLY]="SHOWONLY",
-    [DEBUG]="DEBUG",
-    [INFO]="INFO",
-    [WARNING]="WARNING",
-    [DANGER]="DANGER",
-    [ERROR]="ERROR",
+    [KB_DEBUG]="DEBUG",
+    [KB_EH]="ERR_HANDLE",
+    [KB_CM]="CONN_MGNT",
+    [KB_SM]="STATE_MACHINE",
+    [KB_PS]="PARSER",
+    [LOG_ALL]="ALL",
     /* log-only */
     [LOGONLY]="LOGONLY",
     [LOG_LEVEL_MAXIMUM]=NULL

@@ -103,21 +103,21 @@ argparse(
                 http_req_obj_ins_header_by_idx(&((*this)->http_req), option_index-(NUM_PARAMS-2), optarg);
                 break;
             case 'a':   // fast (cooperate with -b, burst length)
-                printf("Enable fast transmit (for http pipelining).\n");
+                printf("[HTTP Pipeline][Aggressive mode: Enable]\n");
                 (*this)->enable_pipe=1; /* using fast, also enable pipe */
                 fast=1;
                 break;
             case 'b':   // burst length
-                printf("Enable HTTP pipelining.\n");
+                printf("[HTTP Pipeline: Enable]\n");
                 (*this)->enable_pipe=1; /* also enable pipe */
                 burst_length=atoi(optarg);
                 burst_length=(burst_length<=0)?NUM_GAP:burst_length;
                 max_req_size=burst_length;
-                printf("Configure burst length = %d (for http pipelining).\n", burst_length);
+                printf("[HTTP Pipeline][MAX-request size: %d]\n", burst_length);
                 break;
             case 'N':   // using non-blocking
                 (*this)->use_non_block=1;
-                printf("Using non-blocking mode.\n");
+                printf("[NON-blocking: Enable]\n");
                 break;
             case 'c':   // connections (socket)
                 (*this)->conc=atoi(optarg);
@@ -148,12 +148,12 @@ argparse(
                     // append each url
                     
                     if((*this)->urls==NULL){
-                        printf("URL(%d): %s\n", url_cnt++, argv[optind]);
+                        printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         (*this)->urls=calloc(1, sizeof(struct urls));
                         (*this)->urls->url=argv[optind];
                         (*this)->urls->next=NULL;
                     } else {
-                        printf("URL(%d): %s\n", url_cnt++, argv[optind]);
+                        printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         struct urls *root=(*this)->urls;
                         while(root->next!=NULL){
                             root=root->next;
@@ -166,7 +166,7 @@ argparse(
                 break;
             case 'v':   // verbose
                 verbose=1;
-                printf("Enable verbose mode.\n");
+                printf("[Verbose mode: Enable]\n");
                 break;
             case 'p':   // port
                 (*this)->port=atoi(optarg);
@@ -177,11 +177,11 @@ argparse(
                 (*this)->flags|=SPE_METHOD;
                 break;
             case 'l':
-                printf("Enable logging, level is %s\n", optarg); 
                 log_visible=atoi(optarg); /* set log-level */
+                printf("[Logging: Enable, Level = %s]\n", log_level_str[log_visible]);
                 break;
             case 'i':   // pipeline
-                printf("Enable aggressive HTTP pipelining.\n");
+                printf("[HTTP pipelining: Enable]\n");
                 (*this)->enable_pipe=1;
                 break;
             case '?':
@@ -294,7 +294,7 @@ argparse(
 
     // using template
     if((*this)->filename!=NULL){
-        printf("Not support yet!\n");
+        printf("Not support template file yet!\n");
         exit(1);
         // return USE_TEMPLATE
     } else if((*this)->urls!=NULL){
@@ -410,7 +410,11 @@ print_manual(
     u8 detail)
 {
     printf("********************************************************************************\n");
-    printf("A HTTP/1.1 requester which conform with RFC7230.\n");
+#ifdef VER_MAJ 
+    printf("Version %d.%d.%d\n", VER_MAJ, VER_MIN, VER_PAT);
+#endif
+    printf("Welcome to use KB (Kevin Benchmark tool) !\n");
+    printf("A HTTP/1.1 client which conform with RFC7230.\n");
     printf("Author: Kevin Cyu (scyu@a10networks.com).\n");
 #ifdef RELEASE
     printf("%s\n", a10logo);
@@ -426,7 +430,13 @@ print_manual(
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (URL's priority > Template's)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'm', "method", "METHOD", "Specify method token");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'l', "log", "LEVEL", "Enable logging (0~7)"); 
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'l', "log", "LEVEL", "Enable logging (1~99)"); 
+        printf("\t  %s= %s\n", "1", "Show uncategorized only"); 
+        printf("\t  %s= %s\n", "2", "Show error handler only"); 
+        printf("\t  %s= %s\n", "3", "Show connection management only");
+        printf("\t  %s= %s\n", "4", "Show parsing state machine only");
+        printf("\t  %s= %s\n", "5", "Show http response parser only");
+        printf("\t  %s= %s\n", "99", "Show & log all");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'v', "verbose", " ", "Enable verbose printing (using `-h -v` to print more helper info)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500), enable pipe too.");

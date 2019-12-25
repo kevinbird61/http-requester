@@ -38,7 +38,7 @@ insert_new_header_field_name(
     
     if(!(check_header>0)){
         /* if not found, then alloc the memory to print */
-        LOG(WARNING, "[Field-name] Not support `%s` currently",  strndup(status->buff+(idx-offset), offset-1));
+        LOG(KB_PS, "[Field-name] Not support `%s` currently",  strndup(status->buff+(idx-offset), offset-1));
         return ERR_NOT_SUPPORT;
     }
     return ERR_NONE;
@@ -53,8 +53,8 @@ insert_new_header_field_value(
     if(status->curr_bit>0){
         /** TODO: check the current header with existed header. (check conformance here)
          */
-        LOG(INFO, "[Field-name: %s]", get_res_header_name_by_idx[status->curr_bit]);
-        LOG(INFO, "[Field-value: %s]", strndup(status->buff+(idx-offset), offset-1));
+        LOG(KB_PS, "[Field-name: %s]", get_res_header_name_by_idx[status->curr_bit]);
+        LOG(KB_PS, "[Field-value: %s]", strndup(status->buff+(idx-offset), offset-1));
         
         /* record content-length or transfer-encoding (chunked) here */
         if(status->transfer_encoding_dirty){

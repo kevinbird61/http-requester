@@ -17,7 +17,7 @@ http_rcv_state_machine(
     char bytebybyte, *bufbybuf;
     char *readbuf=calloc(buf_size, sizeof(char)); // pre-allocated 32 bytes
     if(readbuf==NULL){
-        LOG(ERROR, "MALLOC error when alloc to *readbuf. Current buf_size: %d", buf_size);
+        LOG(KB_PS, "MALLOC error when alloc to *readbuf. Current buf_size: %d", buf_size);
         exit(1);
     }
 
@@ -54,7 +54,7 @@ http_rcv_state_machine(
             readbuf=realloc(readbuf, buf_size*sizeof(char));
             http_h_status_check->buff=readbuf;
             if(readbuf==NULL){
-                LOG(ERROR, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: %d", buf_size);
+                LOG(KB_PS, "REALLOC failure when realloc to *readbuf, check the memory. Current buf_size: %d", buf_size);
                 exit(1);
             }
             // if you feel this message is too noisy, can comment this line or increase chunk size
@@ -100,7 +100,7 @@ http_rcv_state_machine(
                         char *tmp;
                         tmp=malloc((parse_len)*sizeof(char));
                         snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                        LOG(INFO,  "[Reason Phrase: %s]", tmp);
+                        LOG(KB_PS,  "[Reason Phrase: %s]", tmp);
                         free(tmp);
                     }
                     state=next_http_state(state, '\r');
@@ -114,12 +114,12 @@ http_rcv_state_machine(
                     /** Finished all headers, analyzing now */
 
                     state=MSG_BODY;
-                    LOG(INFO,  "Message header length: %d", buf_idx);
+                    LOG(KB_PS,  "Message header length: %d", buf_idx);
                     /** Version -
                      * - Not support HTTP/0.9, /2.0, /3.0 (e.g. http_ver==0)
                      */
                     if(!http_ver) {
-                        LOG(ERROR, "Only support HTTP/1.0 and /1.1 now.");
+                        LOG(KB_PS, "Only support HTTP/1.0 and /1.1 now.");
                         fprintf(stderr, "Only support HTTP/1.0 and /1.1 now.");
                         exit(1);
                     }
@@ -142,11 +142,11 @@ http_rcv_state_machine(
                     // STATS_INC_CODE(status_code);
                     if(status_code<_200_OK){
                         // 1xx
-                        LOG(WARNING, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
+                        LOG(KB_PS, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
                         // TODO:
                     } else if(status_code>=_200_OK && status_code<_300_MULTI_CHOICES){
                         // 2xx
-                        LOG(NORMAL, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
+                        LOG(KB_PS, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
                         // keep processing
                     } else if(status_code>=_300_MULTI_CHOICES && status_code<_400_BAD_REQUEST){
                         switch(status_code){
@@ -154,7 +154,7 @@ http_rcv_state_machine(
                             case _302_FOUND:
                                 // search `Location` field-value
                                 printf("Redirect to `Location`: %s\n", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
-                                LOG(INFO, "Redirect to `Location`: %s, close the connection.", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
+                                LOG(KB_PS, "Redirect to `Location`: %s, close the connection.", strndup(readbuf+1+(http_h_status_check->field_value[RES_LOC].idx), http_h_status_check->field_value[RES_LOC].offset));
                                 // close the connection
                                 close(sockfd);
                                 // redirect to new target (new conn + modified request)
@@ -169,7 +169,7 @@ http_rcv_state_machine(
                     } else if(status_code>=_400_BAD_REQUEST && status_code<=_505_HTTP_VER_NOT_SUPPORTED){
                         printf("Connection is terminated by %s's failure ...\n", status_code<_500_INTERNAL_SERV_ERR?"client":"server");
                         printf("Response from server: %s, %s\n", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
-                        LOG(ERROR, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
+                        LOG(KB_PS, "Response from server : %s (%s)", get_http_status_code_by_idx[status_code], get_http_reason_phrase_by_idx[status_code]);
                         // terminate, we don't need the parse the rest of data
                         close(sockfd);
                         // FIXME: return error code instead terminate directly
@@ -213,7 +213,7 @@ http_rcv_state_machine(
                             chunked_size=atoi(tmp);
                             printf("[Get Chunk] Chunk size: %d\n", chunked_size);
                             total_chunked_size+=chunked_size;
-                            LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
+                            LOG(KB_PS, "Get Chunk, size = %d", chunked_size);
                             state=CHUNKED; // don't need to check extension
                             use_chunked=1;
                         } else if(parse_len==2){
@@ -221,7 +221,7 @@ http_rcv_state_machine(
                             // FIXME: is this right condition?
                             chunked_size=atoi(tmp);
                             printf("[Last Chunk] Chunk size: %d\n", chunked_size);
-                            LOG(DEBUG, "Last Chunk, size = %d", chunked_size);
+                            LOG(KB_PS, "Last Chunk, size = %d", chunked_size);
                             use_chunked=1;
                         }
                         free(tmp);
@@ -259,12 +259,12 @@ http_rcv_state_machine(
                         case VER:
                             // printf("%d\n", encap_http_version(readbuf+(buf_idx-parse_len)));
                             if((ret=encap_http_version(readbuf+(buf_idx-parse_len))) > 1){ // current only support HTTP/1.1
-                                LOG(DEBUG, "[Version: %s]",  get_http_version_by_idx[ret]);
+                                LOG(KB_PS, "[Version: %s]",  get_http_version_by_idx[ret]);
                                 http_ver=ret;
                             } else { // if not support, just terminate
                                 char *tmp=malloc((parse_len)*sizeof(char));
                                 snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
-                                LOG(ERROR, "[Version not support: %s]", tmp);
+                                LOG(KB_PS, "[Version not support: %s]", tmp);
                                 free(tmp);
                                 flag=0;
                             }
@@ -274,7 +274,7 @@ http_rcv_state_machine(
                             // printf("%d\n", encap_http_status_code(atoi(readbuf+(buf_idx-parse_len))));
                             if((ret=encap_http_status_code(atoi(readbuf+(buf_idx-parse_len)))) > 0){
                                 status_code=ret;
-                                LOG(DEBUG, "[Status code: %s]", get_http_status_code_by_idx[ret]);
+                                LOG(KB_PS, "[Status code: %s]", get_http_status_code_by_idx[ret]);
                             } else { // not support
                                 // char *tmp=malloc((parse_len)*sizeof(char));
                                 // snprintf(tmp, parse_len, "%s", readbuf+(buf_idx-parse_len));
@@ -301,7 +301,7 @@ http_rcv_state_machine(
                             // printf("%s, %s\n", tmp, strndup(readbuf+(buf_idx-parse_len), parse_len));
                             chunked_size=atoi(tmp);
                             printf("[Get Chunk] Chunk size: %d\n", chunked_size);
-                            LOG(DEBUG, "Get Chunk, size = %d", chunked_size);
+                            LOG(KB_PS, "Get Chunk, size = %d", chunked_size);
                             state=CHUNKED_EXT;
                             // use_chunked=1;
                         } else if(parse_len==2){
@@ -309,7 +309,7 @@ http_rcv_state_machine(
                             // FIXME: is this right condition?
                             chunked_size=atoi(tmp);
                             printf("[Last Chunk] Chunk size: %d\n", chunked_size);
-                            LOG(DEBUG, "Last Chunk, size = %d", chunked_size);
+                            LOG(KB_PS, "Last Chunk, size = %d", chunked_size);
                             state=CHUNKED_EXT;
                             // use_chunked=1;
                         }
@@ -322,7 +322,7 @@ http_rcv_state_machine(
         }
     }
 
-    LOG(INFO, "Total received: %d bytes", buf_idx);
+    LOG(KB_PS, "Total received: %d bytes", buf_idx);
     free(readbuf);
 
     return 0;
@@ -344,11 +344,11 @@ http_state_machine(
          */
         http_recast((http_t *)*http_request, &req);
         int sendbytes=send(sockfd, req, strlen(req), 0);
-        LOG(DEBUG, "Finished HTTP recasting. Request length: %d; Sent bytes: %d", strlen(req), sendbytes);
+        LOG(KB_SM, "Finished HTTP recasting. Request length: %d; Sent bytes: %d", strlen(req), sendbytes);
     } else {
         req=(char *)*http_request;
         int sendbytes=send(sockfd, req, strlen(req), 0);
-        LOG(DEBUG, "Using raw HTTP request header. Request length: %d; Sent bytes: %d", strlen(req), sendbytes);
+        LOG(KB_SM, "Using raw HTTP request header. Request length: %d; Sent bytes: %d", strlen(req), sendbytes);
     }
 
     // using one state machine
