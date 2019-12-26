@@ -274,28 +274,14 @@ argparse(
         g_total_thrd_num=(*this)->thrd;
     }
 
-    printf("================================================================================\n");
-    printf("%-50s: %d\n", "Number of threads", (*this)->thrd);
-    printf("%-50s: %d\n", "Number of connections", (*this)->conc);
-    printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
-    printf("%-50s: %d\n", "Max-requests size", g_burst_length);
-    printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
-    /*printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);*/
+    int ret=0;
     struct urls *url_trav=(*this)->urls;
-    printf("%-50s:\n", "Target URL(s): ");
-    while(url_trav!=NULL){
-        printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
-        url_trav=url_trav->next;
-    }
-    printf("%-50s: %d\n", "Port number: ", (*this)->port);
-    printf("%-50s: %s\n", "Method: ", (*this)->method);
-    printf("================================================================================\n");
 
     // using template
     if((*this)->filename!=NULL){
         printf("Not support template file yet!\n");
+        // ret=USE_TEMPLATE;
         exit(1);
-        // return USE_TEMPLATE
     } else if((*this)->urls!=NULL){
         // check urls' number 
         int url_num=0;
@@ -307,17 +293,39 @@ argparse(
         /** need to parse those urls when needed 
          * - currently update randomly
          */
-        return update_url_info_rand(this);
+        ret=update_url_info_rand(this);
     }
 
-    return USE_URL;
+    printf("================================================================================\n");
+    printf("%-50s: %d\n", "Number of threads", (*this)->thrd);
+    printf("%-50s: %d\n", "Number of connections", (*this)->conc);
+    printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
+    printf("%-50s: %d\n", "Max-requests size", g_burst_length);
+    if(ret==USE_URL){
+        printf("%-50s:\n", "Available URL(s): ");
+        url_trav=(*this)->urls;
+        while(url_trav!=NULL){
+            printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
+            url_trav=url_trav->next;
+        }
+        printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);
+    } else {
+        printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
+    }
+    printf("%-50s: %d\n", "Port number: ", (*this)->port);
+    printf("%-50s: %s\n", "Method: ", (*this)->method);
+    printf("================================================================================\n");
+
+    // return code (type of service)
+    return ret;
 }
 
 // parse user's URL
 int 
 parse_url(
     char *url, 
-    char **host, 
+    char **host,
+    u16  *port,
     char **path)
 {
     /** 1. check URL's protocol 
@@ -338,19 +346,35 @@ parse_url(
      */
     // perform same parsing 
     int ori_len=strlen(url);
-    char *ori_url, *host_delim="/";
+    char *ori_url, *host_delim="/", *port_delim=":";
     ori_url=strdup(url);
     // get host
     *host=strtok(url, host_delim);
-    // printf("Host: %s\n", host);
+    // get port (if available)
+    char *port_str=NULL;
+    port_str=strtok((*host), port_delim); // now port_str=host
+    port_str=strtok(NULL, port_delim); // if [:PORT] is existed, then now port_str is the port value
+    if(port_str!=NULL){ // [:PORT] is existed
+        u16 orig_port=(*port);
+        *port=atoi(port_str);
+        if((*port)<=0 || (*port)>65535){ // invalid, then we can't use this value
+            (*port)==orig_port; // use orig value 
+        }
+    }
+    // printf("Host: %s, Port: %d\n", *host, (*port));
     // check host length limitation, refs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames
     if(strlen(*host)>=253){
         printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen(*host));
         // exit(1);
         return ERR_INVALID_HOST_LEN;
     }
-    // get path
-    *path=strndup(ori_url+strlen(*host), ori_len-strlen(*host));
+    // get path 
+    if(port_str!=NULL){
+        *path=strndup(ori_url+strlen(*host)+1+strlen(port_str), ori_len-(strlen(*host)+1+strlen(port_str))); // ":" occupy 1 byte
+        ret=ERR_USE_OTHER_PORT;
+    } else {
+        *path=strndup(ori_url+strlen(*host), ori_len-(strlen(*host)));
+    }
     // when user forget to add / at the end of URL
     if(strlen(*path)==0){
         *path="/";
@@ -364,7 +388,6 @@ update_url_info_rand(
     parsed_args_t **this)
 {
     // randomly pick an URL to update relative information
-    char *picked_url;
     int num_url=0;
     struct urls *url_trav=(*this)->urls;
     while(url_trav!=NULL){
@@ -378,10 +401,10 @@ update_url_info_rand(
     while(picked_id--){
         url_trav=url_trav->next;
     }
-    picked_url=url_trav->url;
-    printf("Num of urls: %d, Randomly pick: %s\n", num_url, picked_url);
+    (*this)->url=url_trav->url;
+    printf("Num of urls: %d, Randomly pick: %s\n", num_url, (*this)->url);
     // only one url, use url only
-    int ret=parse_url(picked_url, &((*this)->host), &((*this)->path));
+    int ret=parse_url((*this)->url, &((*this)->host), &((*this)->port), &((*this)->path));
     switch(ret){
         case ERR_NONE:
             if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
@@ -393,12 +416,14 @@ update_url_info_rand(
                 (*this)->port=DEFAULT_SSL_PORT;
             }
             break;
+        case ERR_USE_OTHER_PORT: // use [:PORT]
+            break;
         case ERR_INVALID_HOST_LEN:
         default:
             exit(1);
     }
 
-    free(url_trav);
+    // free(url_trav); // we might need this urls later (picking another url)
 
     return USE_URL;
 }
@@ -425,9 +450,9 @@ print_manual(
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads, total requests will distribute to each thread");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of connections (per thread)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of requests, distribute to each connection");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (URL's priority > Template's)");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
+    // printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (i.e. `http://kevin.a10networks.com:8080/index.html`)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number (priority is lower than URL's port)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'm', "method", "METHOD", "Specify method token");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'l', "log", "LEVEL", "Enable logging (1~99)"); 
         printf("\t  %s= %s\n", "1", "Show uncategorized only"); 

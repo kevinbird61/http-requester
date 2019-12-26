@@ -10,6 +10,7 @@
 typedef enum {
     /* normal or success */
     ERR_NONE=0,                     // success
+    ERR_USE_OTHER_PORT,             // [:PORT]
     ERR_USE_SSL_PORT,               // change to SSL port - 443 (parse url)
     ERR_REDIRECT,                   // redirect (http_state_machine)
     /* invalid or illegal */
@@ -32,11 +33,14 @@ typedef struct _parsed_args_t {
     u8                          flags;
     u8                          enable_pipe;
     u8                          use_non_block;
-    u32                         port;
+    u16                         port;
     u32                         thrd;
     u32                         conc;
     u32                         conn;
-    char*                       filename;
+    union {
+        char *                  filename;
+        char *                  url;
+    };
     struct urls*                urls;
     char*                       method;
     char*                       host;

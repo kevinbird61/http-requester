@@ -14,6 +14,19 @@
 #define __FILENAME__        (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define AGENT               "kevinbird"
 
+extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
+
+// create argparse object
+parsed_args_t *create_argparse();
+// parse from argc, argv
+int argparse(parsed_args_t **this, int argc, char **argv);
+// parse url, and use the result to fill host & path
+int parse_url(char *url, char **host, u16 *port, char **path);
+// randomly pick a url and then update
+int update_url_info_rand(parsed_args_t **this);
+// print usage
+void print_manual(u8 detail);
+
 static const char *a10logo=
 "\
 WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWNNXXXXNNWWWWWWWWWWWWWW\n\
@@ -68,18 +81,5 @@ enum {
     USE_URL=1,
     USE_TEMPLATE
 };
-
-extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
-
-// create argparse object
-parsed_args_t *create_argparse();
-// parse from argc, argv
-int argparse(parsed_args_t **this, int argc, char **argv);
-// parse url, and use the result to fill host & path
-int parse_url(char *url, char **host, char **path);
-// randomly pick a url and then update
-int update_url_info_rand(parsed_args_t **this);
-// print usage
-void print_manual(u8 detail);
 
 #endif
