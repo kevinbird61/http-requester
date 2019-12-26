@@ -8,8 +8,6 @@ CFLAGS:=-fPIC -O2 -std=gnu99
 LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
-TEST:= $(patsubst %.c, %.out, $(subst test/,,$(wildcard test/*.c)))
-TOOLS:= $(patsubst %.c, %.app, $(subst tools/,,$(wildcard tools/*.c)))
 RELEASE:=libhttp_requester.a
 STATIC_BUILD:=kb
 
@@ -31,12 +29,6 @@ release: $(RELEASE)
 
 %.exe: src/%.c $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS) -lpthread
-
-%.out: test/%.c $(OBJS)
-	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
-
-%.app: tools/%.c $(OBJS)
-	$(CC) $(CFLAGS) $(LIBS) -o $@ $(OBJS) $< $(LIBS)
 
 .PHONY=clean
 
