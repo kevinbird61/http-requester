@@ -23,6 +23,17 @@ extern int      *g_thrd_id_mapping;         // thrd tid (pthread_t) & thrd num (
 extern char     *g_program;                 // program name
 extern int      g_total_thrd_num;           // store number of available thrds
 
+// log filename
+extern char *g_log_dir;
+extern char *g_log_filename;
+extern char *g_log_ext;
+// log level string
+extern char *g_log_level_str[];
+// log enable (global)
+extern unsigned char g_log_visible;
+
+
+// mapping from `thrd id` to `thrd num`
 static inline int get_thrd_tid_from_id(int thrd_tid){
     for(int i=0; i<g_total_thrd_num; i++){ // linear search
         if(g_thrd_id_mapping[i]==thrd_tid){

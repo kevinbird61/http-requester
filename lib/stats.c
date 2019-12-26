@@ -164,33 +164,38 @@ stats_dump()
             switch(i){
                 case 0:
                     for(j=_100_CONTINUE-1; j<_101_SWITCHING_PROTO; j++){
-                        printf("\t[%s]: %-7d", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        if(statistics.status_code_detail[j]>0){
+                            printf("\t[%s]: %-7d\n", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        }
                     }
-                    printf("\n");
                     break;
                 case 1:
                     for(j=_200_OK-1; j<_205_RESET_CONTENT; j++){
-                        printf("\t[%s]: %-7d", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        if(statistics.status_code_detail[j]>0){
+                            printf("\t[%s]: %-7d\n", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        }
                     }
-                    printf("\n");
                     break;
                 case 2:
                     for(j=_300_MULTI_CHOICES-1; j<_307_TEMP_REDIRECT; j++){
-                        printf("\t[%s]: %-7d", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        if(statistics.status_code_detail[j]>0){
+                            printf("\t[%s]: %-7d\n", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        }
                     }
-                    printf("\n");
                     break;
                 case 3:
                     for(j=_400_BAD_REQUEST-1; j<_426_UPGRADE_REQUIRED; j++){
-                        printf("\t[%s]: %-7d", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        if(statistics.status_code_detail[j]>0){
+                            printf("\t[%s]: %-7d\n", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        }
                     }
-                    printf("\n");
                     break;
                 case 4:
                     for(j=_500_INTERNAL_SERV_ERR-1; j<_505_HTTP_VER_NOT_SUPPORTED; j++){
-                        printf("\t[%s]: %-7d", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        if(statistics.status_code_detail[j]>0){
+                            printf("\t[%s]: %-7d\n", get_http_status_code_by_idx[j+1], statistics.status_code_detail[j]);
+                        }
                     }
-                    printf("\n");
                     break;
             }
         }
@@ -223,10 +228,25 @@ stats_dump()
         printf("* %-30s: %f\n", "Avg. max-requests(burst len)", statistics.max_req_size/(float)statistics.thrd_cnt);
 
         // per thrd execution time
-        printf("└─> Per-thread info (ID + VAL): \n");
-        printf("    └─> Execution time: \n");
-        for(int i=0; i<g_total_thrd_num; i++){
-            printf("    * [THRD ID: %4d(%u)]: %10f (sec.)\n", get_thrd_tid_from_id(priv_statistics[i].thrd_cnt), priv_statistics[i].thrd_cnt, priv_statistics[i].total_time/((float)cpuFreq));
+        if(g_verbose){ // only print this ugly detail log when enable verbose mode
+            printf("└─> Per-thread info (ID + VAL): \n");
+            printf("--------------------------------------------------------------------------------\n");
+            printf("|%-5s| %-12s | %-12s | %-12s | %-12s | %-12s |\n", " ", 
+                "Thread ID", "Time (sec.)", "Workload", "Retry", "Log file");
+            printf("--------------------------------------------------------------------------------\n");
+            for(int i=0; i<g_total_thrd_num; i++){
+                // logfile
+                char *logfile=malloc((strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(get_thrd_tid_from_id(priv_statistics[i].thrd_cnt)))+1)*sizeof(char));
+                sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, get_thrd_tid_from_id(priv_statistics[i].thrd_cnt), g_log_ext);
+
+                printf("|%-5s| %-12d | %-12f | %-12d | %-12d | %-12s |\n", 
+                    " ",  get_thrd_tid_from_id(priv_statistics[i].thrd_cnt),  
+                    priv_statistics[i].total_time/((float)cpuFreq),
+                    priv_statistics[i].workload,
+                    priv_statistics[i].retry_conn_num,
+                    logfile);
+            }
+            printf("--------------------------------------------------------------------------------\n");
         }
     }
     printf("********************************************************************************\n");

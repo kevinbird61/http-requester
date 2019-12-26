@@ -11,16 +11,7 @@
 #include "global.h"
 #include "utils.h"
 
-#define LOG_LEVEL_STR log_level_str
-
-// log filename
-static char *log_dir="/tmp/";
-static char *log_filename="http_request";
-static char *log_ext=".log";
-// log level string
-extern char *log_level_str[];
-// log enable (global)
-extern unsigned char log_visible;
+#define LOG_LEVEL_STR g_log_level_str
 
 /** Record any activities,
  * - design:
@@ -47,8 +38,8 @@ typedef enum _log_level {
 #define LOG(loglevel, format, args...)                  \
     do {                                                \
     /* only record specified level  */                  \
-    if(log_visible < LOG_ALL){                          \
-        if(loglevel == log_visible){                    \
+    if(g_log_visible < LOG_ALL){                          \
+        if(loglevel == g_log_visible){                    \
             char *userlog=parse_valist(format, ##args); \
             syslog(loglevel,                            \
                 pthread_self(),                         \

@@ -1,8 +1,11 @@
 #include "logger.h"
 
-unsigned char log_visible=0;
+unsigned char g_log_visible=0;
+char *g_log_dir="/tmp/";
+char *g_log_filename="kb";
+char *g_log_ext=".log";
 
-char *log_level_str[]={
+char *g_log_level_str[]={
     [KB_DEBUG]="DEBUG",
     [KB_EH]="ERR_HANDLE",
     [KB_CM]="CONN_MGNT",
@@ -47,8 +50,8 @@ syslog(
     }
 
     // write into logfile (FIXME: date)
-    char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+strlen(itoa(get_thrd_tid_from_id(thread_id)))+1)*sizeof(char));
-    sprintf(logfile, "%s%s%d%s", log_dir, log_filename, get_thrd_tid_from_id(thread_id), log_ext);
+    char *logfile=malloc((strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(get_thrd_tid_from_id(thread_id)))+1)*sizeof(char));
+    sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, get_thrd_tid_from_id(thread_id), g_log_ext);
     FILE *logfd=fopen(logfile, "a+");
     fwrite(loginfo, sizeof(char), strlen(loginfo), logfd);
 

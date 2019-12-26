@@ -80,7 +80,7 @@ argparse(
 {
     int c, help=0;
     int digit_optind=0;
-    log_visible=0;
+    g_log_visible=0;
     (*this)->use_non_block=0;
 
     // get prog name
@@ -176,8 +176,8 @@ argparse(
                 (*this)->flags|=SPE_METHOD;
                 break;
             case 'l':
-                log_visible=atoi(optarg); /* set log-level */
-                printf("[Logging: Enable, Level = %s]\n", log_level_str[log_visible]);
+                g_log_visible=atoi(optarg); /* set log-level */
+                printf("[Logging: Enable, Level = %s]\n", g_log_level_str[g_log_visible]);
                 break;
             case 'i':   // pipeline
                 printf("[HTTP pipelining: Enable]\n");
@@ -424,7 +424,7 @@ print_manual(
     printf("\t-%-2c    %-7s %-7s: %s.\n", 'h', "", "", "Print this helper function");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads, total requests will distribute to each thread");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of connections (per thread)");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of requests (per thread), distribute to each connection");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of requests, distribute to each connection");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (URL's priority > Template's)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number");
