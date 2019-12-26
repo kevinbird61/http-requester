@@ -1,6 +1,0 @@
-GET / HTTP/1.0
-Host: kevin.imslab.org
-User-Agent: http-requester
-Connection: close
-Accept: *
-
