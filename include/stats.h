@@ -28,8 +28,9 @@
 
 #include <stdio.h>
 // essential deps
-#include "argparse.h"
 #include "conn_mgnt.h"
+#include "argparse.h"
+#include "global.h"
 #include "http.h"
 
 #define STATS       statistics

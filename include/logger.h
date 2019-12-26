@@ -7,6 +7,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include <unistd.h>
+
+#include "global.h"
 #include "utils.h"
 
 #define LOG_LEVEL_STR log_level_str

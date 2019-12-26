@@ -1,8 +1,8 @@
 #include "conn_mgnt.h"
 
 // global init
-u32 burst_length=NUM_GAP;
-u8  fast=0; // default is false
+u32 g_burst_length=NUM_GAP;
+u8  g_fast=0; // default is false
 
 int 
 conn_mgnt_run_non_blocking(conn_mgnt_t *this)
@@ -161,7 +161,8 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                         case RCODE_REDIRECT: /* TODO: require redirection (need to update URL) */
                             // 1) need to close all current connection and create new one
                             // 2) need to finish the rest of reqs with new URL
-                            break;
+                            // break;
+                            goto end; // currently we can't handle redirection (until we support SSL)
                         case RCODE_SERVER_ERR: // 5xx server side error (Do we need to retry in pipeline mode?)
                             LOG(KB_CM, "%s, close the program immediately.", rcode_str[control_var.rcode]);
                             goto end;
@@ -211,7 +212,7 @@ close_and_create:
                                 continue;
                             }
 
-                            if(!fast){ // non-fast mode
+                            if(!g_fast){ // non-fast mode
                                 for(int j=0; j<workload; j++){
                                     // send the requests
                                     this->sockets[i].sent_req++;
@@ -220,6 +221,7 @@ close_and_create:
                                         sock_sent_err_handler(&(this->sockets[i]));
                                         break;
                                     }
+                                    this->sockets[i].retry=0;
                                     STATS_INC_SENT_BYTES(this->thrd_num, request_size);
                                     STATS_INC_SENT_REQS(this->thrd_num, 1);
                                 }
@@ -241,6 +243,7 @@ close_and_create:
                                     sent_req=(sentbytes+this->sockets[i].leftover)/request_size;
                                     this->sockets[i].leftover=(sentbytes+this->sockets[i].leftover)%request_size;
                                     this->sockets[i].sent_req+=sent_req;
+                                    this->sockets[i].retry=0;
                                     
                                     // this->num_gap=sent_req; // constrain here (if we do not constrain here, it will hang the multi-thread program)
                                     STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
@@ -256,7 +259,7 @@ close_and_create:
                                     // break; // if errno happen, then we need to abort sending work (go to recv part)
                                 } else {
                                     this->sockets[i].sent_req++;
-                                    // this->sockets[i].retry=0;
+                                    this->sockets[i].retry=0;
                                     STATS_INC_SENT_BYTES(this->thrd_num, request_size);
                                     STATS_INC_SENT_REQS(this->thrd_num, 1);
                                     // record request `timestamp` only when "single connection"
@@ -279,7 +282,7 @@ close_and_create:
         } else {
             // need to wait more time (no R/W available now)
             LOG(KB_CM, "Timeout occurred! No data after waiting seconds.");
-            LOG(KB_CM, "Waiting for available R/W ... (timeout=%d)", timeout); 
+            LOG(KB_CM, "(%d) Waiting for available R/W ... (poll timeout=%d)", this->thrd_num, timeout); 
             timeout*=2; // increase timeout (reset when ret>0)
             if(timeout > POLL_MAX_TIMEOUT){ // wait until POLL_MAX_TIMEOUT
                 LOG(KB_CM, "CLOSE sending process, we can't wait it anymore.\n");
@@ -365,7 +368,7 @@ conn_mgnt_run(conn_mgnt_t *this)
                 if(this->sockets[i].sent_req==0 && this->sockets[i].unsent_req>=0){ 
                     int sent_req=(this->sockets[i].unsent_req < this->num_gap)? (this->sockets[i].unsent_req): (this->num_gap);
                     // check if --fast is enable or not
-                    if(!fast){
+                    if(!g_fast){
                         // if < num_gap, just send all
                         while(sent_req--){
                             if((send(this->sockets[i].sockfd, http_request, request_size, 0)) < 0){
@@ -429,18 +432,27 @@ conn_mgnt_run(conn_mgnt_t *this)
                                 case RCODE_POLL_DATA: // still have unfinished data (pipe)
                                 case RCODE_FIN: // finish
                                 case RCODE_CLOSE: // connection close, check the workload
-                                    if(this->sockets[i].sent_req>0){
-                                        // not finish yet, need to open new connection
-                                        close(this->sockets[i].sockfd);
-                                        this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
-                                        ufds[i].fd=this->sockets[i].sockfd;
-                                        workload-=this->sockets[i].sent_req; // exit the loop
-                                        this->sockets[i].sent_req=0;
-                                        this->sockets[i].retry_conn_num++; // inc. the number of retry connection
+                                    reset_parsing_state_machine(this->sockets[i].state_m);
+                                    if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
+                                        get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
+                                        if(this->sockets[i].sent_req>0){
+                                            //not finish yet, need to open new connection
+                                            close(this->sockets[i].sockfd);
+                                            this->sockets[i].sockfd=create_tcp_conn(this->args->host, itoa(this->args->port));
+                                            ufds[i].fd=this->sockets[i].sockfd;
+                                            workload-=this->sockets[i].sent_req; // exit the loop
+                                            this->sockets[i].sent_req=0;
+                                            this->sockets[i].retry_conn_num++; // inc. the number of retry connection
+                                        } else {
+                                            // finish (FIXME: exit here is good enough?)
+                                            //exit(1);
+                                        }
                                     }
                                     break;
                                 case RCODE_REDIRECT: // TODO: require redirection
-                                    break;
+                                    // break;
+                                    LOG(KB_CM, "%s, prepare for redirection.", rcode_str[control_var.rcode]);
+                                    exit(1); // currently we can't handle redirection (until we support SSL)
                                 case RCODE_SERVER_ERR: // 5xx server side error
                                     LOG(KB_CM, "%s, close the program immediately.", rcode_str[control_var.rcode]);
                                     exit(1);
@@ -522,6 +534,8 @@ conn_mgnt_run(conn_mgnt_t *this)
                     this->sockets[i].unsent_req--;
                     this->sockets[i].sent_req++;
                 }
+                STATS_INC_SENT_BYTES(this->thrd_num, request_size);
+                STATS_INC_SENT_REQS(this->thrd_num, 1);
                 // inc workload
                 workload+=this->sockets[i].sent_req;
                 // record request `timestamp` only when "single connection"
@@ -607,7 +621,7 @@ conn_mgnt_run(conn_mgnt_t *this)
         }
     }
 
-    STATS_THR_TIME_START(this->thrd_num); // start time of thrd
+    STATS_THR_TIME_END(this->thrd_num); // end time of thrd
     // store the connection status into statistics.
     STATS_CONN(this); 
     
@@ -721,7 +735,7 @@ create_conn_mgnt_non_blocking(
     conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
-    mgnt->num_gap=burst_length; // configurable
+    mgnt->num_gap=g_burst_length; // configurable
     mgnt->total_req=args->conn;
 
     /* create socket lists */
@@ -754,7 +768,7 @@ create_conn_mgnt(
     conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
-    mgnt->num_gap=burst_length; // configurable
+    mgnt->num_gap=g_burst_length; // configurable
     mgnt->total_req=args->conn;
 
     /* create socket lists */

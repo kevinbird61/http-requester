@@ -16,7 +16,7 @@ stats_init()
     statistics.resp_intvl_min=(u64)~0;
     cpuFreq=get_cpufreq();
 
-    for(int i=0; i<total_thrd_num; i++){ // total_thrd_num under argparse.h
+    for(int i=0; i<g_total_thrd_num; i++){ // g_total_thrd_num under argparse.h
         // priv statistics (for each thread)
         memset(&priv_statistics[i], 0x00, sizeof(stat_t));
         priv_statistics[i].resp_intvl_cnt=0;
@@ -106,7 +106,7 @@ void
 stats_dump()
 {
     /************************************ sum up all threads' statistics ************************************/
-    for(int i=0; i<total_thrd_num; i++){
+    for(int i=0; i<g_total_thrd_num; i++){
         // status code
         for(int j=0; j<5; j++){
             statistics.status_code[j]+=priv_statistics[i].status_code[j];
@@ -159,7 +159,7 @@ stats_dump()
     printf("└─> Status Code:\n");
     for(int i=0; i<5; i++){
         printf("    [%dxx]: %d\n", i+1, statistics.status_code[i]);
-        if(verbose){ // only print this ugly detail log when enable verbose mode
+        if(g_verbose){ // only print this ugly detail log when enable verbose mode
             int j;
             switch(i){
                 case 0:
@@ -211,7 +211,7 @@ stats_dump()
     // calculate the wasted requests (if sent_reqs > resp_cnt)
     // which means that those requests waste our bandwidth because of the connection close 
     if(statistics.sent_reqs > statistics.resp_cnt){
-        printf("└─> Wasted : \n");
+        printf("└─> Wasted (Unanswered) : \n");
         printf("* %-30s: %lld\n", "Wasted requests", statistics.sent_reqs-statistics.resp_cnt);
         printf("* %-30s: %lld\n", "Wasted bytes (bandwidth)", (statistics.sent_bytes/statistics.sent_reqs)*(statistics.sent_reqs-statistics.resp_cnt));
     }
@@ -223,10 +223,10 @@ stats_dump()
         printf("* %-30s: %f\n", "Avg. max-requests(burst len)", statistics.max_req_size/(float)statistics.thrd_cnt);
 
         // per thrd execution time
-        printf("└─> Per-thread info: \n");
-        printf("    └─> Execution time (ID : USED_TIME) \n");
-        for(int i=0; i<total_thrd_num; i++){
-            printf("    * [THRD ID: %12u]: %10f (sec.)\n", priv_statistics[i].thrd_cnt, priv_statistics[i].total_time/((float)cpuFreq));
+        printf("└─> Per-thread info (ID + VAL): \n");
+        printf("    └─> Execution time: \n");
+        for(int i=0; i<g_total_thrd_num; i++){
+            printf("    * [THRD ID: %4d(%u)]: %10f (sec.)\n", get_thrd_tid_from_id(priv_statistics[i].thrd_cnt), priv_statistics[i].thrd_cnt, priv_statistics[i].total_time/((float)cpuFreq));
         }
     }
     printf("********************************************************************************\n");
@@ -234,7 +234,7 @@ stats_dump()
     if(statistics.conn_num>0){
         printf("└─> Connection state: \n");
         printf("* %-30s: %d\n", "Number of connections", statistics.conn_num);
-        printf("* %-30s: %d\n", "Workload of each connection", statistics.workload/statistics.conn_num);
+        printf("* %-30s: %d\n", "Avg. workload per connection", statistics.workload/statistics.conn_num);
         printf("* %-30s: %d\n", "Number of retry connections", statistics.retry_conn_num);
         printf("* %-30s: %f\n", "Avg. retry (per conn)", statistics.retry_conn_num/(float)statistics.conn_num);
         /** this part will be unavailable under multi-threads mode 
@@ -250,11 +250,12 @@ stats_dump()
     }
     printf("********************************************************************************\n");
     // time
-    printf("└─> Time: \n");
+    printf("└─> Time/Rate: \n");
     if(statistics.total_time>0){
         printf("* %-30s: %-15f (sec.)\n", "Total execution time", statistics.total_time/(float)cpuFreq );
-        printf("* %-30s: %-15f (requests/sec.)\n",  "Request  rate", statistics.sent_reqs/(statistics.total_time/(float)cpuFreq) );
-        printf("* %-30s: %-15f (responses/sec.)\n", "Reply    rate", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15f (requests/sec.)\n",  "Request rate", statistics.sent_reqs/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15f (responses/sec.)\n", "Reply rate", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15f (MB/sec.)\n", "Throughput", ((statistics.pkt_byte_cnt+statistics.sent_bytes)/(1024*1024))/(statistics.total_time/(float)cpuFreq) );
     }
     // processing time
     if(statistics.process_time>0){

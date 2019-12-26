@@ -4,7 +4,7 @@ VER_MINOR=0
 VER_PATCH=0
 DFLAGS= -DVER_MAJ=$(VER_MAJOR) -DVER_MIN=$(VER_MINOR) -DVER_PAT=$(VER_PATCH)
 LDFLAGS:=-static
-CFLAGS:=-fPIC -g3 -std=gnu99
+CFLAGS:=-fPIC -O2 -std=gnu99
 LIBS:=-I include/
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))

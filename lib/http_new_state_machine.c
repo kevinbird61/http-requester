@@ -36,7 +36,7 @@ recv_again:
                     if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
                         // override current chunk (to prevent too many chunked in one response) 
                         // can't override the hdr, so move the reading ptr to `last_fin_idx + msg_hdr_len`
-                        // FIXME: what if last_fin_idx is too large?
+                        // FIXME: if last_fin_idx is too large? (return RCODE_ERROR)
                         state_m->data_size=state_m->resp->msg_hdr_len;
                     } else {
                         // other case
@@ -47,8 +47,7 @@ recv_again:
                         // if parsing "content length" (chunked need to consider more case), 
                         // we don't care the data_size (just set to 0, means that all parsed 
                         // content has been dropped -> we don't store it currently)
-                        state_m->data_size=state_m->last_fin_idx+state_m->resp->msg_hdr_len;
-                        // state_m->data_size=0; 
+                        state_m->data_size=state_m->resp->msg_hdr_len; 
                         state_m->parsed_len=0; 
                     } else if(state_m->use_chunked){ // if parsing chunk data now, then we just set the data_size & parse_len to 0
                         state_m->data_size=state_m->last_fin_idx + state_m->resp->msg_hdr_len; 
@@ -280,9 +279,9 @@ multi_bytes_http_parsing_state_machine(
             case RCODE_REDIRECT:
                 /* perform redirection, notify caller that need to abort the response and resend */
                 LOG(KB_SM, "Require rediretion.");
-                // return control_var;
-                flag=0;
-                break;
+                return control_var;
+                //flag=0;
+                //break;
             case RCODE_ERROR:
                 // print the error message instead of exit?
                 LOG(KB_SM, "Parsing error occur.");
@@ -486,7 +485,7 @@ http_resp_parser(
                     if(!state_m->resp->http_ver) {
                         LOG(KB_PS, "Only support HTTP/1.0 and /1.1 now.");
                         control_var.rcode=RCODE_NOT_SUPPORT;
-                        exit(1);
+                        return control_var;
                     }
 
                     /** Status Code -
@@ -614,7 +613,7 @@ http_resp_parser(
                 }
                 state_m->p_state=next_http_state(state_m->p_state, ':');
             case 0x09: // HTAB
-            case ' ':
+            case ' ': // SP
                 // parse only when in "start-line" state;
                 if(state_m->p_state>START_LINE && state_m->p_state<REASON_OR_RESOURCE && state_m->parsed_len>0){
                     int ret=0;

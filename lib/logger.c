@@ -47,8 +47,8 @@ syslog(
     }
 
     // write into logfile (FIXME: date)
-    char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+strlen(itoa(thread_id))+1)*sizeof(char));
-    sprintf(logfile, "%s%s%lld%s", log_dir, log_filename, thread_id, log_ext);
+    char *logfile=malloc((strlen(log_dir)+strlen(log_filename)+strlen(log_ext)+strlen(itoa(get_thrd_tid_from_id(thread_id)))+1)*sizeof(char));
+    sprintf(logfile, "%s%s%d%s", log_dir, log_filename, get_thrd_tid_from_id(thread_id), log_ext);
     FILE *logfd=fopen(logfile, "a+");
     fwrite(loginfo, sizeof(char), strlen(loginfo), logfd);
 

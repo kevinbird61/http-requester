@@ -1,12 +1,10 @@
 #ifndef __TYPES__
 #define __TYPES__
 
-#define RECV_BUFF_SCALE     (20)        /* scale x chunk_size = TOTAL_RECV_BUFF */
-#define CHUNK_SIZE          (4*1024)
-
-#include "abnf.h"
 #include "control_var.h"
 #include "http_types.h"
+#include "global.h"
+#include "abnf.h"
 
 /* TODO: error code enum (each func need to follow) */
 typedef enum {

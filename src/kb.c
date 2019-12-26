@@ -17,6 +17,7 @@ int main(int argc, char *argv[]){
 
     // enable multiple threads
     struct _thrd_t* thrds=malloc((args->thrd)*sizeof(struct _thrd_t));
+    g_thrd_id_mapping=calloc(args->thrd, sizeof(int));
     // distribute the total reqs (e.g. args->conn) to each thread
     int leftover=args->conn%args->thrd; /* FIXME: how to deal with leftover */
     args->conn=(args->conn/args->thrd);
@@ -44,6 +45,8 @@ int main(int argc, char *argv[]){
                 exit(1);
             }
         }
+
+        g_thrd_id_mapping[i]=(int)thrds[i].tid; // setup id mapping
         STATS_THR_INIT(i, (u32)thrds[i].tid);
         // these protected obj can be handled when exception occur (e.g. SIGXXX) and close them elegantly
         SIG_PROTECT_CM(thrds[i].mgnt);
@@ -52,6 +55,7 @@ int main(int argc, char *argv[]){
     for(int i=0; i<args->thrd; i++){
         pthread_join(thrds[i].tid, NULL);
     }
+    
     // t_end
     STATS_TIME_END();
     // dump the statistics

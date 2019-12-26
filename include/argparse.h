@@ -2,7 +2,7 @@
 #define __ARGPARSE__
 
 #include <getopt.h>
-#include "conn_mgnt.h" /* fetch global var */
+#include "global.h"
 #include "logger.h"
 #include "types.h"
 #include "http.h"
@@ -70,11 +70,6 @@ enum {
 };
 
 extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
-/* flag for verbose print */
-extern u8 verbose;
-extern char *program;
-extern int total_thrd_num;
-extern int max_req_size;
 
 // create argparse object
 parsed_args_t *create_argparse();

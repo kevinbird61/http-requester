@@ -10,28 +10,16 @@
 #include <sys/poll.h>
 #include "err_handler.h"
 #include "argparse.h"
+#include "global.h"
 #include "types.h"
 #include "conn.h"
 #include "http.h"
 
-#define MAX_RETRY           (5)     // wait 5 sec (permit 5 retry time)
-#define RETRY_WAIT_TIME     (1)     // 4xx, or other error, wait 1 sec and create a new conn to retry
-#define NUM_GAP             (100)   // max-request size
-#define MIN_NUM_GAP         (5)     // min-request size
-#define MAX_SENT_REQ        (1000)  // how many sent_req (unanswered reqs) allow
-#define DEC_RATE_NUMERAT    (9)     // decrease rate = (MAX-request size)*(DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)
-#define DEC_RATE_DENOMIN    (10)    // 
-#define POLL_TIMEOUT        (1000)  // 1 sec (normal/start case)
-#define POLL_MAX_TIMEOUT    (16000) // 16 sec (will exit sending process)
-
-extern u32  burst_length;
-extern u8   fast;
-
 // per thread info
 struct _thrd_t {
-    pthread_t       tid;
-    u8              num;
-    u8              type; // type of this thread
+    pthread_t               tid;
+    int                     num;
+    u8                      type; // type of this thread
     struct _conn_mgnt_t     *mgnt;
     // FIXME: shared info
 };

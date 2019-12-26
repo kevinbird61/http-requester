@@ -1,6 +1,8 @@
 #ifndef __CONTROL_VAR__
 #define __CONTROL_VAR__
 
+#include <stddef.h>
+
 /**
  * Using rcode to determine that which action it should take.
  */

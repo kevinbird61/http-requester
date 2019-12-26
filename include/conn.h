@@ -1,13 +1,13 @@
 #ifndef __CONN__
 #define __CONN__
 
-#include <stdio.h>
+#include <netinet/tcp.h> // TCP_*
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <string.h>
+#include <stdio.h>
+#include <errno.h>
 #include <netdb.h>
-#include <netinet/tcp.h> // TCP_*
 #include <fcntl.h>
 
 /* create connections */

@@ -1,9 +1,10 @@
 #include "argparse.h"
 
-u8 verbose=0; // default is false
-int total_thrd_num=1000; // default is 1000
-int max_req_size=NUM_GAP;
-char *program=NULL;
+u8      g_verbose=0; // default is false
+int     g_total_thrd_num=1000; // default is 1000
+char    *g_program=NULL;
+int     *g_thrd_id_mapping=NULL;
+
 /* option we support:
  * - [x] `-h`:              Print helper function
  * - [x] `-t`, --thread:    Specify number of threads
@@ -83,7 +84,7 @@ argparse(
     (*this)->use_non_block=0;
 
     // get prog name
-    program=argv[0];
+    g_program=argv[0];
 
     while(1){
         int this_option_optind=optind?optind:1;
@@ -105,19 +106,18 @@ argparse(
             case 'a':   // fast (cooperate with -b, burst length)
                 printf("[HTTP Pipeline][Aggressive mode: Enable]\n");
                 (*this)->enable_pipe=1; /* using fast, also enable pipe */
-                fast=1;
+                g_fast=1;
                 break;
             case 'b':   // burst length
                 printf("[HTTP Pipeline: Enable]\n");
                 (*this)->enable_pipe=1; /* also enable pipe */
-                burst_length=atoi(optarg);
-                burst_length=(burst_length<=0)?NUM_GAP:burst_length;
-                max_req_size=burst_length;
-                printf("[HTTP Pipeline][MAX-request size: %d]\n", burst_length);
+                g_burst_length=atoi(optarg);
+                g_burst_length=(g_burst_length<=0)?NUM_GAP:g_burst_length;
+                printf("[HTTP Pipeline][MAX-request size: %d]\n", g_burst_length);
                 break;
             case 'N':   // using non-blocking
                 (*this)->use_non_block=1;
-                printf("[NON-blocking: Enable]\n");
+                printf("[Non-blocking: Enable]\n");
                 break;
             case 'c':   // connections (socket)
                 (*this)->conc=atoi(optarg);
@@ -146,7 +146,6 @@ argparse(
                 optind--;
                 for( ;optind < argc && *argv[optind] != '-'; optind++){
                     // append each url
-                    
                     if((*this)->urls==NULL){
                         printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         (*this)->urls=calloc(1, sizeof(struct urls));
@@ -165,7 +164,7 @@ argparse(
                 }
                 break;
             case 'v':   // verbose
-                verbose=1;
+                g_verbose=1;
                 printf("[Verbose mode: Enable]\n");
                 break;
             case 'p':   // port
@@ -225,7 +224,7 @@ argparse(
     }
 
     if(help){
-        print_manual(verbose);
+        print_manual(g_verbose);
         exit(1);
     }
 
@@ -268,18 +267,18 @@ argparse(
     }
     if(!((*this)->flags&SPE_THRD)){ // if not set, using default value
         (*this)->thrd=1;
-        total_thrd_num=1;
+        g_total_thrd_num=1;
     } else {
         // check upperbound
         (*this)->thrd=((*this)->thrd>MAX_THREAD)? MAX_THREAD: (*this)->thrd;
-        total_thrd_num=(*this)->thrd;
+        g_total_thrd_num=(*this)->thrd;
     }
 
     printf("================================================================================\n");
     printf("%-50s: %d\n", "Number of threads", (*this)->thrd);
     printf("%-50s: %d\n", "Number of connections", (*this)->conc);
     printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
-    printf("%-50s: %d\n", "Max-requests size", burst_length);
+    printf("%-50s: %d\n", "Max-requests size", g_burst_length);
     printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
     /*printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);*/
     struct urls *url_trav=(*this)->urls;
@@ -420,7 +419,7 @@ print_manual(
     printf("%s\n", a10logo);
 #endif
     printf("\n");
-    printf("Usage: [sudo] %s\n", program);
+    printf("Usage: [sudo] %s\n", g_program);
     // printf("\t-h: Print this helper function.\n");
     printf("\t-%-2c    %-7s %-7s: %s.\n", 'h', "", "", "Print this helper function");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads, total requests will distribute to each thread");
@@ -454,7 +453,7 @@ print_manual(
             }
         }
         printf("[Example]-----------------------------------------------------------------------\n");
-        printf("%s -u http://httpd.apache.org -n 1000 -c 10 -t 1 -N\n", program);
+        printf("%s -u http://httpd.apache.org -n 1000 -c 10 -t 1 -N\n", g_program);
         printf("  : using 1 thread and open 10 connections to deliver 1000 requests with non-blocking mode.\n");
     }
     printf("********************************************************************************\n");
