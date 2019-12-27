@@ -15,34 +15,6 @@ typedef struct _http_header_t {
     struct _http_header_t   *next;
 } http_header_t;
 
-/** http request/response
- * - current design goal is ease to use
- * - require compact the memory usage
- */
-typedef struct _http_t {
-    /* statistics */
-    u8                      type;               // request/response
-    u32                     content_length;
-    u8                      *target;            // target/peer IP
-    u16                     port;               // port
-    /* start-line */
-    union {
-        struct _req_t {
-            u8              method_token;       // method 
-            u8              *req_target;        // request-target
-        } __attribute__((packed)) req;
-        struct _res_t {
-            u8              status_code;        // status code
-            u8              *rea_phrase;        // reason-phrase
-        } __attribute__((packed)) res;
-    };
-    u8                      version;
-    /* header field */
-    http_header_t           *headers;
-    /* message body */
-    u8                      *msg_body;
-}__attribute__((packed)) http_t;
-
 struct offset_t {
     u32 idx;    // record the starting index(address) of the buffer
     u32 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
@@ -50,6 +22,7 @@ struct offset_t {
 
 // request header (send request)
 typedef struct _http_req_header_status_t {
+    u8 **field_value;
     // dirty bit (record existence), using u64
     union {
         u32 dirty_bit_align;
@@ -88,17 +61,19 @@ typedef struct _http_req_header_status_t {
                 warning_dirty:1; // 8
         }__attribute__((packed));
     }__attribute__((packed));
-    u8 **field_value;
-} __attribute__((aligned(64))) http_req_header_status_t;
+} __attribute__((packed)) http_req_header_status_t;
 
 // response header
 typedef struct _http_res_header_status_t {
-    // essential fields
+    /** store buffer ptr (start from http message header) 
+     * - assign the actual buffer ptr to here when call create func
+    */
+    u8 *buff;
+    // record current bit (to let caller know which header is processing)
+    u64 curr_bit;
     u16 msg_hdr_len;
-    u8  use_chunked;
-    // status-line
-    u8 http_ver;
-    u8 status_code;
+    // store idx & offset of each header field
+    struct offset_t field_value[RES_HEADER_NAME_MAXIMUM];
     // dirty bit (record existence), using u64
     union {
         u64 dirty_bit_align;
@@ -146,27 +121,18 @@ typedef struct _http_res_header_status_t {
                 spare2:24;
         } __attribute__((packed));
     } __attribute__((packed));
-    // record current bit (to let caller know which header is processing)
-    u64 curr_bit; 
-    // store idx & offset of each header field
-    struct offset_t field_value[RES_HEADER_NAME_MAXIMUM];
     // chunk extension goes here, format: `token = "...(ext)"` (process the result at the end)
     struct offset_t *chunk_ext;
-    /** store buffer ptr (start from http message header) 
-     * - assign the actual buffer ptr to here when call create func
-    */
-    u8 *buff;
-} http_res_header_status_t;    // align with 64
+    u8  use_chunked;
+    // status-line
+    u8 http_ver;
+    u8 status_code;
+} __attribute__((aligned(64))) http_res_header_status_t;    // align with 64
 
 /* for state_machine */
 typedef struct _state_machine_t {
     char                            *buff;              // buf 
     http_res_header_status_t        *resp;              // response instances 
-    u8                              thrd_num;           // thrd_num 
-    u8                              p_state;            // parsing state            
-    /* flag */
-    u8                              use_content_length;
-    u8                              use_chunked;
     /* idx & offset */
     u32                             last_fin_idx;       // idx of latest work (resp, or msg hdr, ...)
     u32                             prev_rcv_len;       // previous recv bytes
@@ -174,6 +140,9 @@ typedef struct _state_machine_t {
     u32                             parsed_len;         // parsed data length (e.g. offset)
     u32                             data_size;          // buffer size 
     u32                             max_buff_size;      // 
+    /* state_m info */
+    u8                              thrd_num;           // thrd_num 
+    u8                              p_state;            // parsing state            
     /* record size */
     union {
         u32 content_length;
@@ -184,6 +153,9 @@ typedef struct _state_machine_t {
         u32 total_chunked_size;
     };
     u32 curr_chunked_size;
-} state_machine_t;
+    /* flag (FIXME: use 1 bit to record) */
+    u8                              use_content_length;
+    u8                              use_chunked;
+} __attribute__((packed)) state_machine_t;
 
 #endif

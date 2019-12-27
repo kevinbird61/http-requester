@@ -30,6 +30,7 @@ struct _conn_t {
     int             sockfd;         // socket fd
     int             unsent_req;     // unfinished req
     int             sent_req;       // unanswered req
+    u16             num_gap;        // number of gaps between "sent" and "rcvd"
     int             leftover;
     int             rcvd_res;       // received resp
     int             retry_conn_num; // retry connection number (create a new sockfd)
@@ -41,6 +42,7 @@ typedef struct _conn_mgnt_t {
     u8              thrd_num;   // belong to which thread.
     u8              pipe;       // ON/OFF, enable pipeline or not (default is 0, not enable)
     u16             num_gap;    // number of gaps between "sent" and "rcvd"
+    u8              is_wait;    // 
     u32             total_req;  // total # of reqs
     u32             sent_req;   // # of requests have been sent
     u32             rcvd_res;   // # of responses have been received

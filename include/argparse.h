@@ -21,7 +21,7 @@ parsed_args_t *create_argparse();
 // parse from argc, argv
 int argparse(parsed_args_t **this, int argc, char **argv);
 // parse url, and use the result to fill host & path
-int parse_url(char *url, char **host, u16 *port, char **path);
+int parse_url(parsed_args_t *this); //char *url, char **host, u16 *port, char **path);
 // randomly pick a url and then update
 int update_url_info_rand(parsed_args_t **this);
 // print usage

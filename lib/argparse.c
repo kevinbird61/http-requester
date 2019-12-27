@@ -104,20 +104,20 @@ argparse(
                 http_req_obj_ins_header_by_idx(&((*this)->http_req), option_index-(NUM_PARAMS-2), optarg);
                 break;
             case 'a':   // fast (cooperate with -b, burst length)
-                printf("[HTTP Pipeline][Aggressive mode: Enable]\n");
+                //printf("[HTTP Pipeline][Aggressive mode: Enable]\n");
                 (*this)->enable_pipe=1; /* using fast, also enable pipe */
                 g_fast=1;
                 break;
             case 'b':   // burst length
-                printf("[HTTP Pipeline: Enable]\n");
+                //printf("[HTTP Pipeline: Enable]\n");
                 (*this)->enable_pipe=1; /* also enable pipe */
                 g_burst_length=atoi(optarg);
                 g_burst_length=(g_burst_length<=0)?NUM_GAP:g_burst_length;
-                printf("[HTTP Pipeline][MAX-request size: %d]\n", g_burst_length);
+                //printf("[HTTP Pipeline][MAX-request size: %d]\n", g_burst_length);
                 break;
             case 'N':   // using non-blocking
                 (*this)->use_non_block=1;
-                printf("[Non-blocking: Enable]\n");
+                //printf("[Non-blocking: Enable]\n");
                 break;
             case 'c':   // connections (socket)
                 (*this)->conc=atoi(optarg);
@@ -147,12 +147,12 @@ argparse(
                 for( ;optind < argc && *argv[optind] != '-'; optind++){
                     // append each url
                     if((*this)->urls==NULL){
-                        printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
+                        //printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         (*this)->urls=calloc(1, sizeof(struct urls));
                         (*this)->urls->url=argv[optind];
                         (*this)->urls->next=NULL;
                     } else {
-                        printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
+                        //printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         struct urls *root=(*this)->urls;
                         while(root->next!=NULL){
                             root=root->next;
@@ -165,7 +165,7 @@ argparse(
                 break;
             case 'v':   // verbose
                 g_verbose=1;
-                printf("[Verbose mode: Enable]\n");
+                // printf("[Verbose mode: Enable]\n");
                 break;
             case 'p':   // port
                 (*this)->port=atoi(optarg);
@@ -177,10 +177,10 @@ argparse(
                 break;
             case 'l':
                 g_log_visible=atoi(optarg); /* set log-level */
-                printf("[Logging: Enable, Level = %s]\n", g_log_level_str[g_log_visible]);
+                //printf("[Logging: Enable, Level = %s]\n", g_log_level_str[g_log_visible]);
                 break;
             case 'i':   // pipeline
-                printf("[HTTP pipelining: Enable]\n");
+                //printf("[HTTP pipelining: Enable]\n");
                 (*this)->enable_pipe=1;
                 break;
             case '?':
@@ -301,6 +301,11 @@ argparse(
     printf("%-50s: %d\n", "Number of connections", (*this)->conc);
     printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
     printf("%-50s: %d\n", "Max-requests size", g_burst_length);
+    printf("%-50s: %s\n", "HTTP Pipeline", ((*this)->enable_pipe==1)? "Enable": "-");
+    printf("%-50s: %s\n", "Aggressive Pipe", (g_fast==1)? "Enable": "-");
+    printf("%-50s: %s\n", "Non-Blocking Mode", ((*this)->use_non_block==1)? "Enable": "-");
+    printf("%-50s: %s\n", "Verbose Mode", (g_verbose==1)? "Enable": "-");
+    printf("%-50s: %d\n", "Logging Level", g_log_visible); 
     if(ret==USE_URL){
         printf("%-50s:\n", "Available URL(s): ");
         url_trav=(*this)->urls;
@@ -312,6 +317,8 @@ argparse(
     } else {
         printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
     }
+    printf("%-50s: %s\n", "Scheme: ", (*this)->scheme);
+    printf("%-50s: %s\n", "URI: ", (*this)->path);
     printf("%-50s: %d\n", "Port number: ", (*this)->port);
     printf("%-50s: %s\n", "Method: ", (*this)->method);
     printf("================================================================================\n");
@@ -323,62 +330,63 @@ argparse(
 // parse user's URL
 int 
 parse_url(
-    char *url, 
-    char **host,
-    u16  *port,
-    char **path)
+    parsed_args_t *this)
 {
-    /** 1. check URL's protocol 
-     *      - http
-     */
+    char *url=(this)->url;
+
     int ret=ERR_NONE;
-    if(!strncasecmp(url, "http:", 5)){
+    if(!strncasecmp((this)->url, "http:", 5)){
         // start from "http://<URL>"
-        url=strndup(url+7, strlen(url)-7); // "http://" = 7 bytes   
+        (this)->url=strndup((this)->url+7, strlen((this)->url)-7); // "http://" = 7 bytes   
+        (this)->scheme="http";
     } else if(!strncasecmp(url, "https:", 6)){
-        url=strndup(url+8, strlen(url)-8); // "https://" = 8 bytes 
+        (this)->url=strndup((this)->url+8, strlen((this)->url)-8); // "https://" = 8 bytes 
+        (this)->scheme="https";
         // need to change port!, using return value to do the trick
         ret=ERR_USE_SSL_PORT;
+    } else {
+        // treat as http
+        (this)->scheme="http";
     }
-    // Now URL = <HOST>/<Pathname>
-    /** FIXME: Do we need to perform parsing [:PORT] 
-     *      between processing <Host> and <Path> ?
-     */
+
     // perform same parsing 
-    int ori_len=strlen(url);
+    int ori_len=strlen((this)->url);
     char *ori_url, *host_delim="/", *port_delim=":";
-    ori_url=strdup(url);
+    ori_url=strdup((this)->url);
     // get host
-    *host=strtok(url, host_delim);
+    (this)->host=strtok((this)->url, host_delim);
     // get port (if available)
     char *port_str=NULL;
-    port_str=strtok((*host), port_delim); // now port_str=host
+    port_str=strtok((this)->host, port_delim); // now port_str=host
     port_str=strtok(NULL, port_delim); // if [:PORT] is existed, then now port_str is the port value
     if(port_str!=NULL){ // [:PORT] is existed
-        u16 orig_port=(*port);
-        *port=atoi(port_str);
-        if((*port)<=0 || (*port)>65535){ // invalid, then we can't use this value
-            (*port)==orig_port; // use orig value 
+        u16 orig_port=(this)->port;
+        (this)->port=atoi(port_str);
+        if((this)->port<=0 || (this)->port>65535){ // invalid, then we can't use this value
+            (this)->port==orig_port; // use orig value 
         }
     }
     // printf("Host: %s, Port: %d\n", *host, (*port));
     // check host length limitation, refs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames
-    if(strlen(*host)>=253){
-        printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen(*host));
+    if(strlen((this)->host)>=253){
+        printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen((this)->host));
         // exit(1);
         return ERR_INVALID_HOST_LEN;
     }
     // get path 
     if(port_str!=NULL){
-        *path=strndup(ori_url+strlen(*host)+1+strlen(port_str), ori_len-(strlen(*host)+1+strlen(port_str))); // ":" occupy 1 byte
+        (this)->path=strndup(ori_url+strlen((this)->host)+1+strlen(port_str), ori_len-(strlen((this)->host)+1+strlen(port_str))); // ":" occupy 1 byte
         ret=ERR_USE_OTHER_PORT;
     } else {
-        *path=strndup(ori_url+strlen(*host), ori_len-(strlen(*host)));
+        (this)->path=strndup(ori_url+strlen((this)->host), ori_len-(strlen((this)->host)));
     }
     // when user forget to add / at the end of URL
-    if(strlen(*path)==0){
-        *path="/";
+    if(strlen((this)->path)==0){
+        (this)->path="/";
     }
+
+    free(ori_url);
+
     return ret;
 }
 
@@ -404,7 +412,7 @@ update_url_info_rand(
     (*this)->url=url_trav->url;
     printf("Num of urls: %d, Randomly pick: %s\n", num_url, (*this)->url);
     // only one url, use url only
-    int ret=parse_url((*this)->url, &((*this)->host), &((*this)->port), &((*this)->path));
+    int ret=parse_url(*this);
     switch(ret){
         case ERR_NONE:
             if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num

@@ -19,10 +19,12 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
-    //printf("HTTP request:*******************************************************************\n");
-    //printf("%s\n", http_request);
-    //printf("================================================================================\n");
-    
+    if(g_verbose){
+        printf("(THR: %d) HTTP request:*********************************************************\n", this->thrd_num);
+        printf("%s\n", http_request);
+        printf("================================================================================\n");
+    }
+
     char *packed_req=NULL;
     if(this->args->enable_pipe){
         packed_req=copy_str_n_times(http_request, this->num_gap);
@@ -59,6 +61,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     this->num_gap);*/
 
                 if(this->sockets[i].unsent_req==0 && this->sockets[i].sent_req==0){ // we can skip this one (which have finish its sending process)
+                    // finish, close
                     continue;
                 }
 
@@ -135,10 +138,10 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
                                 
                                 if(this->sockets[i].sent_req>0){ // you sent too much, recv side can't consume
-                                    int prev_num_gap=this->num_gap;
-                                    this->num_gap=((this->num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN));
-                                    this->num_gap=((this->num_gap< MIN_NUM_GAP)? MIN_NUM_GAP: this->num_gap); // min-pipe size
-                                    LOG(KB_CM, "(%d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, prev_num_gap, this->num_gap);
+                                    int prev_num_gap=this->sockets[i].num_gap;
+                                    this->sockets[i].num_gap=((this->sockets[i].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN));
+                                    this->sockets[i].num_gap=((this->sockets[i].num_gap< MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[i].num_gap); // min-pipe size
+                                    LOG(KB_CM, "(THR: %d, SOCK: %d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, this->sockets[i].sockfd, prev_num_gap, this->sockets[i].num_gap);
                                 }
 
                                 close(this->sockets[i].sockfd); // do we need to wait ?
@@ -153,9 +156,12 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 continue;
                             } else {
                                 /* connection is still established (recvbytes==0, and buf_idx==data_size) */
-                                LOG(KB_CM, "(%d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", this->thrd_num, all_fin, this->total_req,
+                                LOG(KB_CM, "(THR: %d, SOCK: %d) CONN still ESTAB, waiting ... ", this->thrd_num, this->sockets[i].sockfd);
+                                LOG(KB_CM, "(THR: %d, SOCK: %d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", 
+                                    this->thrd_num, this->sockets[i].sockfd,
+                                    all_fin, this->total_req,
                                     this->sockets[i].sent_req,  this->sockets[i].unsent_req,  this->sockets[i].rcvd_res,
-                                    this->num_gap);
+                                    this->sockets[i].num_gap);
                             }
                             break;
                         case RCODE_REDIRECT: /* TODO: require redirection (need to update URL) */
@@ -164,16 +170,22 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             // break;
                             goto end; // currently we can't handle redirection (until we support SSL)
                         case RCODE_SERVER_ERR: // 5xx server side error (Do we need to retry in pipeline mode?)
-                            LOG(KB_CM, "%s, close the program immediately.", rcode_str[control_var.rcode]);
+                            LOG(KB_CM, "(THR: %d, SOCK: %d) %s, close the program immediately.", 
+                                this->thrd_num, this->sockets[i].sockfd,
+                                rcode_str[control_var.rcode]);
                             goto end;
                         case RCODE_CLIENT_ERR: // 4xx client side error 
                             LOG(KB_CM, "%s", rcode_str[control_var.rcode]); 
                         case RCODE_ERROR: {// error occur, need to abort this connection
-                            int prev_num_gap=this->num_gap;
-                            this->num_gap=((this->num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)); // decrease max_req_size, and reset num_gap (burst length)
-                            this->num_gap=((this->num_gap<MIN_NUM_GAP)? MIN_NUM_GAP: this->num_gap); // min-pipe size
-                            LOG(KB_CM, "(%d) ERROR-RESIZE, from %d to %d.", this->thrd_num, prev_num_gap, this->num_gap);
 close_and_create:
+                            if(this->sockets[i].sent_req>0){ // means that we have sent some reqs before, but this conn has been closed => we should decrease max-req size
+                                int prev_num_gap=this->sockets[i].num_gap;
+                                this->sockets[i].num_gap=((this->sockets[i].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)); // decrease max_req_size, and reset num_gap (burst length)
+                                this->sockets[i].num_gap=((this->sockets[i].num_gap<MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[i].num_gap); // min-pipe size
+                                LOG(KB_CM, "(THR: %d, SOCK: %d) ERROR-RESIZE, from %d to %d.",
+                                    this->thrd_num, this->sockets[i].sockfd,
+                                    prev_num_gap, this->sockets[i].num_gap);
+                            }
                             // not finish yet, need to open new connection
                             close(this->sockets[i].sockfd);
                             // need to wait a second 
@@ -205,7 +217,7 @@ close_and_create:
                         this->sockets[i].retry=0;
                         if(this->args->enable_pipe){ // enable pipe 
                             // calculate workload
-                            int workload=(this->sockets[i].unsent_req < this->num_gap)? (this->sockets[i].unsent_req-this->sockets[i].sent_req): (this->num_gap-this->sockets[i].sent_req);
+                            int workload=(this->sockets[i].unsent_req < this->sockets[i].num_gap)? (this->sockets[i].unsent_req-this->sockets[i].sent_req): (this->sockets[i].num_gap-this->sockets[i].sent_req);
                             workload=(workload<0)? 0: workload;
                             int workload_bytes=(workload==0)? this->sockets[i].leftover: (request_size*(workload-1))+(request_size-this->sockets[i].leftover);
                             if(workload_bytes==0){
@@ -221,7 +233,7 @@ close_and_create:
                                         sock_sent_err_handler(&(this->sockets[i]));
                                         break;
                                     }
-                                    this->sockets[i].retry=0;
+                                    //this->sockets[i].retry=0;
                                     STATS_INC_SENT_BYTES(this->thrd_num, request_size);
                                     STATS_INC_SENT_REQS(this->thrd_num, 1);
                                 }
@@ -243,9 +255,7 @@ close_and_create:
                                     sent_req=(sentbytes+this->sockets[i].leftover)/request_size;
                                     this->sockets[i].leftover=(sentbytes+this->sockets[i].leftover)%request_size;
                                     this->sockets[i].sent_req+=sent_req;
-                                    this->sockets[i].retry=0;
-                                    
-                                    // this->num_gap=sent_req; // constrain here (if we do not constrain here, it will hang the multi-thread program)
+                                    //this->sockets[i].retry=0;
                                     STATS_INC_SENT_BYTES(this->thrd_num, sentbytes);
                                     STATS_INC_SENT_REQS(this->thrd_num, sent_req);
                                 }
@@ -259,7 +269,7 @@ close_and_create:
                                     // break; // if errno happen, then we need to abort sending work (go to recv part)
                                 } else {
                                     this->sockets[i].sent_req++;
-                                    this->sockets[i].retry=0;
+                                    //this->sockets[i].retry=0;
                                     STATS_INC_SENT_BYTES(this->thrd_num, request_size);
                                     STATS_INC_SENT_REQS(this->thrd_num, 1);
                                     // record request `timestamp` only when "single connection"
@@ -303,12 +313,22 @@ end:
     free(http_request);
     for(int i=0;i<this->args->conc;i++){
         close(this->sockets[i].sockfd); // close all conn
-        free(this->sockets[i].state_m->resp);
-        free(this->sockets[i].state_m->buff);
-        free(this->sockets[i].state_m);
+        if(this->sockets[i].state_m->resp!=NULL){
+            free(this->sockets[i].state_m->resp);
+        }
+        if(this->sockets[i].state_m->buff){
+            free(this->sockets[i].state_m->buff);
+        }
+        if(this->sockets[i].state_m){
+            free(this->sockets[i].state_m);
+        }
     }
-    free(this->sockets);
-    free(this); // conn_mgnt obj
+    if(this->sockets!=NULL){
+        free(this->sockets);
+    }
+    if(this!=NULL){
+        free(this); // conn_mgnt obj
+    }
 
     /* finish: need to print all the statistics again */
     return 0; 
@@ -754,6 +774,7 @@ create_conn_mgnt_non_blocking(
         // set total reqs (workload) of each sockfd
         mgnt->sockets[i].unsent_req=(mgnt->total_req/args->conc);
         mgnt->sockets[i].sent_req=0;
+        mgnt->sockets[i].num_gap=mgnt->num_gap; // each connection can control its' max-req size
     }
     // append the rest workload to last sockfd
     mgnt->sockets[args->conc-1].unsent_req+=(mgnt->total_req%args->conc);
@@ -787,6 +808,7 @@ create_conn_mgnt(
         // set total reqs (workload) of each sockfd
         mgnt->sockets[i].unsent_req=(mgnt->total_req/args->conc);
         mgnt->sockets[i].sent_req=0;
+        mgnt->sockets[i].num_gap=mgnt->num_gap; // each connection can control its' max-req size
     }
     // append the rest workload to last sockfd
     mgnt->sockets[args->conc-1].unsent_req+=(mgnt->total_req%args->conc);

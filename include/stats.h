@@ -43,15 +43,17 @@ struct _resp_intvl_t {
 
 typedef struct _statistics_t {
     /* status code (1xx ~ 5xx) */
-    int status_code[5];
-    int status_code_detail[STATUS_CODE_MAXIMUM];
-    /* connection status */
-    struct _conn_t *sockets;
-    u32 thrd_cnt; 
-    int conn_num;
+    int status_code_detail[STATUS_CODE_MAXIMUM];            // >37 (38)=38*4=152 bytes
     int retry_conn_num;
-    int workload;
-    int max_req_size;
+    int status_code[5];                                     // 5*4=20 bytes
+    /* request number */
+    u64 sent_bytes;
+    u64 sent_reqs;
+    /* response number */
+    u64 pkt_byte_cnt;                                       // bytes counts
+    u64 hdr_size;
+    u64 body_size;
+    u64 resp_cnt;                                           // pkt counts (response)        
     /* time */
     u64 total_time;                                         // program execution time
     u64 process_time;                                       // handle response (from "recv" to "finish parsing") 
@@ -61,15 +63,13 @@ typedef struct _statistics_t {
     u64 resp_intvl_min;
     u64 resp_intvl_median;
     float avg_resp_intvl_time;
-    /* request number */
-    u64 sent_bytes;
-    u64 sent_reqs;
-    /* response number */
-    u64 pkt_byte_cnt;                                       // bytes counts
-    u64 hdr_size;
-    u64 body_size;
-    u64 resp_cnt;                                           // pkt counts (response)
-} stat_t;
+    /* connection status */
+    struct _conn_t *sockets;                                // 8 bytes
+    u32 thrd_cnt;                                           // 4 bytes
+    int conn_num;                                   
+    int workload;                                           
+    int max_req_size;
+} __attribute__((packed)) stat_t;
 
 /* main statistics (single thread) */
 extern struct _resp_intvl_t resp_intvl_queue[];             // record all the response interval (only available when using single connection, non-pipeline mode)

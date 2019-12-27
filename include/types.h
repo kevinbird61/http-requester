@@ -43,6 +43,7 @@ typedef struct _parsed_args_t {
     };
     struct urls*                urls;
     char*                       method;
+    char*                       scheme;
     char*                       host;
     char*                       path;
     http_req_header_status_t *  http_req;

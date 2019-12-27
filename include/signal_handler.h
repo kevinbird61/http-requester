@@ -27,11 +27,13 @@ static inline void sig_handler(int signal){
             /* Release all protected obj */
             int free_cm=0;
             while(protect_conn_mgnt!=NULL){
-                STATS_CONN((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj); // store all conn stats from each conn_mgnt
-                STATS_THR_TIME_END(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num); // calculate for end time of each thread
-                free(protect_conn_mgnt->protect_obj);
-                protect_conn_mgnt=protect_conn_mgnt->next;
-                free_cm++;
+                if(protect_conn_mgnt->protect_obj!=NULL){
+                    STATS_CONN((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj); // store all conn stats from each conn_mgnt
+                    STATS_THR_TIME_END(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num); // calculate for end time of each thread
+                    free(protect_conn_mgnt->protect_obj);
+                    protect_conn_mgnt=protect_conn_mgnt->next;
+                    free_cm++;
+                }
             }
             STATS_TIME_END(); // calculate total execution time (otherwise will get wrong result: only calculate the starting timestamp)
             STATS_DUMP(); // print statistics
