@@ -38,7 +38,7 @@ insert_new_header_field_name(
     
     if(!(check_header>0)){
         /* if not found, then alloc the memory to print */
-        LOG(KB_PS, "[Field-name] Not support `%s` currently",  strndup(status->buff+(idx-offset), offset-1));
+        LOG(KB_PS, "[Field-name] Not support `%s` currently", strndup(status->buff+(idx-offset), offset-1));
         return ERR_NOT_SUPPORT;
     }
     return ERR_NONE;
@@ -63,7 +63,7 @@ insert_new_header_field_value(
                 strndup(
                     status->buff+1+(status->field_value[RES_TRANSFER_ENCODING].idx), 
                     status->field_value[RES_TRANSFER_ENCODING].offset), 
-                "chunked", strlen("chunked"))){
+                "chunked", 7)){
                 status->use_chunked=1;
             }
         }

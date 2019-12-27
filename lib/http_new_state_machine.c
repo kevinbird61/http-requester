@@ -70,11 +70,11 @@ recv_again:
                     state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
                 } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
                     if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
-                        LOG(KB_SM, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        LOG(KB_SM, "Keep parsing: %d (%d)", state_m->buf_idx, state_m->data_size);
                         //continue;
                         break;
                     } else {
-                        LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
+                        LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, state_m->data_size);
                         // reset state machine
                         reset_parsing_state_machine(state_m);
                         // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)

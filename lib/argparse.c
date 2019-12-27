@@ -296,35 +296,56 @@ argparse(
         ret=update_url_info_rand(this);
     }
 
+    // flags 
+    switch(ret){
+        case USE_TEMPLATE:
+            (*this)->use_template=1;
+            break;
+        case USE_URL:
+        default:
+            (*this)->use_url=1;
+            break;
+    }
+
+    if(!g_verbose){ // if non-verbose, print here
+        print_config((*this));
+    }
+
+    // return code (type of service)
+    return ret;
+}
+
+void 
+print_config(
+    parsed_args_t *this)
+{
+    struct urls *url_trav=(this)->urls;
     printf("================================================================================\n");
-    printf("%-50s: %d\n", "Number of threads", (*this)->thrd);
-    printf("%-50s: %d\n", "Number of connections", (*this)->conc);
-    printf("%-50s: %d\n", "Number of total requests", (*this)->conn);
+    printf("%-50s: %d\n", "Number of threads", (this)->thrd);
+    printf("%-50s: %d\n", "Number of connections", (this)->conc);
+    printf("%-50s: %d\n", "Number of total requests", (this)->conn);
     printf("%-50s: %d\n", "Max-requests size", g_burst_length);
-    printf("%-50s: %s\n", "HTTP Pipeline", ((*this)->enable_pipe==1)? "Enable": "-");
+    printf("%-50s: %s\n", "HTTP Pipeline", (this->enable_pipe==1)? "Enable": "-");
     printf("%-50s: %s\n", "Aggressive Pipe", (g_fast==1)? "Enable": "-");
-    printf("%-50s: %s\n", "Non-Blocking Mode", ((*this)->use_non_block==1)? "Enable": "-");
+    printf("%-50s: %s\n", "Non-Blocking Mode", (this->use_non_block==1)? "Enable": "-");
     printf("%-50s: %s\n", "Verbose Mode", (g_verbose==1)? "Enable": "-");
     printf("%-50s: %d\n", "Logging Level", g_log_visible); 
-    if(ret==USE_URL){
+    if(this->use_url){
         printf("%-50s:\n", "Available URL(s): ");
-        url_trav=(*this)->urls;
+        url_trav=this->urls;
         while(url_trav!=NULL){
             printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
             url_trav=url_trav->next;
         }
-        printf("%-50s: %s\n", "Target URL: ", (*this)->url==NULL? "None": (char*)(*this)->url);
+        printf("%-50s: %s\n", "Target URL: ", this->url==NULL? "None": (char*)this->url);
     } else {
-        printf("%-50s: %s\n", "Using HTTP header template", (*this)->filename==NULL? "None": (char*)(*this)->filename);
+        printf("%-50s: %s\n", "Using HTTP header template", this->filename==NULL? "None": (char*)this->filename);
     }
-    printf("%-50s: %s\n", "Scheme: ", (*this)->scheme);
-    printf("%-50s: %s\n", "URI: ", (*this)->path);
-    printf("%-50s: %d\n", "Port number: ", (*this)->port);
-    printf("%-50s: %s\n", "Method: ", (*this)->method);
+    printf("%-50s: %s\n", "Scheme: ", this->scheme);
+    printf("%-50s: %s\n", "URI: ", this->path);
+    printf("%-50s: %d\n", "Port number: ", this->port);
+    printf("%-50s: %s\n", "Method: ", this->method);
     printf("================================================================================\n");
-
-    // return code (type of service)
-    return ret;
 }
 
 // parse user's URL

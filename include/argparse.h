@@ -25,6 +25,7 @@ int parse_url(parsed_args_t *this); //char *url, char **host, u16 *port, char **
 // randomly pick a url and then update
 int update_url_info_rand(parsed_args_t **this);
 // print usage
+void print_config(parsed_args_t *this);
 void print_manual(u8 detail);
 
 static const char *a10logo=

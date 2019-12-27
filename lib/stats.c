@@ -102,10 +102,34 @@ stats_conn(
     PRIV_STATS[mgnt->thrd_num].max_req_size=mgnt->num_gap;
 }
 
+u8 
+stats_progress(
+    u32 total_workload)
+{
+    u32 curr_workload=0, num_fin_thrd=0;
+    for(int i=0; i<g_total_thrd_num; i++){
+        curr_workload+=priv_statistics[i].resp_cnt;
+        if(priv_statistics[i].is_fin){
+            num_fin_thrd++;
+        }
+    }
+
+    printf("Complete: %-3d%% (%10d reqs), execution time: %-5.2f sec.\n", 
+        (curr_workload*100)/total_workload, curr_workload,
+        (read_tsc()-STATS.total_time)/(float)cpuFreq);
+
+    if(num_fin_thrd==g_total_thrd_num){ // all thrds are finished
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
 void 
 stats_dump()
 {
     /************************************ sum up all threads' statistics ************************************/
+    u64 thread_max_time=0; // for g_verbose 
     for(int i=0; i<g_total_thrd_num; i++){
         // status code
         for(int j=0; j<5; j++){
@@ -150,6 +174,11 @@ stats_dump()
                     statistics.resp_intvl_min=priv_statistics[i].resp_intvl_min;
                 }
             }
+        }
+
+        // calculate thread's MAX time
+        if(priv_statistics[i].total_time > thread_max_time){
+            thread_max_time=priv_statistics[i].total_time;
         }
     }
 
@@ -272,15 +301,20 @@ stats_dump()
     // time
     printf("└─> Time/Rate: \n");
     if(statistics.total_time>0){
-        printf("* %-30s: %-15f (sec.)\n", "Total execution time", statistics.total_time/(float)cpuFreq );
-        printf("* %-30s: %-15f (requests/sec.)\n",  "Request rate", statistics.sent_reqs/(statistics.total_time/(float)cpuFreq) );
-        printf("* %-30s: %-15f (responses/sec.)\n", "Reply rate", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
-        printf("* %-30s: %-15f (MB/sec.)\n", "Throughput", ((statistics.pkt_byte_cnt+statistics.sent_bytes)/(1024*1024))/(statistics.total_time/(float)cpuFreq) );
+        if(g_verbose){ 
+            // periodically print out progress will affect the accuracy of time, so use thread's MAX time 
+            printf("* %-30s: %-15.2f (sec.)\n", "Total execution time", thread_max_time/(float)cpuFreq );
+        } else { // use main thread's end time
+            printf("* %-30s: %-15.2f (sec.)\n", "Total execution time", statistics.total_time/(float)cpuFreq );
+        }
+        printf("* %-30s: %-15.2f (requests/sec.)\n",  "Request rate", statistics.sent_reqs/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15.2f (responses/sec.)\n", "Reply rate", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15.2f (MB/sec.)\n", "Throughput", ((statistics.pkt_byte_cnt+statistics.sent_bytes)/(1024*1024))/(statistics.total_time/(float)cpuFreq) );
     }
     // processing time
     if(statistics.process_time>0){
-        printf("* %-30s: %-15f (sec./thrd)\n", "Avg. parsing time ", statistics.process_time/((float)cpuFreq*statistics.thrd_cnt));
-        printf("* %-30s: %-15f (sec./conn)\n", "Avg. parsing time ", statistics.process_time/((float)cpuFreq*statistics.conn_num));
+        printf("* %-30s: %-15.2f (sec./thrd)\n", "Avg. parsing time ", statistics.process_time/((float)cpuFreq*statistics.thrd_cnt));
+        printf("* %-30s: %-15.2f (sec./conn)\n", "Avg. parsing time ", statistics.process_time/((float)cpuFreq*statistics.conn_num));
     }
     printf("********************************************************************************\n");
     // response time interval

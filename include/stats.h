@@ -63,6 +63,11 @@ typedef struct _statistics_t {
     u64 resp_intvl_min;
     u64 resp_intvl_median;
     float avg_resp_intvl_time;
+    /* state */
+    struct {
+        u8  is_fin: 1,
+            reserved: 7;
+    };
     /* connection status */
     struct _conn_t *sockets;                                // 8 bytes
     u32 thrd_cnt;                                           // 4 bytes
@@ -86,6 +91,7 @@ void stats_push_resp_intvl(u8 thrd_num, u64 intvl);
 // all connections statistics - need to call stats_init_sockets first.
 void stats_conn(void* cm);  // only available in conn_mgnt class
 
+u8 stats_progress(u32 total_workload);
 // dump all statistics
 void stats_dump();
 
@@ -98,7 +104,12 @@ void stats_dump();
 #define STATS_TIME_END()                                (STATS.total_time=(read_tsc()-STATS.total_time))
 #define STATS_THR_INIT(thrd_num, thrd_id)               (PRIV_STATS[thrd_num].thrd_cnt=thrd_id) /* using thrd_cnt to record thrd_id */
 #define STATS_THR_TIME_START(thrd_num)                  (PRIV_STATS[thrd_num].total_time=read_tsc())
-#define STATS_THR_TIME_END(thrd_num)                    (PRIV_STATS[thrd_num].total_time=(read_tsc()-PRIV_STATS[thrd_num].total_time))
+#define STATS_THR_TIME_END(thrd_num)                    \
+    do {                                                \
+        PRIV_STATS[thrd_num].total_time=(read_tsc()-PRIV_STATS[thrd_num].total_time);   \
+        PRIV_STATS[thrd_num].is_fin=1;                                                  \
+    } while(0)
+#define STATS_THR_FIN(thrd_num)                         (PRIV_STATS[thrd_num].is_fin=1;)
 #define STATS_PUSH_RESP_INTVL(thrd_num, intvl)          stats_push_resp_intvl(thrd_num, intvl)
 #define STATS_INC_PROCESS_TIME(thrd_num, time)          (PRIV_STATS[thrd_num].process_time+=time)
 // req
@@ -113,6 +124,7 @@ void stats_dump();
 // sync connection status
 #define STATS_CONN(conn_mgnt)                           (stats_conn(conn_mgnt))
 // print func
+#define STATS_PROGRESS(total_workload)                  stats_progress(total_workload)
 #define STATS_DUMP()                                    stats_dump()
 
 #endif

@@ -18,7 +18,9 @@ int main(int argc, char *argv[]){
     // enable multiple threads
     struct _thrd_t* thrds=malloc((args->thrd)*sizeof(struct _thrd_t));
     g_thrd_id_mapping=calloc(args->thrd, sizeof(int));
-    // distribute the total reqs (e.g. args->conn) to each thread
+    // distribute the total reqs (e.g. args->conn) to each thread 
+    // Notice: args->conn has been modified later, need to store this value first
+    u32 total_req=args->conn;
     int leftover=args->conn%args->thrd; /* FIXME: how to deal with leftover */
     args->conn=(args->conn/args->thrd);
     // need to create more threads
@@ -50,6 +52,17 @@ int main(int argc, char *argv[]){
         STATS_THR_INIT(i, (u32)thrds[i].tid);
         // these protected obj can be handled when exception occur (e.g. SIGXXX) and close them elegantly
         SIG_PROTECT_CM(thrds[i].mgnt);
+    }
+
+    if(g_verbose){ // only enable when user specify `-v`
+        CLEAR_SCREEN();
+        while(STATS_PROGRESS(total_req)){
+            CLEAR_SCREEN();
+            usleep(500000); // print periodically (0.5 sec)
+        }
+        // print user config after finish
+        print_config(args);
+        // print http request ?
     }
 
     for(int i=0; i<args->thrd; i++){

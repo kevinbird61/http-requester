@@ -19,7 +19,6 @@
 struct _thrd_t {
     pthread_t               tid;
     int                     num;
-    u8                      type; // type of this thread
     struct _conn_mgnt_t     *mgnt;
     // FIXME: shared info
 };

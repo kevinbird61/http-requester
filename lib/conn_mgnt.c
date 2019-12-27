@@ -19,11 +19,6 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
-    if(g_verbose){
-        printf("(THR: %d) HTTP request:*********************************************************\n", this->thrd_num);
-        printf("%s\n", http_request);
-        printf("================================================================================\n");
-    }
 
     char *packed_req=NULL;
     if(this->args->enable_pipe){
@@ -51,7 +46,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
         if ( (ret=poll(ufds, this->args->conc, timeout) )>0 ) { // poll
             // reset timeout to 1 sec
             timeout=POLL_TIMEOUT;
-            
+
             // using ring-like sending model (not always start from 0, each node has equal change)
             for(int i=0; i<this->args->conc; i++){
                 /*LOG(NORMAL, "(%d, %d) Ret=%d (R: %d, W: %d), All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", 
