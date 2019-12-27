@@ -6,7 +6,7 @@ char *g_log_filename="kb";
 char *g_log_ext=".log";
 
 char *g_log_level_str[]={
-    [KB_DEBUG]="DEBUG",
+    [KB_DEBUG]="DEBUG (Developer)",
     [KB]="UNSORT",
     [KB_EH]="ERR_HANDLE",
     [KB_CM]="CONN_MGNT",

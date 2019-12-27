@@ -11,6 +11,18 @@ int main(int argc, char *argv[]){
     SIG_HANDLE(SIGSEGV);
     SIG_HANDLE(SIGPIPE);
 
+    /* select mode */
+    if(args->use_probe_mode){
+        goto kb_probe_mode;
+    } else {
+        goto kb_loadgen;
+    }
+
+kb_probe_mode:
+    print_config(args);
+
+    return 0;
+kb_loadgen:
     // pthread_self() not always return 0, need to maintain a mapping table 
     STATS_INIT(); // init statistics
     STATS_TIME_START();
@@ -73,9 +85,8 @@ int main(int argc, char *argv[]){
     STATS_TIME_END();
     // dump the statistics
     STATS_DUMP();
-
-    free(args);
     free(thrds);
+    free(args);
 
     return 0;
 }

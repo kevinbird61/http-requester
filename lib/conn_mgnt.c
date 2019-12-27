@@ -22,7 +22,11 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
 
     char *packed_req=NULL;
     if(this->args->enable_pipe){
-        packed_req=copy_str_n_times(http_request, this->num_gap);
+        if(this->num_gap < MIN_NUM_GAP){
+            packed_req=copy_str_n_times(http_request, MIN_NUM_GAP);
+        } else {
+            packed_req=copy_str_n_times(http_request, this->num_gap);
+        }
     }
     int packed_len=0, leftover=0, request_size=strlen(http_request);
     // timeout
@@ -69,28 +73,31 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     if( ufds[i].revents & POLLIN || ufds[i].revents & POLLOUT ){
                         // will handle by R/W event, waiting
                         if(errno==EWOULDBLOCK || errno==EAGAIN){
-                            // Resource Temporarily Unavailable (RST), wait first
-                            this->sockets[i].retry++;
+                            // Operation would block, in non-blocking mode, we just ignore it
+                            LOG(KB_CM, "Operation would block, wait for next turn.");
+                        } else if(errno==EINPROGRESS){
+                            // try to connect now, go to next connection
+                            /*this->sockets[i].retry++;
                             if(this->sockets[i].retry>MAX_RETRY){
                                 LOG(KB_CM, "Close kb.");
                                 goto end;
-                            }
-                            sleep(this->sockets[i].retry);
-                            LOG(KB_CM, "Resource Temporarily Unavailable. kb wait for `%d` sec.", this->sockets[i].retry);
-                        } else if(errno==EINPROGRESS){
-                            // connect is establishing now, go to next connection
-                            LOG(KB_CM, "[INPROGRESS] Connection is establishing now, please wait");
+                            }*/
+                            // sleep(1);
+                            LOG(KB_CM, "[INPROGRESS] Connection is establishing now, please wait (%d)", 1);
                         } 
                     } else {
                         // remote device is unavailable, create a new one
                         LOG(KB_CM, "POLLERR");
-                        this->sockets[i].retry++;
+                        //this->sockets[i].retry++;
+                        //usleep(5000);
                         goto close_and_create;
                     }
                 } else if( ufds[i].revents & POLLHUP ){
                     /* The device has been disconnected */
                     LOG(KB_CM, "POLLHUP"); // create a new one for it
-                    this->sockets[i].retry++;
+                    //this->sockets[i].retry++;
+                    //usleep(this->sockets[i].retry);
+                    //usleep(5000);
                     goto close_and_create;
                 } else if( ufds[i].revents & POLLNVAL ){
                     /* The specified fd value is invalid. This flag is only valid in the revents member; it shall ignored in the events member. */
@@ -99,7 +106,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                 }
 
                 if ( ufds[i].revents & POLLIN ) { // able to recv
-                    this->sockets[i].retry=0;
+                    // this->sockets[i].retry=0;
                     // record response `timestamp` only when "single connection", and then PUSH into response interval queue
                     if(this->args->conc==1 && resp_intvl>0){ // single connection, and send() successfully
                         resp_intvl=read_tsc()-resp_intvl;
@@ -209,7 +216,7 @@ close_and_create:
                     // check workload (unsent_req), and if there have any unanswer req (sent_req)
                     // if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req <= MAX_SENT_REQ){ 
                     if(this->sockets[i].unsent_req>0){ // send if there have unsent requests, and there are no any unanswered req
-                        this->sockets[i].retry=0;
+                        //this->sockets[i].retry=0;
                         if(this->args->enable_pipe){ // enable pipe 
                             // calculate workload
                             int workload=(this->sockets[i].unsent_req < this->sockets[i].num_gap)? (this->sockets[i].unsent_req-this->sockets[i].sent_req): (this->sockets[i].num_gap-this->sockets[i].sent_req);
@@ -304,7 +311,7 @@ end:
     STATS_CONN(this); 
     
     /* free */
-    if(packed_req!=NULL){ free(packed_req); }
+    //if(packed_req!=NULL){ free(packed_req); }
     free(http_request);
     for(int i=0;i<this->args->conc;i++){
         close(this->sockets[i].sockfd); // close all conn
@@ -350,7 +357,11 @@ conn_mgnt_run(conn_mgnt_t *this)
     
     char *packed_req=NULL;
     if(this->args->enable_pipe){
-        packed_req=copy_str_n_times(http_request, this->num_gap);
+        if(this->num_gap < MIN_NUM_GAP){
+            packed_req=copy_str_n_times(http_request, MIN_NUM_GAP);
+        } else {
+            packed_req=copy_str_n_times(http_request, this->num_gap);
+        }
     }
     int packed_len=0, request_size=strlen(http_request);
     // timeout

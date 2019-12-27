@@ -1,5 +1,10 @@
 #include "prober.h"
 
+char *common_uri[]={
+    "/index.html",
+    "/",
+};
+
 int 
 probe_mgnt_run(
     probe_mgnt_t *this)

@@ -40,6 +40,7 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [10]={"verbose", no_argument, NULL, 'v'},
         [11]={"thread", required_argument, NULL, 't'}, 
         [12]={"nonblk", no_argument, NULL, 'N'}, /* using non-blocking */
+        [13]={"probe", no_argument, NULL, 'P'}, /* probe mode */
         /* request headers (using itoa(REQ_*) as option name) */    
         [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
 };
@@ -170,6 +171,9 @@ argparse(
             case 'p':   // port
                 (*this)->port=atoi(optarg);
                 (*this)->flags|=SPE_PORT;
+                break;
+            case 'P':   // probe mode
+                (*this)->use_probe_mode=1;
                 break;
             case 'm':   // method
                 (*this)->method=optarg;
@@ -324,13 +328,20 @@ print_config(
     printf("%-50s: %d\n", "Number of threads", (this)->thrd);
     printf("%-50s: %d\n", "Number of connections", (this)->conc);
     printf("%-50s: %d\n", "Number of total requests", (this)->conn);
-    printf("%-50s: %d\n", "Max-requests size", g_burst_length);
-    printf("%-50s: %s\n", "HTTP Pipeline", (this->enable_pipe==1)? "Enable": "-");
-    printf("%-50s: %s\n", "Aggressive Pipe", (g_fast==1)? "Enable": "-");
-    printf("%-50s: %s\n", "Non-Blocking Mode", (this->use_non_block==1)? "Enable": "-");
-    printf("%-50s: %s\n", "Verbose Mode", (g_verbose==1)? "Enable": "-");
-    printf("%-50s: %d\n", "Logging Level", g_log_visible); 
-    if(this->use_url){
+    printf("%-50s: %s\n", "Scheme: ", this->scheme);
+    if(this->use_probe_mode){
+        /* show probe options */
+        printf("%-50s: %s\n", "Probe mode", "Enable");
+    } else {
+        printf("%-50s: %d\n", "Max-requests size", g_burst_length);
+        printf("%-50s: %s\n", "HTTP Pipeline", (this->enable_pipe==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Aggressive Pipe", (g_fast==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Non-Blocking Mode", (this->use_non_block==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Verbose Mode", (g_verbose==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Logging Level", g_log_level_str[g_log_visible]);
+        printf("%-50s: %s\n", "URI: ", this->path);
+    }
+    if(this->use_url){ // only enable in non-probe mode
         printf("%-50s:\n", "Available URL(s): ");
         url_trav=this->urls;
         while(url_trav!=NULL){
@@ -341,8 +352,6 @@ print_config(
     } else {
         printf("%-50s: %s\n", "Using HTTP header template", this->filename==NULL? "None": (char*)this->filename);
     }
-    printf("%-50s: %s\n", "Scheme: ", this->scheme);
-    printf("%-50s: %s\n", "URI: ", this->path);
     printf("%-50s: %d\n", "Port number: ", this->port);
     printf("%-50s: %s\n", "Method: ", this->method);
     printf("================================================================================\n");
@@ -426,12 +435,12 @@ update_url_info_rand(
     url_trav=(*this)->urls;
     srand(time(NULL));
     int picked_id=(rand()%num_url);
-    printf("Picked id: %d\n", picked_id);
+    //printf("Picked id: %d\n", picked_id);
     while(picked_id--){
         url_trav=url_trav->next;
     }
     (*this)->url=url_trav->url;
-    printf("Num of urls: %d, Randomly pick: %s\n", num_url, (*this)->url);
+    //printf("Num of urls: %d, Randomly pick: %s\n", num_url, (*this)->url);
     // only one url, use url only
     int ret=parse_url(*this);
     switch(ret){

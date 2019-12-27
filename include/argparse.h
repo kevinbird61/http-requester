@@ -7,7 +7,7 @@
 #include "types.h"
 #include "http.h"
 
-#define NUM_PARAMS          (14)
+#define NUM_PARAMS          (15)
 #define MAX_THREAD          (1000)    // max thread number
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)

@@ -33,10 +33,11 @@ typedef struct _parsed_args_t {
     u8                          flags;
     struct {
         u8  use_non_block:1,
+            use_probe_mode:1,
             enable_pipe:1,
             use_url:1,
             use_template:1,
-            reserved:4;
+            reserved:3;
     };
     u16                         port;
     u32                         thrd;
