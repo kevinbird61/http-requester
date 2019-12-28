@@ -11,6 +11,7 @@
 #include <sys/select.h>
 #include <sys/poll.h>
 #include "err_handler.h"
+#include "control_var.h"
 #include "argparse.h"
 #include "global.h"
 #include "types.h"
@@ -19,13 +20,18 @@
 
 extern char *common_uri[]; // popular, common uri
 
+struct _str_list_t {
+    char*                   str;
+    struct _str_list_t*     next;
+};
+
 // probe management
 typedef struct _probe_mgnt_t {
-    parsed_args_t*      args;
-    state_machine_t*    state_m;
-    int                 probe_fd;
-    char *              found_uri;
-    u8                  thrd_num;
+    parsed_args_t*          args;
+    state_machine_t*        state_m;
+    int                     probe_fd;
+    struct _str_list_t*     found_uri;
+    u8                      thrd_num;
 } probe_mgnt_t;
 
 // int prepare_dict(); // prepare pre-defined resource list (dictionary)

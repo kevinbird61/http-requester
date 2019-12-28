@@ -1,16 +1,13 @@
 #include "signal_handler.h"
 #include "conn_mgnt.h"
+#include "probe_mgnt.h"
 
 int main(int argc, char *argv[]){
     parsed_args_t *args=create_argparse();
     u8 ret=argparse(&args, argc, argv);
 
-    // signal handler
-    SIG_HANDLE(SIGINT);
-    SIG_HANDLE(SIGALRM);
-    SIG_HANDLE(SIGSEGV);
-    SIG_HANDLE(SIGPIPE);
-
+    /* global var init */
+    g_thrd_id_mapping=calloc(args->thrd, sizeof(int));
     /* select mode */
     if(args->use_probe_mode){
         goto kb_probe_mode;
@@ -18,18 +15,27 @@ int main(int argc, char *argv[]){
         goto kb_loadgen;
     }
 
-kb_probe_mode:
-    print_config(args);
+kb_probe_mode:{
+    g_thrd_id_mapping[0]=(int)pthread_self(); // setup id mapping (enable logging)
+    probe_mgnt_t *prober=create_probe_mgnt(args);
+    probe_mgnt_run(prober);
 
     return 0;
-kb_loadgen:
+} /* kb_probe_mode */
+
+kb_loadgen:{
+    // signal handler
+    SIG_HANDLE(SIGINT);
+    SIG_HANDLE(SIGALRM);
+    SIG_HANDLE(SIGSEGV);
+    SIG_HANDLE(SIGPIPE);
+
     // pthread_self() not always return 0, need to maintain a mapping table 
     STATS_INIT(); // init statistics
     STATS_TIME_START();
 
     // enable multiple threads
     struct _thrd_t* thrds=malloc((args->thrd)*sizeof(struct _thrd_t));
-    g_thrd_id_mapping=calloc(args->thrd, sizeof(int));
     // distribute the total reqs (e.g. args->conn) to each thread 
     // Notice: args->conn has been modified later, need to store this value first
     u32 total_req=args->conn;
@@ -87,6 +93,6 @@ kb_loadgen:
     STATS_DUMP();
     free(thrds);
     free(args);
-
     return 0;
-}
+} /* kb_loadgen */
+} /* main() */
