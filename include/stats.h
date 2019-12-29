@@ -50,19 +50,13 @@ typedef struct _statistics_t {
     u64 sent_bytes;
     u64 sent_reqs;
     /* response number */
-    u64 pkt_byte_cnt;                                       // bytes counts
+    u64 recv_bytes;
+    u64 recv_resps;
     u64 hdr_size;
-    u64 body_size;
-    u64 resp_cnt;                                           // pkt counts (response)        
+    u64 body_size;        
     /* time */
     u64 total_time;                                         // program execution time
     u64 process_time;                                       // handle response (from "recv" to "finish parsing") 
-    u64 resp_intvl_cnt;
-    u64 total_resp_intvl_time;
-    u64 resp_intvl_max;
-    u64 resp_intvl_min;
-    u64 resp_intvl_median;
-    float avg_resp_intvl_time;
     /* state */
     struct {
         u8  is_fin: 1,
@@ -74,6 +68,13 @@ typedef struct _statistics_t {
     int conn_num;                                   
     int workload;                                           
     int max_req_size;
+    /* interval */
+    u64 resp_intvl_cnt;
+    u64 total_resp_intvl_time;
+    u64 resp_intvl_max;
+    u64 resp_intvl_min;
+    u64 resp_intvl_median;
+    float avg_resp_intvl_time;
 } __attribute__((packed)) stat_t;
 
 /* main statistics (single thread) */
@@ -117,10 +118,10 @@ void stats_dump();
 #define STATS_INC_SENT_REQS(thrd_num, reqs)             (PRIV_STATS[thrd_num].sent_reqs+=reqs)
 // resp
 #define STATS_INC_CODE(thrd_num, status_code)           stats_inc_code(thrd_num, status_code)
-#define STATS_INC_PKT_BYTES(thrd_num, size)             (PRIV_STATS[thrd_num].pkt_byte_cnt+=size)
+#define STATS_INC_PKT_BYTES(thrd_num, size)             (PRIV_STATS[thrd_num].recv_bytes+=size)
 #define STATS_INC_HDR_BYTES(thrd_num, size)             (PRIV_STATS[thrd_num].hdr_size+=size)
 #define STATS_INC_BODY_BYTES(thrd_num, size)            (PRIV_STATS[thrd_num].body_size+=size)
-#define STATS_INC_RESP_NUM(thrd_num, cnt)               (PRIV_STATS[thrd_num].resp_cnt+=cnt)
+#define STATS_INC_RESP_NUM(thrd_num, cnt)               (PRIV_STATS[thrd_num].recv_resps+=cnt)
 // sync connection status
 #define STATS_CONN(conn_mgnt)                           (stats_conn(conn_mgnt))
 // print func

@@ -108,7 +108,7 @@ stats_progress(
 {
     u32 curr_workload=0, num_fin_thrd=0;
     for(int i=0; i<g_total_thrd_num; i++){
-        curr_workload+=priv_statistics[i].resp_cnt;
+        curr_workload+=priv_statistics[i].recv_resps;
         if(priv_statistics[i].is_fin){
             num_fin_thrd++;
         }
@@ -121,8 +121,8 @@ stats_progress(
     // other thread
     for(int i=0; i<g_total_thrd_num; i++){
         printf("└─> (Thrd: %d) Complete: %-3lld%% (%10lld reqs)\n", 
-            i, (priv_statistics[i].resp_cnt*100)/(total_workload/g_total_thrd_num), 
-            priv_statistics[i].resp_cnt);
+            i, (priv_statistics[i].recv_resps*100)/(total_workload/g_total_thrd_num), 
+            priv_statistics[i].recv_resps);
     }
 
     if(num_fin_thrd==g_total_thrd_num){ // all thrds are finished
@@ -150,10 +150,10 @@ stats_dump()
         statistics.sent_bytes+=priv_statistics[i].sent_bytes;
         statistics.sent_reqs+=priv_statistics[i].sent_reqs;
         // resp pkt,byte counts
-        statistics.pkt_byte_cnt+=priv_statistics[i].pkt_byte_cnt;
+        statistics.recv_bytes+=priv_statistics[i].recv_bytes;
         statistics.hdr_size+=priv_statistics[i].hdr_size;
         statistics.body_size+=priv_statistics[i].body_size;
-        statistics.resp_cnt+=priv_statistics[i].resp_cnt;
+        statistics.recv_resps+=priv_statistics[i].recv_resps;
         // conn stat
         statistics.conn_num+=priv_statistics[i].conn_num;
         statistics.retry_conn_num+=priv_statistics[i].retry_conn_num;
@@ -241,20 +241,20 @@ stats_dump()
     printf("└─> Request info: \n");
     printf("* %-30s: %lld\n", "Total sent bytes", statistics.sent_bytes);
     printf("* %-30s: %lld\n", "Total sent requests", statistics.sent_reqs);
-    if(statistics.resp_cnt>0){
+    if(statistics.recv_resps>0){
         printf("└─> Response info: \n");
-        printf("* %-30s: %lld\n", "Total recevied bytes", statistics.pkt_byte_cnt);
-        printf("* %-30s: %lld\n", "Total response pkts", statistics.resp_cnt);
-        printf("* %-30s: %lld\n", "Avg. bytes per pkt", statistics.pkt_byte_cnt/statistics.resp_cnt);
-        printf("* %-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.resp_cnt);
-        printf("* %-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.resp_cnt); 
+        printf("* %-30s: %lld\n", "Total recevied bytes", statistics.recv_bytes);
+        printf("* %-30s: %lld\n", "Total response pkts", statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Avg. bytes per pkt", statistics.recv_bytes/statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.recv_resps); 
     } /* packet, byte counts */
-    // calculate the wasted requests (if sent_reqs > resp_cnt)
+    // calculate the wasted requests (if sent_reqs > recv_resps)
     // which means that those requests waste our bandwidth because of the connection close 
-    if(statistics.sent_reqs > statistics.resp_cnt){
+    if(statistics.sent_reqs > statistics.recv_resps){
         printf("└─> Wasted (Unanswered) : \n");
-        printf("* %-30s: %lld\n", "Wasted requests", statistics.sent_reqs-statistics.resp_cnt);
-        printf("* %-30s: %lld\n", "Wasted bytes (bandwidth)", (statistics.sent_bytes/statistics.sent_reqs)*(statistics.sent_reqs-statistics.resp_cnt));
+        printf("* %-30s: %lld\n", "Wasted requests", statistics.sent_reqs-statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Wasted bytes (bandwidth)", (statistics.sent_bytes/statistics.sent_reqs)*(statistics.sent_reqs-statistics.recv_resps));
     }
     printf("********************************************************************************\n");
     // thrd info
@@ -315,8 +315,8 @@ stats_dump()
             printf("* %-30s: %-15.2f (sec.)\n", "Total execution time", statistics.total_time/(float)cpuFreq );
         }
         printf("* %-30s: %-15.2f (requests/sec.)\n",  "Request rate", statistics.sent_reqs/(statistics.total_time/(float)cpuFreq) );
-        printf("* %-30s: %-15.2f (responses/sec.)\n", "Reply rate", statistics.resp_cnt/(statistics.total_time/(float)cpuFreq) );
-        printf("* %-30s: %-15.2f (MB/sec.)\n", "Throughput", ((statistics.pkt_byte_cnt+statistics.sent_bytes)/(1024*1024))/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15.2f (responses/sec.)\n", "Reply rate", statistics.recv_resps/(statistics.total_time/(float)cpuFreq) );
+        printf("* %-30s: %-15.2f (MB/sec.)\n", "Throughput", ((statistics.recv_bytes+statistics.sent_bytes)/(1024*1024))/(statistics.total_time/(float)cpuFreq) );
     }
     // processing time
     if(statistics.process_time>0){
