@@ -113,10 +113,17 @@ stats_progress(
             num_fin_thrd++;
         }
     }
-
+    
+    // main thread
     printf("Complete: %-3d%% (%10d reqs), execution time: %-5.2f sec.\n", 
         (curr_workload*100)/total_workload, curr_workload,
         (read_tsc()-STATS.total_time)/(float)cpuFreq);
+    // other thread
+    for(int i=0; i<g_total_thrd_num; i++){
+        printf("└─> (Thrd: %d) Complete: %-3lld%% (%10lld reqs)\n", 
+            i, (priv_statistics[i].resp_cnt*100)/(total_workload/g_total_thrd_num), 
+            priv_statistics[i].resp_cnt);
+    }
 
     if(num_fin_thrd==g_total_thrd_num){ // all thrds are finished
         return 0;

@@ -22,6 +22,7 @@ probe_mgnt_run(
      * - we cannot open too many connections to probe!
      */
     int i=0, num_found=0, num_missed=0;
+    char *port=itoa(this->args->port);
     // first, we check common_uri
     while(common_uri[i]!=NULL){
         // pack our uri
@@ -58,8 +59,10 @@ probe_mgnt_run(
                 // other errors (need further investigation)
                 break;
         }
+
+        free(probe_req);
         // need to create a new conn
-        this->probe_fd=create_tcp_conn(this->args->host, itoa(this->args->port));
+        this->probe_fd=create_tcp_conn(this->args->host, port);
         reset_parsing_state_machine(this->state_m);
         i++;
     }
