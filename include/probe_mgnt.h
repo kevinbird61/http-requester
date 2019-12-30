@@ -4,6 +4,7 @@
 /** Send probe requests to examine the available resource of target server
 */
 #include <pthread.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>

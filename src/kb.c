@@ -75,7 +75,7 @@ kb_loadgen:{
     if(g_verbose){ // only enable when user specify `-v`
         CLEAR_SCREEN();
         while(STATS_PROGRESS(total_req)){
-            CLEAR_SCREEN();
+            UPDATE_SCREEN();
             usleep(500000); // print periodically (0.5 sec)
         }
         // print user config after finish

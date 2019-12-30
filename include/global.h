@@ -17,6 +17,7 @@
 #define CHUNK_SIZE          (8*1024)        //
 
 #define CLEAR_SCREEN()      (printf("\e[1;1H\e[2J"))
+#define UPDATE_SCREEN()     (printf("\e[1;1H"))
 
 extern u32      g_burst_length;             // max-request size
 extern u8       g_fast;                     // flag for enable aggressive pipe

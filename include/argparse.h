@@ -12,7 +12,7 @@
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define __FILENAME__        (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define AGENT               "kevinbird"
+#define AGENT               "kb"
 
 extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
 

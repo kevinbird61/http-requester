@@ -41,10 +41,17 @@ static inline void sig_handler(int signal){
             printf("Release %d conn_mgnt gracefully.\n", free_cm);
             exit(1);
         }
-        case SIGSEGV: /* segmentation fault */
-            perror("SIGSEGV:");
-            printf("File: %s, Line: %d\n", __FILE__, __LINE__);
-            exit(1);
+        case SIGSEGV: // segmentation fault 
+            if(errno==EAGAIN || errno==EINPROGRESS){ 
+                // blocking operation :
+                // - EAGAIN: Resource Temporary Unavailable
+                // - EINPROGRESS: Operation in progress
+                break;
+            } else {
+                perror("SIGSEGV:");
+                printf("File: %s, Line: %d\n", __FILE__, __LINE__);
+                exit(1);
+            }
         default:
             perror("UNKNOWN:");
             break;

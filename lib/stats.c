@@ -97,9 +97,11 @@ stats_conn(
     for(int i=0; i<PRIV_STATS[mgnt->thrd_num].conn_num; i++){
         PRIV_STATS[mgnt->thrd_num].retry_conn_num+=mgnt->sockets[i].retry_conn_num;
         PRIV_STATS[mgnt->thrd_num].workload+=mgnt->sockets[i].rcvd_res;
+        PRIV_STATS[mgnt->thrd_num].max_req_size+=mgnt->sockets[i].num_gap; // per-conn max-req-size
     }
     // get max-request size
-    PRIV_STATS[mgnt->thrd_num].max_req_size=mgnt->num_gap;
+    // FIXME: do we need to use floating point ?
+    PRIV_STATS[mgnt->thrd_num].max_req_size/=PRIV_STATS[mgnt->thrd_num].conn_num; 
 }
 
 u8 
@@ -244,10 +246,10 @@ stats_dump()
     if(statistics.recv_resps>0){
         printf("└─> Response info: \n");
         printf("* %-30s: %lld\n", "Total recevied bytes", statistics.recv_bytes);
-        printf("* %-30s: %lld\n", "Total response pkts", statistics.recv_resps);
-        printf("* %-30s: %lld\n", "Avg. bytes per pkt", statistics.recv_bytes/statistics.recv_resps);
-        printf("* %-30s: %lld\n", "Avg. header length", statistics.hdr_size/statistics.recv_resps);
-        printf("* %-30s: %lld\n", "Avg. body length", statistics.body_size/statistics.recv_resps); 
+        printf("* %-30s: %lld\n", "Total recevied responses", statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Avg. bytes (per response)", statistics.recv_bytes/statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Avg. hdr size (per response)", statistics.hdr_size/statistics.recv_resps);
+        printf("* %-30s: %lld\n", "Avg. body size (per response)", statistics.body_size/statistics.recv_resps); 
     } /* packet, byte counts */
     // calculate the wasted requests (if sent_reqs > recv_resps)
     // which means that those requests waste our bandwidth because of the connection close 
@@ -266,23 +268,24 @@ stats_dump()
         // per thrd execution time
         if(g_verbose){ // only print this ugly detail log when enable verbose mode
             printf("└─> Per-thread info (ID + VAL): \n");
-            printf("--------------------------------------------------------------------------------\n");
-            printf("|%-5s| %-12s | %-12s | %-12s | %-12s | %-12s |\n", " ", 
-                "Thread ID", "Time (sec.)", "Workload", "Retry", "Log file");
-            printf("--------------------------------------------------------------------------------\n");
+            printf("------------------------------------------------------------------------------------------------------\n");
+            printf("|%-5s| %-12s | %-12s | %-12s | %-12s | %-12s | %-12s |\n", " ", 
+                "Thread ID", "Time (sec.)", "Workload", "Retry", "MAX-Request", "Log file");
+            printf("------------------------------------------------------------------------------------------------------\n");
             for(int i=0; i<g_total_thrd_num; i++){
                 // logfile
                 char *logfile=malloc((strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(get_thrd_tid_from_id(priv_statistics[i].thrd_cnt)))+1)*sizeof(char));
                 sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, get_thrd_tid_from_id(priv_statistics[i].thrd_cnt), g_log_ext);
 
-                printf("|%-5s| %-12d | %-12f | %-12d | %-12d | %-12s |\n", 
+                printf("|%-5s| %-12d | %-12f | %-12d | %-12d | %-12d | %-12s |\n", 
                     " ",  get_thrd_tid_from_id(priv_statistics[i].thrd_cnt),  
                     priv_statistics[i].total_time/((float)cpuFreq),
                     priv_statistics[i].workload,
                     priv_statistics[i].retry_conn_num,
+                    priv_statistics[i].max_req_size,
                     logfile);
             }
-            printf("--------------------------------------------------------------------------------\n");
+            printf("------------------------------------------------------------------------------------------------------\n");
         }
     }
     printf("********************************************************************************\n");

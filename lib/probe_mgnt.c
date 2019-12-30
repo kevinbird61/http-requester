@@ -53,15 +53,16 @@ probe_mgnt_run(
                 // need to create a new connection
                 printf("Missed %s\n", common_uri[i]);
                 num_missed++;
-                usleep(1000);
+                usleep(5000);
                 break;
             default:
                 // other errors (need further investigation)
                 break;
         }
 
-        free(probe_req);
+        //free(probe_req);
         // need to create a new conn
+        close(this->probe_fd);
         this->probe_fd=create_tcp_conn(this->args->host, port);
         reset_parsing_state_machine(this->state_m);
         i++;
