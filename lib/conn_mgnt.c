@@ -179,6 +179,9 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                         case RCODE_CLIENT_ERR: // 4xx client side error 
                             LOG(KB_CM, "%s", rcode_str[control_var.rcode]); 
                         case RCODE_ERROR: {// error occur, need to abort this connection
+                            // not finish yet, need to open new connection
+                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
+                                get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){ /* FIXME: use `Connection` field to determine that we need to create a new conn or not */
 close_and_create:
                             if(this->sockets[i].sent_req>0){ // means that we have sent some reqs before, but this conn has been closed => we should decrease max-req size
                                 int prev_num_gap=this->sockets[i].num_gap;
@@ -203,6 +206,7 @@ close_and_create:
                             free(port);
                             // because current fd is invalid, go to next connection
                             continue;
+                            } /* get_tcp_conn_stat (only close and create when server close this conn first) */
                         }
                         case RCODE_NOT_SUPPORT: // parsing not finished (suspend by incomplete packet), or parsing error
                         default: // TODO: other errors
@@ -333,7 +337,8 @@ end:
     }
 
     /* finish: need to print all the statistics again */
-    return 0; 
+    pthread_exit(0);
+    // return 0; 
 }
 
 int 

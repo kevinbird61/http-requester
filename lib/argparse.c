@@ -29,8 +29,8 @@ int     *g_thrd_id_mapping=NULL;
 struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={ 
         [0]={"url", required_argument, NULL, 'u'},
         [1]={"port", required_argument, NULL, 'p'},
-        [2]={"conc", required_argument, NULL, 'c'},
-        [3]={"conn", required_argument, NULL, 'n'},
+        [2]={"conn", required_argument, NULL, 'c'}, /* connections (FIXME: also need to modified the field name in parsed_args_t!) */
+        [3]={"num", required_argument, NULL, 'n'}, /* total requests (FIXME: also need to modified the field name in parsed_args_t!) */
         [4]={"file", required_argument, NULL, 'f'},
         [5]={"method", required_argument, NULL, 'm'},
         [6]={"pipe", no_argument, NULL, 'i'},
@@ -486,8 +486,8 @@ print_manual(
     // printf("\t-h: Print this helper function.\n");
     printf("\t-%-2c    %-7s %-7s: %s.\n", 'h', "", "", "Print this helper function");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 't', "thread", "NUM", "Specify number of threads, total requests will distribute to each thread");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conc", "NUM", "Specify number of connections (per thread)");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "conn", "NUM", "Specify number of requests, distribute to each connection");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'c', "conn", "NUM", "Specify number of connections (per thread)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'n', "num", "NUM", "Specify number of requests, distribute to each connection");
     // printf("\t-%-2c, --%-7s %-7s: %s.\n", 'f', "file", "FILE", "Specify input file with HTTP request header template (use to setup those HTTP connections)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'u', "url", "URL", "Specify URL (i.e. `http://kevin.a10networks.com:8080/index.html`)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'p', "port", "PORT", "Specify target port number (priority is lower than URL's port)");

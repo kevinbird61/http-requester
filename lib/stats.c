@@ -122,7 +122,7 @@ stats_progress(
         (read_tsc()-STATS.total_time)/(float)cpuFreq);
     // other thread
     for(int i=0; i<g_total_thrd_num; i++){
-        printf("└─> (Thrd: %d) Complete: %-3lld%% (%10lld reqs)\n", 
+        printf("└─> (Thrd: %-3d) Complete: %-3lld%% (%10lld reqs)\n", 
             i, (priv_statistics[i].recv_resps*100)/(total_workload/g_total_thrd_num), 
             priv_statistics[i].recv_resps);
     }
