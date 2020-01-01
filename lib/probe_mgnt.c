@@ -67,6 +67,9 @@ probe_mgnt_run(
         reset_parsing_state_machine(this->state_m);
         i++;
     }
+
+    /* TODO: examine with variable-length uri */
+
 end: 
     /* print out all statistics */
     printf("********************************************************************************\n");

@@ -75,7 +75,7 @@ typedef struct _statistics_t {
     u64 resp_intvl_min;
     u64 resp_intvl_median;
     float avg_resp_intvl_time;
-} __attribute__((packed)) stat_t;
+} __attribute__((aligned(64))) stat_t;
 
 /* main statistics (single thread) */
 extern struct _resp_intvl_t resp_intvl_queue[];             // record all the response interval (only available when using single connection, non-pipeline mode)

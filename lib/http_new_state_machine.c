@@ -349,6 +349,7 @@ multi_bytes_http_parsing_state_machine(
     return control_var;
 }
 
+static inline 
 control_var_t
 http_resp_parser(
     state_machine_t *state_m)

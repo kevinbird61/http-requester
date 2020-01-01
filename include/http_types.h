@@ -154,8 +154,11 @@ typedef struct _state_machine_t {
     };
     u32 curr_chunked_size;
     /* flag (FIXME: use 1 bit to record) */
-    u8                              use_content_length;
-    u8                              use_chunked;
+    struct {
+        u8  use_content_length: 1,
+            use_chunked: 1,
+            reserved: 6;
+    };
 } __attribute__((packed)) state_machine_t;
 
 #endif

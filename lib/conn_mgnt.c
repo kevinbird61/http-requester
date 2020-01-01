@@ -180,8 +180,21 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             LOG(KB_CM, "%s", rcode_str[control_var.rcode]); 
                         case RCODE_ERROR: {// error occur, need to abort this connection
                             // not finish yet, need to open new connection
-                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
-                                get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){ /* FIXME: use `Connection` field to determine that we need to create a new conn or not */
+                            /*if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
+                                get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){ // FIXME: use `Connection` field to determine that we need to create a new conn or not 
+                            */
+                            if(this->sockets[i].state_m->resp->status_code = _404_NOT_FOUND){ 
+                                /* in 404 not found, we may not need to close connection, instead 
+                                 * of using the origin connection again.
+                                 */
+                                this->sockets[i].sent_req=0;
+                                this->sockets[i].leftover=0; // we don't need to shift sending data for incomplete request                            
+                                reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
+                                continue;
+                            } else if(this->sockets[i].state_m->resp->status_code == _400_BAD_REQUEST) {
+                                /*
+                                 * in 400 bad request, the connection will be closed by server side.
+                                 */
 close_and_create:
                             if(this->sockets[i].sent_req>0){ // means that we have sent some reqs before, but this conn has been closed => we should decrease max-req size
                                 int prev_num_gap=this->sockets[i].num_gap;
