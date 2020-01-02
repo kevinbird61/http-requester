@@ -38,14 +38,14 @@ kb_loadgen:{
     struct _thrd_t* thrds=malloc((args->thrd)*sizeof(struct _thrd_t));
     // distribute the total reqs (e.g. args->conn) to each thread 
     // Notice: args->conn has been modified later, need to store this value first
-    u32 total_req=args->conn;
-    int leftover=args->conn%args->thrd; /* FIXME: how to deal with leftover */
-    args->conn=(args->conn/args->thrd);
+    u32 total_req=args->reqs;
+    int leftover=args->reqs%args->thrd; /* FIXME: how to deal with leftover */
+    args->reqs=(args->reqs/args->thrd);
     // need to create more threads
     for(int i=0; i<args->thrd; i++){
         thrds[i].num=i;
         if(i==(args->thrd-1)){ // the last thread carry the leftover
-            args->conn+=leftover;
+            args->reqs+=leftover;
         }
         if(args->use_non_block){
             thrds[i].mgnt=create_conn_mgnt_non_blocking(args);

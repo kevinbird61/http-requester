@@ -93,7 +93,7 @@ stats_conn(
     // get the condition of each connection
     PRIV_STATS[mgnt->thrd_num].sockets=mgnt->sockets;
     // store the statistics
-    PRIV_STATS[mgnt->thrd_num].conn_num=mgnt->args->conc;
+    PRIV_STATS[mgnt->thrd_num].conn_num=mgnt->args->conn;
     for(int i=0; i<PRIV_STATS[mgnt->thrd_num].conn_num; i++){
         PRIV_STATS[mgnt->thrd_num].retry_conn_num+=mgnt->sockets[i].retry_conn_num;
         PRIV_STATS[mgnt->thrd_num].workload+=mgnt->sockets[i].rcvd_res;

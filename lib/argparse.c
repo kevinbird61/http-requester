@@ -121,13 +121,13 @@ argparse(
                 //printf("[Non-blocking: Enable]\n");
                 break;
             case 'c':   // connections (socket)
-                (*this)->conc=atoi(optarg);
-                (*this)->conc=(*this)->conc>0?(*this)->conc:1; // default value (when illegal)
-                (*this)->flags|=SPE_CONC;
-                break;
-            case 'n':   // total connections (requests)
                 (*this)->conn=atoi(optarg);
                 (*this)->conn=(*this)->conn>0?(*this)->conn:1; // default value (when illegal)
+                (*this)->flags|=SPE_CONC;
+                break;
+            case 'n':   // total requests
+                (*this)->reqs=atoi(optarg);
+                (*this)->reqs=(*this)->reqs>0?(*this)->reqs:1; // default value (when illegal)
                 (*this)->flags|=SPE_CONN;
                 break;
             case 't':   // thread number
@@ -234,10 +234,10 @@ argparse(
 
     // print the system parameters 
     if(!((*this)->flags&SPE_CONC)){
-        (*this)->conc=1;
+        (*this)->conn=1;
     } 
     if(!((*this)->flags&SPE_CONN)){
-        (*this)->conn=2;
+        (*this)->reqs=2;
     }
     if(!((*this)->flags&SPE_FILE)){
         // use url & method
@@ -276,6 +276,13 @@ argparse(
         // check upperbound
         (*this)->thrd=((*this)->thrd>MAX_THREAD)? MAX_THREAD: (*this)->thrd;
         g_total_thrd_num=(*this)->thrd;
+    }
+
+    /* check total requests & number of connections */ 
+    if((*this)->reqs < (((*this)->thrd)*((*this)->conn)) ){
+        // then we assign args->conn to args->thrd*args->conc
+        // each connection just need to send one requests
+        (*this)->reqs=((*this)->thrd)*((*this)->conn);
     }
 
     int ret=0;
@@ -326,8 +333,8 @@ print_config(
     struct urls *url_trav=(this)->urls;
     printf("================================================================================\n");
     printf("%-50s: %d\n", "Number of threads", (this)->thrd);
-    printf("%-50s: %d\n", "Number of connections", (this)->conc);
-    printf("%-50s: %d\n", "Number of total requests", (this)->conn);
+    printf("%-50s: %d\n", "Number of connections", (this)->conn);
+    printf("%-50s: %d\n", "Number of total requests", (this)->reqs);
     printf("%-50s: %s\n", "Scheme: ", this->scheme);
     if(this->use_probe_mode){
         /* show probe options */

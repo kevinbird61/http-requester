@@ -40,9 +40,9 @@ typedef struct _parsed_args_t {
             reserved:3;
     };
     u16                         port;
-    u32                         thrd;
-    u32                         conc;
-    u32                         conn;
+    u32                         thrd;   // threads
+    u32                         conn;   // connections
+    u32                         reqs;   // requests
     union {
         char *                  filename;
         char *                  url;
