@@ -27,29 +27,6 @@ stats_init()
     }
 }
 
-void 
-stats_inc_code(u8 thrd_num, unsigned char code_enum)
-{
-    PRIV_STATS[thrd_num].status_code_detail[code_enum-1]++; // because index start from 1
-    switch(code_enum){
-        case _100_CONTINUE ... _101_SWITCHING_PROTO:
-            PRIV_STATS[thrd_num].status_code[0]++;
-            break;
-        case _200_OK ... _205_RESET_CONTENT:
-            PRIV_STATS[thrd_num].status_code[1]++;
-            break;
-        case _300_MULTI_CHOICES ... _307_TEMP_REDIRECT:
-            PRIV_STATS[thrd_num].status_code[2]++;
-            break;
-        case _400_BAD_REQUEST ... _426_UPGRADE_REQUIRED:
-            PRIV_STATS[thrd_num].status_code[3]++;
-            break;
-        case _500_INTERNAL_SERV_ERR ... _505_HTTP_VER_NOT_SUPPORTED:
-            PRIV_STATS[thrd_num].status_code[4]++;
-            break;
-    }
-}
-
 void
 stats_push_resp_intvl(
     u8 thrd_num,

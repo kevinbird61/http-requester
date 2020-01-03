@@ -29,35 +29,36 @@ recv_again:
                 /* require another recv() to poll new data */
                 // check upperbound & move (prevent using too many realloc, and too much buff length)
                 if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
-                    /* we need to skip the chunked data (or store it temporary) to prevent override the http header */
-                    if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
-                        // override current chunk (to prevent too many chunked in one response) 
-                        // can't override the hdr, so move the reading ptr to `last_fin_idx + msg_hdr_len`
-                        // FIXME: if last_fin_idx is too large? (return RCODE_ERROR)
-                        state_m->data_size=state_m->resp->msg_hdr_len;
-                    } else {
-                        // other case
-                        state_m->data_size=state_m->data_size-state_m->last_fin_idx;
-                    }
-                    // then move the leftover to the front, also need to reset buf_idx;
-                    if(state_m->use_content_length ){ 
-                        // if parsing "content length" (chunked need to consider more case), 
-                        // we don't care the data_size (just set to 0, means that all parsed 
-                        // content has been dropped -> we don't store it currently)
+                    /** 
+                     * Meaning of each idx:
+                     * - last_fin_idx: end idx of previous response 
+                     * - data_size: available data size (data we want to move)
+                     * - parsed_len: how many data has been parsed
+                     * - msg_hdr_len: header length
+                     * 
+                     * Logic:
+                     * We move the unfinished data to the front
+                     */
+                    // then move the leftover to the front
+                    if(state_m->use_content_length || state_m->use_chunked){ 
                         state_m->data_size=state_m->resp->msg_hdr_len; 
                         state_m->parsed_len=0; 
-                    } else if(state_m->use_chunked){ // if parsing chunk data now, then we just set the data_size & parse_len to 0
-                        state_m->data_size=state_m->last_fin_idx + state_m->resp->msg_hdr_len; 
-                        state_m->parsed_len=0;
+                    } else {
+                        if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
+                            state_m->data_size=state_m->resp->msg_hdr_len;
+                        } else {
+                            // other case (e.g. while parsing header and not finished yet)
+                            state_m->data_size=state_m->data_size-state_m->last_fin_idx;
+                        }
                     }
                     // need to adjust the offset of each response obj
                     update_res_header_idx(state_m->resp, state_m->last_fin_idx);
                     LOG(KB_SM ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
                     state_m->buf_idx=state_m->data_size;
-                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size);
-                    // reset the rest and fin_idx
-                    memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
-                    state_m->last_fin_idx=0; 
+                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size); // move the unfinished data to the front of buffer
+                    // FIXME: do we need to reset the rest?
+                    // memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
+                    state_m->last_fin_idx=0; // move the last_fin_idx to the starting point
                 }
 
                 recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, MSG_DONTWAIT);
@@ -74,8 +75,7 @@ recv_again:
                         LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, state_m->data_size);
                         // reset state machine
                         reset_parsing_state_machine(state_m);
-                        // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)
-                        control_var.rcode=RCODE_CLOSE; // server turn off the connection
+                        control_var.rcode=RCODE_CLOSE; // server turn off the connection, let conn_mgnt handle
                         flag=0;
                         break;
                     }
@@ -107,7 +107,7 @@ recv_again:
             case RCODE_CLIENT_ERR: // 4xx
                 LOG(KB_SM, "%s", rcode_str[control_var.rcode]);
                 /* increase stats */
-                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
+                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same field
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
                 STATS_INC_RESP_NUM(state_m->thrd_num, 1);
@@ -120,7 +120,7 @@ recv_again:
                 num_reqs--; // finish one response
                 fin_resp++;
                 /* increase stats */
-                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
+                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same field
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
                 STATS_INC_RESP_NUM(state_m->thrd_num, 1);

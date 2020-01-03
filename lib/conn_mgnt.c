@@ -53,6 +53,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     continue;
                 }
 
+                /********************************************* error check *********************************************/
                 if( ufds[i].revents & POLLERR ){
                     /** An error has occurred on the device or stream. (This flag is only valid in the revents bitmask; it shall be ignored in the events member)
                      * - remote device cannot connect (send RST to us), we need to wait
@@ -83,7 +84,8 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     goto end; // invalid, close the program
                 }
 
-                if ( ufds[i].revents & POLLIN ) { // able to recv
+                /********************************************* able to recv *********************************************/
+                if ( ufds[i].revents & POLLIN ) { 
                     // record response `timestamp` only when "single connection", and then PUSH into response interval queue
                     if(this->args->conn==1 && resp_intvl>0){ // single connection, and send() successfully
                         resp_intvl=read_tsc()-resp_intvl;
@@ -114,36 +116,31 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             if(all_fin==this->total_req){ 
                                 goto end;
                             }
-                            // not finish yet, need to open new connection
-                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
-                                get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
-                                
-                                if(this->sockets[i].sent_req>0){ // you sent too much, recv side can't consume
-                                    int prev_num_gap=this->sockets[i].num_gap;
-                                    this->sockets[i].num_gap=((this->sockets[i].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN));
-                                    this->sockets[i].num_gap=((this->sockets[i].num_gap< MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[i].num_gap); // min-pipe size
-                                    LOG(KB_CM, "(THR: %d, SOCK: %d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, this->sockets[i].sockfd, prev_num_gap, this->sockets[i].num_gap);
-                                }
-
-                                close(this->sockets[i].sockfd); // do we need to wait ?
-                                char *port=itoa(this->args->port);
-                                this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
-                                ufds[i].fd=this->sockets[i].sockfd;
+                            // recv 0: means that peer side has disconnected, we don't need to check tcp state again.
+                            if(this->sockets[i].sent_req>0){ // you sent too much, recv side can't consume
+                                int prev_num_gap=this->sockets[i].num_gap;
+                                this->sockets[i].num_gap=((this->sockets[i].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN));
+                                this->sockets[i].num_gap=((this->sockets[i].num_gap< MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[i].num_gap); // min-pipe size
                                 this->sockets[i].retry_conn_num++; // inc. the number of retry connection
-                                this->sockets[i].leftover=0; // need to reset leftover 
                                 this->sockets[i].sent_req=0; // new connection, set sent_req to 0
-                                free(port);
-                                // because fd has been changed, we need to move to next connection
-                                continue;
-                            } else {
-                                /* connection is still established (recvbytes==0, and buf_idx==data_size) */
-                                LOG(KB_CM, "(THR: %d, SOCK: %d) CONN still ESTAB, waiting ... ", this->thrd_num, this->sockets[i].sockfd);
-                                LOG(KB_CM, "(THR: %d, SOCK: %d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", 
-                                    this->thrd_num, this->sockets[i].sockfd,
-                                    all_fin, this->total_req,
-                                    this->sockets[i].sent_req,  this->sockets[i].unsent_req,  this->sockets[i].rcvd_res,
-                                    this->sockets[i].num_gap);
+                                LOG(KB_CM, "(THR: %d, SOCK: %d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, this->sockets[i].sockfd, prev_num_gap, this->sockets[i].num_gap);
                             }
+
+                            // LOG(KB_CM, "(THR: %d, SOCK: %d) CONN still ESTAB, waiting ... ", this->thrd_num, this->sockets[i].sockfd);
+                            LOG(KB_CM, "(THR: %d, SOCK: %d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", 
+                                this->thrd_num, this->sockets[i].sockfd,
+                                all_fin, this->total_req,
+                                this->sockets[i].sent_req,  this->sockets[i].unsent_req,  this->sockets[i].rcvd_res,
+                                this->sockets[i].num_gap);
+
+                            close(this->sockets[i].sockfd); // do we need to wait ?
+                            char *port=itoa(this->args->port);
+                            this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
+                            ufds[i].fd=this->sockets[i].sockfd;
+                            this->sockets[i].leftover=0; // need to reset leftover 
+                            free(port);
+                            // because fd has been changed, we need to move to next connection
+                            continue;
                             break;
                         case RCODE_REDIRECT: /* TODO: require redirection (need to update URL) */
                             // 1) need to close all current connection and create new one
@@ -162,17 +159,22 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             /*if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
                                 get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){ // FIXME: use `Connection` field to determine that we need to create a new conn or not 
                             */
-                            if(this->sockets[i].state_m->resp->status_code = _404_NOT_FOUND){ 
-                                /* in 404 not found, we may not need to close connection, instead 
+                            if( this->sockets[i].state_m->resp->status_code == _404_NOT_FOUND || 
+                                this->sockets[i].state_m->resp->status_code == _403_FORBIDDEN || 
+                                this->sockets[i].state_m->resp->status_code == _405_METHOD_NOT_ALLOWED || 
+                                this->sockets[i].state_m->resp->status_code == _406_NOT_ACCEPTABLE){ 
+                                /** in these situation, we may not need to close connection, instead 
                                  * of using the origin connection again.
+                                 * FIXME: there are still have other status code 
                                  */
                                 this->sockets[i].sent_req=0;
                                 this->sockets[i].leftover=0; // we don't need to shift sending data for incomplete request                            
                                 reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
                                 continue;
-                            } else if(this->sockets[i].state_m->resp->status_code == _400_BAD_REQUEST) {
-                                /*
-                                 * in 400 bad request, the connection will be closed by server side.
+                            } else {
+                                /**
+                                 * For example: 400, 408, 413, ... 
+                                 * the connection will be closed by server side.
                                  * FIXME: other 4xx response ?
                                  */
 close_and_create:
@@ -199,7 +201,7 @@ close_and_create:
                             free(port);
                             // because current fd is invalid, go to next connection
                             continue;
-                            } /* _400_BAD_REQUEST */
+                            } /* close connection by status_code (4xx) */
                             /* get_tcp_conn_stat (only close and create when server close this conn first) */
                         }
                         case RCODE_NOT_SUPPORT: // parsing not finished (suspend by incomplete packet), or parsing error
@@ -210,16 +212,22 @@ close_and_create:
                     }
                 }
 
-                if ( ufds[i].revents & POLLOUT ) { // able to sent
+                /********************************************* able to sent *********************************************/
+                if ( ufds[i].revents & POLLOUT ) { 
                     // check workload (unsent_req), and if there have any unanswer req (sent_req)
                     // if(this->sockets[i].unsent_req>0 && this->sockets[i].sent_req <= MAX_SENT_REQ){ // send if there have unsent requests, and there are no any unanswered req
                     if(this->sockets[i].unsent_req>0){ // send if there have unsent requests
                         if(this->args->enable_pipe){ // enable pipe 
                             // calculate workload (if there have unanswered req, workload == number of responses msg)
-                            int workload=(this->sockets[i].unsent_req < this->sockets[i].num_gap)? (this->sockets[i].unsent_req-this->sockets[i].sent_req): (this->sockets[i].num_gap-this->sockets[i].sent_req);
+                            int workload =  (this->sockets[i].unsent_req < this->sockets[i].num_gap)? 
+                                            (this->sockets[i].unsent_req-this->sockets[i].sent_req): 
+                                            (this->sockets[i].num_gap-this->sockets[i].sent_req);
                             workload=(workload<0)? 0: workload;
-                            int workload_bytes=(workload==0)? this->sockets[i].leftover: (request_size*(workload-1))+(request_size-this->sockets[i].leftover);
-                            if(workload_bytes==0){ // if there have nothing to send, then go to next connection
+                            int workload_bytes= (workload==0)? 
+                                                this->sockets[i].leftover: 
+                                                (request_size*(workload-1))+(request_size-this->sockets[i].leftover);
+                            // if there have nothing to send, then go to next connection
+                            if(workload_bytes==0){ 
                                 continue;
                             }
 
@@ -327,7 +335,6 @@ end:
 
     /* finish: need to print all the statistics again */
     pthread_exit(0);
-    // return 0; 
 }
 
 int 
@@ -345,10 +352,7 @@ conn_mgnt_run(conn_mgnt_t *this)
     http_req_obj_ins_header_by_idx(&this->args->http_req, REQ_USER_AGENT, AGENT);
     // finish
     http_req_finish(&http_request, this->args->http_req);
-    //printf("HTTP request:*******************************************************************\n");
-    //printf("%s\n", http_request);
-    //printf("================================================================================\n");
-    
+
     char *packed_req=NULL;
     if(this->args->enable_pipe){
         if(this->num_gap < MIN_NUM_GAP){
@@ -369,13 +373,13 @@ conn_mgnt_run(conn_mgnt_t *this)
         for(int i=0;i<this->args->conn;i++){
             ufds[i].fd=this->sockets[i].sockfd;
             ufds[i].events = POLLIN;
+            this->sockets[i].state_m->thrd_num=this->thrd_num; // set thrd_num 
         }
 
         // each sockfd check its workload, and send its request 
         int all_fin=0;
         // if unfinished, keep send & recv
         while(all_fin<this->total_req){
-            // printf("Work status(%d/%d)\n", all_fin, this->total_req);
             u32 workload=0; // in each iteration
             // each socket send num_gap at one time
             for(int i=0;i<this->args->conn;i++){
@@ -553,9 +557,10 @@ conn_mgnt_run(conn_mgnt_t *this)
                     }
                     this->sockets[i].unsent_req--;
                     this->sockets[i].sent_req++;
+                    STATS_INC_SENT_BYTES(this->thrd_num, request_size);
+                    STATS_INC_SENT_REQS(this->thrd_num, 1);
                 }
-                STATS_INC_SENT_BYTES(this->thrd_num, request_size);
-                STATS_INC_SENT_REQS(this->thrd_num, 1);
+                
                 // inc workload
                 workload+=this->sockets[i].sent_req;
                 // record request `timestamp` only when "single connection"

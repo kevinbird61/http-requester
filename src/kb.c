@@ -55,7 +55,6 @@ kb_loadgen:{
             } else { // not support
                 exit(1);
             }
-            
         } else { // 
             thrds[i].mgnt=create_conn_mgnt(args);
             thrds[i].mgnt->thrd_num=i;

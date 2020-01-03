@@ -20,6 +20,10 @@ http_res_header_status_t *
 create_http_header_status(char *readbuf)
 {
     http_res_header_status_t *http_header_status=calloc(1, sizeof(http_res_header_status_t));
+    if(http_header_status==NULL){
+        LOG(KB_EH, "Create HTTP response header object failed.");
+        return NULL;
+    }
     // assign
     http_header_status->buff=readbuf;
 

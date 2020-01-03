@@ -7,12 +7,27 @@ int
 http_req_obj_create(http_req_header_status_t **req)
 {
     *req=calloc(1, sizeof(http_req_header_status_t));
+    if((*req)==NULL){
+        LOG(KB_EH, "Create HTTP request header object failed.");
+        return ERR_MEMORY;
+    }
     // assign dynamic 2d array (e.g. string array)
     (*req)->field_value=calloc(REQ_HEADER_NAME_MAXIMUM, sizeof(u8 *));
-    for(int i=0;i<REQ_HEADER_NAME_MAXIMUM;i++){
-        // default length = 255
-        (*req)->field_value[i]=calloc(DEFAULT_FIELD_VAL_LEN, sizeof(char));
+    if(((*req)->field_value)==NULL){
+        LOG(KB_EH, "Create HTTP request header field_value failed.");
+        return ERR_MEMORY;
     }
+
+    for(int i=0;i<REQ_HEADER_NAME_MAXIMUM;i++){
+        // default length = 255 
+        (*req)->field_value[i]=calloc(DEFAULT_FIELD_VAL_LEN, sizeof(char));
+        if(((*req)->field_value)==NULL){
+            LOG(KB_EH, "Create HTTP request header field_value's element (%d) failed.", i);
+            return ERR_MEMORY;
+        }
+    }
+
+    return ERR_NONE;
 }
 
 int 
@@ -33,6 +48,8 @@ http_req_obj_ins_header_by_idx(
         // skip or abort?
         exit(1);
     }
+    
+    return ERR_NONE;
 }
 
 /******************************************** req rawdata ********************************************/
@@ -56,6 +73,7 @@ http_req_ins_header(char **rawdata, char *field_name, char *field_value)
 {
     if(*rawdata==NULL){
         // you need to call http_req_create_start_line first
+        LOG(KB_EH, "You need to call `http_req_create_start_line` first.");
         return ERR_INVALID;
     }
     int h_len=strlen(field_name)+strlen(field_value)+4; // + 1 SP, 1 colon, CRLF
