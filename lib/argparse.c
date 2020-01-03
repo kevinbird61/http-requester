@@ -64,6 +64,10 @@ create_argparse()
     }
 
     parsed_args_t *new_argparse=calloc(1, sizeof(parsed_args_t));
+    if(new_argparse==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     new_argparse->port=DEFAULT_PORT;
     new_argparse->urls=NULL;
     // init http_req_obj
@@ -82,13 +86,13 @@ argparse(
     int c, help=0;
     int digit_optind=0;
     g_log_visible=0;
-    (*this)->use_non_block=0;
+    (*this)->use_non_block=0; // default is blocking mode
 
     // get prog name
     g_program=argv[0];
 
     while(1){
-        int this_option_optind=optind?optind:1;
+        int this_option_optind=optind? optind: 1;
         int option_index=0;
         char *field_name, *field_value;
         c=getopt_long(argc, argv, ":iavhNl:b:u:p:m:c:n:f:t:", options, &option_index);
@@ -100,39 +104,33 @@ argparse(
                  *  atoi(options[option_index].name) = field-name enum
                  *  optarg = field-value
                  */
-                // puts(options[option_index].name);
-                // puts(optarg);
                 http_req_obj_ins_header_by_idx(&((*this)->http_req), option_index-(NUM_PARAMS-2), optarg);
                 break;
             case 'a':   // fast (cooperate with -b, burst length)
-                //printf("[HTTP Pipeline][Aggressive mode: Enable]\n");
                 (*this)->enable_pipe=1; /* using fast, also enable pipe */
                 g_fast=1;
                 break;
             case 'b':   // burst length
-                //printf("[HTTP Pipeline: Enable]\n");
                 (*this)->enable_pipe=1; /* also enable pipe */
                 g_burst_length=atoi(optarg);
-                g_burst_length=(g_burst_length<=0)?NUM_GAP:g_burst_length;
-                //printf("[HTTP Pipeline][MAX-request size: %d]\n", g_burst_length);
+                g_burst_length=(g_burst_length<=0)? NUM_GAP: g_burst_length;
                 break;
             case 'N':   // using non-blocking
                 (*this)->use_non_block=1;
-                //printf("[Non-blocking: Enable]\n");
                 break;
             case 'c':   // connections (socket)
                 (*this)->conn=atoi(optarg);
-                (*this)->conn=(*this)->conn>0?(*this)->conn:1; // default value (when illegal)
+                (*this)->conn=(*this)->conn>0? (*this)->conn: 1; // default value (when illegal)
                 (*this)->flags|=SPE_CONN;
                 break;
             case 'n':   // total requests
                 (*this)->reqs=atoi(optarg);
-                (*this)->reqs=(*this)->reqs>0?(*this)->reqs:1; // default value (when illegal)
+                (*this)->reqs=(*this)->reqs>0? (*this)->reqs: 1; // default value (when illegal)
                 (*this)->flags|=SPE_REQS;
                 break;
             case 't':   // thread number
                 (*this)->thrd=atoi(optarg);
-                (*this)->thrd=(*this)->thrd>0?(*this)->thrd:1; // default value (set to 1 if value is 0)
+                (*this)->thrd=(*this)->thrd>0? (*this)->thrd: 1; // default value (set to 1 if value is 0)
                 (*this)->flags|=SPE_THRD;
                 break;
             case 'f':   // using template file
@@ -148,17 +146,23 @@ argparse(
                 for( ;optind < argc && *argv[optind] != '-'; optind++){
                     // append each url
                     if((*this)->urls==NULL){
-                        //printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         (*this)->urls=calloc(1, sizeof(struct urls));
+                        if((*this)->urls==NULL){
+                            LOG(KB_EH, "Cannot allocate memory for thread information.");
+                            exit(1);
+                        }
                         (*this)->urls->url=argv[optind];
                         (*this)->urls->next=NULL;
                     } else {
-                        //printf("[URL(%d): %s]\n", url_cnt++, argv[optind]);
                         struct urls *root=(*this)->urls;
                         while(root->next!=NULL){
                             root=root->next;
                         }
                         root->next=calloc(1, sizeof(struct urls));
+                        if(root->next==NULL){
+                            LOG(KB_EH, "Cannot allocate memory for thread information.");
+                            exit(1);
+                        }
                         root->next->url=argv[optind];
                         root->next->next=NULL;
                     }
@@ -166,7 +170,6 @@ argparse(
                 break;
             case 'v':   // verbose
                 g_verbose=1;
-                // printf("[Verbose mode: Enable]\n");
                 break;
             case 'p':   // port
                 (*this)->port=atoi(optarg);
@@ -181,10 +184,8 @@ argparse(
                 break;
             case 'l':
                 g_log_visible=atoi(optarg); /* set log-level */
-                //printf("[Logging: Enable, Level = %s]\n", g_log_level_str[g_log_visible]);
                 break;
             case 'i':   // pipeline
-                //printf("[HTTP pipelining: Enable]\n");
                 (*this)->enable_pipe=1;
                 break;
             case '?':
@@ -193,14 +194,10 @@ argparse(
                  *  - argv[this_option_optind+1] : field-value
                  */
                 printf("Using ambiguous matching on `%s`.\n", argv[this_option_optind]+2);
-                
-                // printf("%d, %d, %d\n", get_req_header_name_enum_by_str(argv[this_option_optind]+2), argv[this_option_optind+1]!=NULL, get_req_header_name_enum_by_str(argv[this_option_optind+1]));
                 if(get_req_header_name_enum_by_str(argv[this_option_optind]+2)>0 
                     && argv[this_option_optind+1]!=NULL){ 
                     // also checking its value is valid & not another req header 
                     if(get_req_header_name_enum_by_str(argv[this_option_optind+1]+2)==0){ 
-                        // puts(argv[this_option_optind]);
-                        // puts(argv[this_option_optind+1]);
                         http_req_obj_ins_header_by_idx(&((*this)->http_req), 
                             get_req_header_name_enum_by_str(argv[this_option_optind]+2), 
                             argv[this_option_optind+1]);
@@ -301,9 +298,7 @@ argparse(
             url_num++;
             url_trav=url_trav->next;
         }
-        /** need to parse those urls when needed 
-         * - currently update randomly
-         */
+        // need to parse those urls when needed - currently update randomly
         ret=update_url_info_rand(this);
     }
 
@@ -369,6 +364,8 @@ int
 parse_url(
     parsed_args_t *this)
 {
+    /** FIXME: do not using strtok() */
+
     char *url=(this)->url;
     char *ori_url, *host_delim="/", *port_delim=":", *port_str=NULL;
     int ret=ERR_NONE, ori_len=0;
@@ -467,7 +464,6 @@ update_url_info_rand(
     }
 
     // free(url_trav); // we might need this urls later (picking another url)
-
     return USE_URL;
 }
 

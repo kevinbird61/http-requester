@@ -27,6 +27,10 @@ itoa(
     u64 number)
 {
     char *str=malloc((get_digits(number)+1)*sizeof(char));
+    if(str==NULL){
+        perror("Cannot allocate memory for thread information.");
+        exit(1);
+    }
     sprintf(str, "%lld", number);
     return str;
 }
@@ -55,6 +59,10 @@ u8 *
 getdate(void)
 {
     char *date=malloc(32*sizeof(char));
+    if(date==NULL){
+        perror("Cannot allocate memory for thread information.");
+        exit(1);
+    }
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     sprintf(date, "%04d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1,tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -67,6 +75,10 @@ copy_str_n_times(
     int n_times)
 {
     char *total=malloc((n_times+1)*(strlen(ori)));
+    if(total==NULL){
+        perror("Cannot allocate memory for thread information.");
+        exit(1);
+    }
     sprintf(total, "%s", ori);
     for(int i=1;i<n_times;i++){
         sprintf(total+strlen(total), "%s", ori);

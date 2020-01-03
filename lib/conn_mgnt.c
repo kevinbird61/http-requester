@@ -49,7 +49,8 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
             // using ring-like sending model (not always start from 0, each node has equal change)
             for(int i=0; i<this->args->conn; i++){
                 if(this->sockets[i].unsent_req==0 && this->sockets[i].sent_req==0){ // we can skip this one (which have finish its sending process)
-                    // finish, close
+                    // finish
+                    ufds[i].events = 0; // Don't monitor anything
                     continue;
                 }
 
@@ -670,6 +671,10 @@ create_conn_mgnt_non_blocking(
     parsed_args_t *args)
 {
     conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
+    if(mgnt==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=g_burst_length; // configurable
@@ -677,6 +682,10 @@ create_conn_mgnt_non_blocking(
 
     /* create socket lists */
     mgnt->sockets=calloc(args->conn, sizeof(struct _conn_t));
+    if(mgnt->sockets==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     for(int i=0;i<args->conn;i++){
         // create sockfd
         mgnt->sockets[i].sockfd=create_tcp_conn_non_blocking(args->host, itoa(args->port));
@@ -704,6 +713,10 @@ create_conn_mgnt(
     parsed_args_t *args)
 {
     conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
+    if(mgnt==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=g_burst_length; // configurable
@@ -711,6 +724,10 @@ create_conn_mgnt(
 
     /* create socket lists */
     mgnt->sockets=calloc(args->conn, sizeof(struct _conn_t));
+    if(mgnt->sockets==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     for(int i=0;i<args->conn;i++){
         // create sockfd
         mgnt->sockets[i].sockfd=create_tcp_conn(args->host, itoa(args->port));

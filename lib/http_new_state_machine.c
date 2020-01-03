@@ -597,6 +597,10 @@ http_resp_parser(
                                 state_m->resp->http_ver=ret;
                             } else { // if not support, just terminate
                                 char *tmp=malloc((state_m->parsed_len)*sizeof(char));
+                                if(tmp==NULL){
+                                    LOG(KB_EH, "Cannot allocate memory for thread information.");
+                                    exit(1);
+                                }
                                 snprintf(tmp, state_m->parsed_len, "%s", state_m->buff+(state_m->buf_idx-state_m->parsed_len));
                                 LOG(KB_PS, "[Version not support: %s]", tmp);
                                 free(tmp);
@@ -627,6 +631,10 @@ http_resp_parser(
                     // need to parse the chunk size here, and prepare to parse chunk extension
                     if( http_h_status_check->use_chunked ){
                         char *tmp=calloc(state_m->parsed_len, sizeof(char));
+                        if(tmp==NULL){
+                            LOG(KB_EH, "Cannot allocate memory for thread information.");
+                            exit(1);
+                        }
                         char *chunked_str=strndup(state_m->buff+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len);
                         sprintf(tmp, "%ld", strtol(chunked_str, NULL, 16));
                         if((atoi(tmp))>0){
@@ -688,7 +696,15 @@ state_machine_t *
 create_parsing_state_machine()
 {
     state_machine_t *new_obj = calloc(1, sizeof(state_machine_t));
+    if(new_obj==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     new_obj->buff=calloc(RECV_BUFF_SCALE*CHUNK_SIZE, sizeof(char));
+    if(new_obj->buff==NULL){
+        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        exit(1);
+    }
     new_obj->resp=create_http_header_status(new_obj->buff);
     new_obj->max_buff_size=RECV_BUFF_SCALE*CHUNK_SIZE;
     return new_obj;
