@@ -6,7 +6,7 @@
 #include "global.h"
 #include "abnf.h"
 
-/* TODO: error code enum (each func need to follow) */
+/* error code enum (argparse) */
 typedef enum {
     /* normal or success */
     ERR_NONE=0,                     // success
@@ -23,14 +23,14 @@ typedef enum {
     ERR_UNDEFINED
 } error_code;
 
-/* user input */
+/* maintain available url lists */
 struct urls {
     char *url;
     struct urls *next;
 };
 
 typedef struct _parsed_args_t {
-    u8                          flags;
+    u8                          flags;  // user parameters (see argparse.h)
     struct {
         u8  use_non_block:1,
             use_probe_mode:1,
@@ -40,15 +40,15 @@ typedef struct _parsed_args_t {
             reserved:3;
     };
     u16                         port;
-    u32                         thrd;   // threads
-    u32                         conn;   // connections
-    u32                         reqs;   // requests
+    u32                         thrd;           // threads
+    u32                         conn;           // connections (per thread)
+    u32                         reqs;           // total requests
     union {
-        char *                  filename;
-        char *                  url;
+        char *                  filename;       // template 
+        char *                  url;            // selected url
     };
-    struct urls*                urls;
-    char*                       method;
+    struct urls*                urls;           // maintain url lists
+    char*                       method;         // 
     char*                       scheme;
     char*                       host;
     char*                       path;

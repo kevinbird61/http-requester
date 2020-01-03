@@ -35,7 +35,6 @@ extern char *g_log_level_str[];
 // log enable (global)
 extern unsigned char g_log_visible;
 
-
 // mapping from `thrd id` to `thrd num`
 static inline int get_thrd_tid_from_id(int thrd_tid){
     for(int i=0; i<g_total_thrd_num; i++){ // linear search

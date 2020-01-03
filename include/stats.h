@@ -27,7 +27,7 @@
  */
 
 #include <stdio.h>
-// essential deps
+
 #include "conn_mgnt.h"
 #include "argparse.h"
 #include "global.h"

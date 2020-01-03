@@ -8,7 +8,7 @@ int main(int argc, char *argv[]){
 
     /* global var init */
     g_thrd_id_mapping=calloc(args->thrd, sizeof(int));
-    /* select mode */
+    /* select mode (default is loadgen) */
     if(args->use_probe_mode){
         goto kb_probe_mode;
     } else {
@@ -76,7 +76,7 @@ kb_loadgen:{
         CLEAR_SCREEN();
         do {
             UPDATE_SCREEN();
-            usleep(500000); // print periodically (0.5 sec)
+            usleep(USEC); // print periodically (0.5 sec)
         } while(STATS_PROGRESS(total_req));
         // print user config after finish
         print_config(args);

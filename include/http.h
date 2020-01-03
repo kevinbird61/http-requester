@@ -61,14 +61,14 @@ int http_req_finish(char **rawdata, http_req_header_status_t *req);
  */
 // create http_header_status_obj
 http_res_header_status_t *create_http_header_status(char *readbuf);
-// insert & check if there have any conflict
+// insert & check if there have any conflict (current implementation just override it)
 int insert_new_header_field_name(http_res_header_status_t *status, u32 idx, u32 offset);
 int check_res_header_field_name(http_res_header_status_t *status, char *field_name);
 int insert_new_header_field_value(http_res_header_status_t *status, u32 idx, u32 offset);
 int update_res_header_idx(http_res_header_status_t *status, u32 shift_offset);
 
 /** http_helper.c:
- * - encap/decap those mapping code (with prefix `get_*`/`encap_*`)
+ * - encap/decap those mapping code, from code to str and vice versa. (with prefix `get_*`/`encap_*`)
  */
 int encap_http_version(char *version);
 int encap_http_method_token(char *method);

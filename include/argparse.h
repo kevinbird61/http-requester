@@ -60,17 +60,17 @@ NWWMMWNWMMWNWMMWWWMMMWWWMMWNWMMWWWMMMWNWMMWNWMMWWWWMWWWWMMWWWWMMWNWWMWWWWMMWNWMM
 
 /* user parameters:
  * - using flags to determine using default or user specified value:
- *      0x01: conc
- *      0x02: conn
- *      0x04: file (if this bit is set, then disable url and method)
- *      0x08: url
+ *      0x01: conn  (connections)
+ *      0x02: reqs  (total requests)
+ *      0x04: file  (if this bit is set, then disable url and method)
+ *      0x08: url   
  *      0x10: port
  *      0x20: method
  *      0x40: thrd
  */
 enum {
-    SPE_CONC=0x01,
-    SPE_CONN=0x02,
+    SPE_CONN=0x01,
+    SPE_REQS=0x02,
     SPE_FILE=0x04,
     SPE_URL=0x08,
     SPE_PORT=0x10,

@@ -108,7 +108,8 @@ u8
 stats_progress(
     u32 total_workload)
 {
-    u32 curr_workload=0, num_fin_thrd=0;
+    u32 curr_workload=0, num_fin_thrd=0, leftover=0;
+    float exec_time=(read_tsc()-STATS.total_time)/(float)cpuFreq, remain_time=0;
     for(int i=0; i<g_total_thrd_num; i++){
         curr_workload+=priv_statistics[i].recv_resps;
         if(priv_statistics[i].is_fin){
@@ -116,13 +117,16 @@ stats_progress(
         }
     }
     
-    // main thread
-    printf("Complete: %-3d%% (%10d reqs), execution time: %-5.2f sec.\n", 
+    // calculate remaining time
+    leftover=total_workload-curr_workload;
+    remain_time=(leftover*exec_time)/curr_workload;
+    // main thread (total progress)
+    printf("Completed: %-3d%% (%10d reqs), execution time: %-5.2f sec. (Remaining: %-5.2f sec.)\n", 
         (curr_workload*100)/total_workload, curr_workload,
-        (read_tsc()-STATS.total_time)/(float)cpuFreq);
-    // other thread
+        exec_time, remain_time);
+    // other thread (individual progress)
     for(int i=0; i<g_total_thrd_num; i++){
-        printf("└─> (Thrd: %-3d) Complete: %-3lld%% (%10lld reqs)\n", 
+        printf("└─> (Thrd: %-3d) Completed: %-3lld%% (%10lld reqs)\n", 
             i, (priv_statistics[i].recv_resps*100)/(total_workload/g_total_thrd_num), 
             priv_statistics[i].recv_resps);
     }
@@ -296,16 +300,6 @@ stats_dump()
         printf("* %-30s: %d\n", "Avg. workload per connection", statistics.workload/statistics.conn_num);
         printf("* %-30s: %d\n", "Number of retry connections", statistics.retry_conn_num);
         printf("* %-30s: %f\n", "Avg. retry (per conn)", statistics.retry_conn_num/(float)statistics.conn_num);
-        /** this part will be unavailable under multi-threads mode 
-         * (because each thread has its connections, so this part need to re-design)
-         * 
-        printf("* Each connection status: \n");
-        printf("|%-10s|%-10s|%-10s|%-10s|\n", "socket ID", "unsent_req", "sent_req", "recv_resp");
-        for(int i=0; i<statistics.conn_num; i++){
-            printf("|%-10d|%-10d|%-10d|%-10d|\n", 
-                    statistics.sockets[i].sockfd, statistics.sockets[i].unsent_req, 
-                    statistics.sockets[i].sent_req, statistics.sockets[i].rcvd_res);
-        }*/
     }
     printf("********************************************************************************\n");
     // time

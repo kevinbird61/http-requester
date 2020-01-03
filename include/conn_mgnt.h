@@ -20,7 +20,6 @@ struct _thrd_t {
     pthread_t               tid;
     int                     num;
     struct _conn_mgnt_t     *mgnt;
-    // FIXME: shared info
 };
 
 // per connection
@@ -29,41 +28,37 @@ struct _conn_t {
     int             sockfd;         // socket fd
     int             unsent_req;     // unfinished req
     int             sent_req;       // unanswered req
-    u16             num_gap;        // number of gaps between "sent" and "rcvd"
-    int             leftover;
     int             rcvd_res;       // received resp
+    u16             num_gap;        // currrent allowed burst size 
+    int             leftover;       // in non-blocking sent with pipelining, we might sent an incompleted requests, so we need to sent out the rest to prevent error of 400 bad requests
     int             retry_conn_num; // retry connection number (create a new sockfd)
     int             retry;          // (reserved)
-};  
+} __attribute__((packed));  
 
 typedef struct _conn_mgnt_t {
+    struct _conn_t* sockets;
     parsed_args_t*  args;       // user's arguments
     u8              thrd_num;   // belong to which thread.
-    u8              pipe;       // ON/OFF, enable pipeline or not (default is 0, not enable)
     u16             num_gap;    // number of gaps between "sent" and "rcvd"
-    u8              is_wait;    // 
     u32             total_req;  // total # of reqs
-    u32             sent_req;   // # of requests have been sent
-    u32             rcvd_res;   // # of responses have been received
-    struct _conn_t* sockets;
-} conn_mgnt_t;
+    struct {
+        u8          pipe:1,     // ON/OFF, enable pipeline or not (default is 0, not enable)
+                    is_wait:1,  // FIXME: enhance the waiting mechanism of retry connection
+                    reserved: 6;
+    };
+}  __attribute__((packed)) conn_mgnt_t;
 
-// create 
-conn_mgnt_t *create_conn_mgnt(parsed_args_t *args);
-conn_mgnt_t *create_conn_mgnt_non_blocking(parsed_args_t *args);
-/** main function: 
+
+/** main function: (multiple threads, multiple sockets)
  *  - run with configuration (manage all connections)
  *  - handle all connections (with different cases)
  *  - retry the unanswer one
  */
-// single thread, multiple socket (non-blocking)
-int conn_mgnt_run(conn_mgnt_t *this);
-int conn_mgnt_run_non_blocking(conn_mgnt_t *this);
-// single thread, single socket
-int conn_mgnt_run_blocking(conn_mgnt_t *this);
-// update args
-int conn_mgnt_update_args(parsed_args_t *args);
-// update num_gap
-int conn_mgnt_update_num_gap(u32 num_gap);
+// create 
+conn_mgnt_t *create_conn_mgnt_non_blocking(parsed_args_t *args);
+conn_mgnt_t *create_conn_mgnt(parsed_args_t *args);
+// runner
+int conn_mgnt_run_non_blocking(conn_mgnt_t *this); // full non-blocking (connect, send, recv)
+int conn_mgnt_run(conn_mgnt_t *this); // hybrid mode (non-blocking recv + blocking send)
 
 #endif

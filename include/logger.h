@@ -15,7 +15,7 @@
 
 /** Record any activities,
  * - design:
- *      - file location: `/tmp/http_requester_<thread-id>.log`
+ *      - file location: `/tmp/kb<thread-id>.log`
  * - format: 
  *      [@TIME][@LOG_LEVEL][FUNC] Description.
  *

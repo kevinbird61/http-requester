@@ -123,12 +123,12 @@ argparse(
             case 'c':   // connections (socket)
                 (*this)->conn=atoi(optarg);
                 (*this)->conn=(*this)->conn>0?(*this)->conn:1; // default value (when illegal)
-                (*this)->flags|=SPE_CONC;
+                (*this)->flags|=SPE_CONN;
                 break;
             case 'n':   // total requests
                 (*this)->reqs=atoi(optarg);
                 (*this)->reqs=(*this)->reqs>0?(*this)->reqs:1; // default value (when illegal)
-                (*this)->flags|=SPE_CONN;
+                (*this)->flags|=SPE_REQS;
                 break;
             case 't':   // thread number
                 (*this)->thrd=atoi(optarg);
@@ -233,10 +233,10 @@ argparse(
     }
 
     // print the system parameters 
-    if(!((*this)->flags&SPE_CONC)){
+    if(!((*this)->flags&SPE_CONN)){
         (*this)->conn=1;
     } 
-    if(!((*this)->flags&SPE_CONN)){
+    if(!((*this)->flags&SPE_REQS)){
         (*this)->reqs=2;
     }
     if(!((*this)->flags&SPE_FILE)){
@@ -370,8 +370,9 @@ parse_url(
     parsed_args_t *this)
 {
     char *url=(this)->url;
+    char *ori_url, *host_delim="/", *port_delim=":", *port_str=NULL;
+    int ret=ERR_NONE, ori_len=0;
 
-    int ret=ERR_NONE;
     if(!strncasecmp((this)->url, "http:", 5)){
         // start from "http://<URL>"
         (this)->url=strndup((this)->url+7, strlen((this)->url)-7); // "http://" = 7 bytes   
@@ -387,27 +388,24 @@ parse_url(
     }
 
     // perform same parsing 
-    int ori_len=strlen((this)->url);
-    char *ori_url, *host_delim="/", *port_delim=":";
+    ori_len=strlen((this)->url);
     ori_url=strdup((this)->url);
     // get host
     (this)->host=strtok((this)->url, host_delim);
     // get port (if available)
-    char *port_str=NULL;
     port_str=strtok((this)->host, port_delim); // now port_str=host
     port_str=strtok(NULL, port_delim); // if [:PORT] is existed, then now port_str is the port value
     if(port_str!=NULL){ // [:PORT] is existed
         u16 orig_port=(this)->port;
         (this)->port=atoi(port_str);
-        if((this)->port<=0 || (this)->port>65535){ // invalid, then we can't use this value
+        if((this)->port<=0 || (this)->port>65535){ // check this port value, if invalid, then we can't use this value, rollback to origin
             (this)->port==orig_port; // use orig value 
         }
     }
-    // printf("Host: %s, Port: %d\n", *host, (*port));
+
     // check host length limitation, refs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames
     if(strlen((this)->host)>=253){
         printf("Invalid Host length: %ld\nRefs: https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_hostnames\n", strlen((this)->host));
-        // exit(1);
         return ERR_INVALID_HOST_LEN;
     }
     // get path 
@@ -433,7 +431,7 @@ update_url_info_rand(
     parsed_args_t **this)
 {
     // randomly pick an URL to update relative information
-    int num_url=0;
+    int num_url=0, picked_id=0, ret=0;
     struct urls *url_trav=(*this)->urls;
     while(url_trav!=NULL){
         num_url++;
@@ -441,15 +439,15 @@ update_url_info_rand(
     }
     url_trav=(*this)->urls;
     srand(time(NULL));
-    int picked_id=(rand()%num_url);
+    picked_id=(rand()%num_url);
     //printf("Picked id: %d\n", picked_id);
     while(picked_id--){
         url_trav=url_trav->next;
     }
     (*this)->url=url_trav->url;
-    //printf("Num of urls: %d, Randomly pick: %s\n", num_url, (*this)->url);
+
     // only one url, use url only
-    int ret=parse_url(*this);
+    ret=parse_url(*this);
     switch(ret){
         case ERR_NONE:
             if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num

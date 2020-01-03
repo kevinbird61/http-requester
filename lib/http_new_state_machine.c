@@ -14,9 +14,6 @@ multi_bytes_http_parsing_state_machine_non_blocking(
     control_var_t control_var;
     /* Parse the data, and store the result into respones objs */
     while(flag){
-        /*if(fin_resp==1)
-            printf("NON-BLOCKING while\n");*/
-
         // call parser (store the state and response obj into state_machine's instance)
         control_var=http_resp_parser(state_m);
 recv_again:
@@ -179,7 +176,6 @@ recv_again:
         }
     }
 
-    control_var.failed_resp=num_reqs; // the leftover are unfinish num_resp 
     control_var.num_resp=fin_resp;
     return control_var;
 }
@@ -344,7 +340,6 @@ multi_bytes_http_parsing_state_machine(
         }
     }
     
-    control_var.failed_resp=num_reqs; // the leftover are unfinish num_resp 
     control_var.num_resp=fin_resp;
     return control_var;
 }
@@ -382,18 +377,6 @@ http_resp_parser(
         }
         // check if header using transfer-encoding
         if(state_m->use_chunked){
-            /*if(!(--state_m->chunked_size)){
-                state_m->curr_chunked_size++;
-                LOG(INFO, "Finish chunk, idx: %d (Parsed: %d)", state_m->buf_idx-1, state_m->curr_chunked_size);
-                // state_m->last_fin_idx=state_m->buf_idx-1; // update last_fin_idx
-                state_m->parsed_len=0;
-                state_m->use_chunked=0;
-                state_m->p_state=NEXT_CHUNKED;
-            } else {
-                // Parsing other chunk features here 
-                state_m->curr_chunked_size++;
-                continue;
-            }*/
             if(state_m->chunked_size>0){
                 // move idx
                 int avail_data=(state_m->data_size-state_m->buf_idx)+1;
@@ -416,14 +399,6 @@ http_resp_parser(
 
         // check if header using content-length
         if(state_m->use_content_length){
-            /*if(!(--state_m->content_length)){
-                LOG(INFO, "[CL] Parsing process has been done. Total content length: %d bytes (%d KB)", state_m->total_content_length, state_m->total_content_length/1024);
-                control_var->rcode=RCODE_FIN;
-                // return control_var;
-                break;
-            }
-            continue; // if not enough, then keep going
-            */
             if(state_m->content_length>0){
                 // move idx
                 int avail_data=(state_m->data_size-state_m->buf_idx)+1;
@@ -458,12 +433,8 @@ http_resp_parser(
                     } else {
                         /** (last-element) start-line
                          * - Response: Reason phrase
+                         * (we don't need to recognize reason phrase)
                          */
-                        /*char *tmp;
-                        tmp=malloc((state_m->parsed_len)*sizeof(char));
-                        snprintf(tmp, state_m->parsed_len, "%s", state_m->buff+(state_m->buf_idx-state_m->parsed_len));
-                        LOG(INFO,  "[Reason Phrase: %s]", tmp);
-                        free(tmp);*/
                     }
                     state_m->p_state=next_http_state(state_m->p_state, '\r');
                     state_m->parsed_len=0;
@@ -501,7 +472,7 @@ http_resp_parser(
                      *          (also using `Location` to perform redirect)
                      *      - ...
                      *
-                     * - if 4xx or 5xx, then connection can be terminated; (FIXME: Can we terminate directly?)
+                     * - if 4xx or 5xx, then connection can be terminated; (Return RCODE_4XX_* or RCODE_5XX_*)
                      *
                      */
                     if(state_m->resp->status_code<_200_OK){

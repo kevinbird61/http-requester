@@ -2,17 +2,17 @@
 #define __CONTROL_VAR__
 
 #include <stddef.h>
+#include "types.h"
 
 /**
  * Using rcode to determine that which action it should take.
  */
 
 typedef struct _control_var_t {
-    int     rcode;
-    int     num_resp;
-    int     failed_resp;
-    int     return_obj_type;
-    void*   return_obj;
+    unsigned char   rcode;              // type of return 
+    int             num_resp;           // number of finished responses
+    int             return_obj_type;    // type of return obj (use to type casting)
+    void*           return_obj;         // store the value/obj we want to return 
 } control_var_t;
 
 // enum - rcode
