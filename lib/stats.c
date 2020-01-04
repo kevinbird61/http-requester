@@ -141,7 +141,8 @@ stats_dump()
         statistics.sent_bytes+=priv_statistics[i].sent_bytes;
         statistics.sent_reqs+=priv_statistics[i].sent_reqs;
         // resp pkt,byte counts
-        statistics.recv_bytes+=priv_statistics[i].recv_bytes;
+        // statistics.recv_bytes+=priv_statistics[i].recv_bytes;
+        statistics.recv_bytes+=(priv_statistics[i].hdr_size+priv_statistics[i].body_size);
         statistics.hdr_size+=priv_statistics[i].hdr_size;
         statistics.body_size+=priv_statistics[i].body_size;
         statistics.recv_resps+=priv_statistics[i].recv_resps;

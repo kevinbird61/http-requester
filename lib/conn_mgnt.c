@@ -107,6 +107,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     this->sockets[i].unsent_req-=control_var.num_resp;
                     this->sockets[i].sent_req-=control_var.num_resp;
                     this->sockets[i].sent_req=(this->sockets[i].sent_req<0)? 0: this->sockets[i].sent_req; // can sent_req be negative ?
+                    STATS_INC_RESP_NUM(this->thrd_num, control_var.num_resp); // we increase the total response here
                     
                     switch(control_var.rcode){
                         case RCODE_POLL_DATA: // still have unfinished data (pipe), don't wait

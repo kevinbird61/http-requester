@@ -107,10 +107,8 @@ recv_again:
             case RCODE_CLIENT_ERR: // 4xx
                 LOG(KB_SM, "%s", rcode_str[control_var.rcode]);
                 /* increase stats */
-                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same field
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
-                STATS_INC_RESP_NUM(state_m->thrd_num, 1);
                 STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
                 flag=0;
                 break;
@@ -120,10 +118,8 @@ recv_again:
                 num_reqs--; // finish one response
                 fin_resp++;
                 /* increase stats */
-                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same field
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
-                STATS_INC_RESP_NUM(state_m->thrd_num, 1);
                 STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
                 if(num_reqs<=0){ // check if we have finished all response or not
                     LOG(KB_SM, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
