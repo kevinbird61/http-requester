@@ -29,17 +29,21 @@ struct _conn_t {
     int             unsent_req;     // unfinished req
     int             sent_req;       // unanswered req
     int             rcvd_res;       // received resp
-    u16             num_gap;        // currrent allowed burst size 
-    int             leftover;       // in non-blocking sent with pipelining, we might sent an incompleted requests, so we need to sent out the rest to prevent error of 400 bad requests
-    int             retry_conn_num; // retry connection number (create a new sockfd)
-    int             retry;          // (reserved)
+    struct {
+        u32         leftover: 8,    // in non-blocking sent with pipelining, we might sent an incompleted requests, so we need to sent out the rest to prevent error of 400 bad requests
+                    num_gap: 24;    // currrent allowed burst size 
+        u32         retry_conn_num: 24,
+                    retry: 8;
+    };
 } __attribute__((packed));  
 
 typedef struct _conn_mgnt_t {
     struct _conn_t* sockets;
     parsed_args_t*  args;       // user's arguments
-    u8              thrd_num;   // belong to which thread.
-    u16             num_gap;    // number of gaps between "sent" and "rcvd"
+    struct {
+        u32         thrd_num: 8,    // belong to which thread.
+                    num_gap: 24;    // number of gaps between "sent" and "rcvd"
+    };
     u32             total_req;  // total # of reqs
     struct {
         u8          pipe:1,     // ON/OFF, enable pipeline or not (default is 0, not enable)

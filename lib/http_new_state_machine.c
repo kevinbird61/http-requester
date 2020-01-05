@@ -1,347 +1,75 @@
 #include "http.h"
 
-control_var_t
-multi_bytes_http_parsing_state_machine_non_blocking(
-    state_machine_t *state_m,
-    int sockfd,
-    u32 num_reqs)
+// current only use in Response
+static inline http_state
+next_http_state(http_state cur_state, char ch)
 {
-    /* get all the data:
-     * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
-     */
-    /* stats */
-    int flag=1, recvbytes=0, fin_resp=0, fin_idx=0;
-    control_var_t control_var;
-    /* Parse the data, and store the result into respones objs */
-    while(flag){
-        // call parser (store the state and response obj into state_machine's instance)
-        control_var=http_resp_parser(state_m);
-recv_again:
-        switch (control_var.rcode)
-        {
-            case RCODE_POLL_DATA:
-                // if not enough, keep polling 
-                if(num_reqs==0){ // finish all response
-                    control_var.num_resp=fin_resp;
-                    control_var.rcode=RCODE_FIN;
-                    return control_var;
-                }
-                /* require another recv() to poll new data */
-                // check upperbound & move (prevent using too many realloc, and too much buff length)
-                if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
-                    /** 
-                     * Meaning of each idx:
-                     * - last_fin_idx: end idx of previous response 
-                     * - data_size: available data size (data we want to move)
-                     * - parsed_len: how many data has been parsed
-                     * - msg_hdr_len: header length
-                     * 
-                     * Logic:
-                     * We move the unfinished data to the front
-                     */
-                    // then move the leftover to the front
-                    if(state_m->use_content_length || state_m->use_chunked){ 
-                        state_m->data_size=state_m->resp->msg_hdr_len; 
-                        state_m->parsed_len=0; 
-                    } else {
-                        if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
-                            state_m->data_size=state_m->resp->msg_hdr_len;
-                        } else {
-                            // other case (e.g. while parsing header and not finished yet)
-                            state_m->data_size=state_m->data_size-state_m->last_fin_idx;
-                        }
-                    }
-                    // need to adjust the offset of each response obj
-                    update_res_header_idx(state_m->resp, state_m->last_fin_idx);
-                    LOG(KB_SM ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
-                    state_m->buf_idx=state_m->data_size;
-                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size); // move the unfinished data to the front of buffer
-                    // FIXME: do we need to reset the rest?
-                    // memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
-                    state_m->last_fin_idx=0; // move the last_fin_idx to the starting point
-                }
-
-                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, MSG_DONTWAIT);
-                if(recvbytes>0){
-                    LOG(KB_SM, "RECV: %d bytes", recvbytes);
-                    state_m->prev_rcv_len=recvbytes;
-                    state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
-                } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
-                    if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
-                        LOG(KB_SM, "Keep parsing: %d (%d)", state_m->buf_idx, state_m->data_size);
-                        //continue;
-                        break;
-                    } else {
-                        LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, state_m->data_size);
-                        // reset state machine
-                        reset_parsing_state_machine(state_m);
-                        control_var.rcode=RCODE_CLOSE; // server turn off the connection, let conn_mgnt handle
-                        flag=0;
-                        break;
-                    }
-                } else { 
-                    // -1
-                    // LOG(NORMAL, "ERROR RECV: %d bytes, num_reqs: %d, fin_resp: %d, %d", recvbytes, num_reqs, fin_resp, control_var.rcode);
-                    if(num_reqs>0){ // not recv all resp, but don't hang in here, turn back (don't block)
-                        flag=0;
-                        break;
-                    } else { // num_reqs<=0, 
-                        control_var.num_resp=fin_resp;
-                        control_var.rcode=RCODE_FIN;
-                        return control_var;
-                    }
-                }
-                break;
-            case RCODE_REDIRECT:
-                /* perform redirection, notify caller that need to abort the response and resend */
-                LOG(KB_SM, "Require rediretion.");
-                // return control_var;
-                flag=0;
-                break;
-            case RCODE_ERROR:
-                // print the error message instead of exit?
-                LOG(KB_SM, "Parsing error occur.");
-                flag=0;
-                break;
-            case RCODE_SERVER_ERR: // 5xx
-            case RCODE_CLIENT_ERR: // 4xx
-                LOG(KB_SM, "%s", rcode_str[control_var.rcode]);
-                /* increase stats */
-                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
-                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
-                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
-                flag=0;
-                break;
-            case RCODE_FIN:
-            case RCODE_NEXT_RESP:
-                LOG(KB_SM, "Finish one respose.");
-                num_reqs--; // finish one response
-                fin_resp++;
-                /* increase stats */
-                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
-                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
-                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
-                if(num_reqs<=0){ // check if we have finished all response or not
-                    LOG(KB_SM, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
-                    control_var.num_resp=fin_resp;
-                    control_var.rcode=RCODE_FIN;
-                    return control_var;
-                }
-                /* update fin_idx */
-                state_m->last_fin_idx=state_m->buf_idx;
-
-                // Finish one resp, and need to parse next:
-                // - create a new resp obj (TODO: maintain a response queue to store
-                //  all the parsed responses.)
-                // - we don't modify the buf_idx, just pass buff ptr to response obj.
-                // - reset the essential states, prepare for parsing next response.
-                memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
-                state_m->resp->buff=state_m->buff;
-                state_m->p_state=VER;
-                state_m->resp->status_code=0;
-                state_m->resp->http_ver=0;
-                state_m->use_content_length=0;
-                state_m->use_chunked=0;
-                state_m->content_length=0;
-                state_m->total_content_length=0;
-                state_m->curr_chunked_size=0;
-                state_m->parsed_len=0; // prevent from reading wrong starting point
-                break;
-            case RCODE_NOT_SUPPORT: 
-                /* cautious: this case could be caused by parsing error. 
-                 * but mostly it will cause by non-blocking recv (which means 
-                 * that still need to check if there still need to poll another
-                 * data)
-                 */
-                LOG(KB_SM, "Not support."); // huge burst will hang up here
-                state_m->parsed_len=0;
-                if(state_m->buf_idx < state_m->data_size){ // still have other data, which means that parsing error 
-                    flag=0;
-                    control_var.rcode=RCODE_ERROR; // or using RCODE_ERROR
-                } else {
-                    // require another data (keep parsing)
-                    state_m->buf_idx=state_m->last_fin_idx;
-                    control_var.rcode=RCODE_POLL_DATA;
-                    goto recv_again; /* receive as more as it can */
-                }
-                break;
-            default:
-                LOG(KB_SM, "Unknown: %d", control_var.rcode);
-                flag=0;
-                break;
-        }
+    switch(cur_state)
+    {
+        // start-line
+        case START_LINE:
+            return VER;
+        case VER:
+            switch(ch){
+                case ' ':
+                    return CODE_OR_TOKEN;
+                default:
+                    return VER;
+            }
+        case CODE_OR_TOKEN:
+            switch(ch){
+                case ' ':
+                    return REASON_OR_RESOURCE;
+                case '\r':
+                case '\n':
+                    return HEADER;
+                default:
+                    return CODE_OR_TOKEN;
+            }
+        case REASON_OR_RESOURCE:
+            switch(ch){
+                case ' ':
+                    return REASON_OR_RESOURCE;
+                case '\r':
+                case '\n':
+                default:
+                    return HEADER;
+            }
+        // header
+        case HEADER:
+            switch(ch){
+                case '\r':
+                case '\n':
+                    return FIELD_NAME;
+                default:
+                    return HEADER;
+            }
+        case FIELD_NAME:
+            switch(ch){
+                case ':':
+                    return FIELD_VALUE;
+                case '\r':
+                    return MSG_BODY;
+                default:
+                    return FIELD_NAME;
+            }
+        case FIELD_VALUE:
+            switch(ch){
+                case '\r':
+                    return HEADER;
+                default:
+                    return FIELD_VALUE;
+            }
+        case MSG_BODY:
+            return MSG_BODY;
+        case CHUNKED:
+            return CHUNKED;
+        default:
+            return cur_state;
     }
-
-    control_var.num_resp=fin_resp;
-    return control_var;
 }
 
-control_var_t
-multi_bytes_http_parsing_state_machine(
-    state_machine_t *state_m,
-    int sockfd,
-    u32 num_reqs)
-{
-    /* get all the data:
-     * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
-     */
-    /* stats */
-    int flag=1, recvbytes=0, fin_resp=0;
-    control_var_t control_var;
-    /* Parse the data, and store the result into respones objs */
-    /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
-     *  to prevent occupying too much memory ?
-     */
-    while(flag){
-        // call parser (store the state and response obj into state_machine's instance)
-        control_var=http_resp_parser(state_m);
-        switch (control_var.rcode)
-        {
-            case RCODE_POLL_DATA:
-                // if not enough, keep polling 
-                if(!num_reqs){ // finish all response
-                    flag=0;
-                    break;
-                }
-                /* require another recv() to poll new data */
-                // check upperbound & move (prevent using too many realloc, and too much buff length)
-                // if( (strlen(state_m->buff)) > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
-                if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
-                    /* we need to skip the chunked data (or store it temporary) to prevent override the http header */
-                    if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
-                        // override current chunk (to prevent too many chunked in one response) 
-                        // can't override the hdr, so move the reading ptr to `last_fin_idx + msg_hdr_len`
-                        // FIXME: what if last_fin_idx is too large?
-                        state_m->data_size=state_m->resp->msg_hdr_len;
-                    } else {
-                        // other case
-                        state_m->data_size=state_m->data_size-state_m->last_fin_idx;
-                    }
-                    LOG(KB_SM ,"Data bytes: %d, last_fin_idx=%d (use_chunked: %d, chunked size=%d)", state_m->data_size, state_m->last_fin_idx, state_m->use_chunked, state_m->chunked_size);
-                    // then move the leftover to the front, also need to reset buf_idx;
-                    if(state_m->use_content_length ){ // if parsing chunk data now, then we just set the data_size & parse_len to 0
-                        state_m->data_size=0; // if parsing "content length" (chunked need to consider more case), we don't care the data_size (just set to 0, means that all parsed content has been dropped -> we don't store it currently)
-                        state_m->parsed_len=0; 
-                    }
-                    // need to adjust the offset of each response obj
-                    update_res_header_idx(state_m->resp, state_m->last_fin_idx);
-                    LOG(KB_SM ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
-                    state_m->buf_idx=state_m->data_size;
-                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size);
-                    // reset the rest and fin_idx
-                    memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
-                    state_m->last_fin_idx=0; 
-                }
-               
-
-                /* FIXME: check the connection state before call recv() */
-                // check_tcp_conn_stat(sockfd);
-                /*if(get_tcp_conn_stat(sockfd)==TCP_CLOSE){
-                    // connection is close or ready to close 
-                    LOG(WARNING, "Connection(%d) is closed.", sockfd);
-                    flag=0;
-                    break;
-                }*/
-
-                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
-                state_m->prev_rcv_len=recvbytes;
-                if(recvbytes>0){
-                    LOG(KB_SM, "RECV: %d bytes", recvbytes);
-                    state_m->prev_rcv_len=recvbytes;
-                    state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
-                } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
-                    if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
-                        LOG(KB_SM, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
-                        break;
-                    } else {
-                        LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
-                        // reset state machine
-                        reset_parsing_state_machine(state_m);
-                        // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)
-                        control_var.rcode=RCODE_CLOSE; // server turn off the connection
-                        flag=0;
-                        break;
-                    }
-                } else { // don't hang in here, turn back
-                    // -1
-                    flag=0;
-                    break; 
-                }
-                break;
-            case RCODE_REDIRECT:
-                /* perform redirection, notify caller that need to abort the response and resend */
-                LOG(KB_SM, "Require rediretion.");
-                return control_var;
-                //flag=0;
-                //break;
-            case RCODE_ERROR:
-                // print the error message instead of exit?
-                LOG(KB_SM, "Parsing error occur.");
-                flag=0;
-                break;
-            case RCODE_SERVER_ERR: // 5xx
-            case RCODE_CLIENT_ERR: // 4xx
-                LOG(KB_SM, "%s", rcode_str[control_var.rcode]);
-                /* increase stats */
-                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
-                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
-                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
-                STATS_INC_RESP_NUM(state_m->thrd_num, 1);
-                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
-                flag=0;
-                break;
-            case RCODE_FIN:
-            case RCODE_NEXT_RESP:
-                LOG(KB_SM, "Finish one respose.");
-                num_reqs--; // finish one response
-                fin_resp++;
-                /* increase stats */
-                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
-                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
-                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
-                STATS_INC_RESP_NUM(state_m->thrd_num, 1);
-                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
-                /* update fin_idx */
-                state_m->last_fin_idx=state_m->buf_idx;
-
-                // Finish one resp, and need to parse next:
-                // - create a new resp obj (TODO: maintain a response queue to store
-                //  all the parsed responses.)
-                // - we don't modify the buf_idx, just pass buff ptr to response obj.
-                // - reset the essential states, prepare for parsing next response.
-                memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
-                state_m->resp->buff=state_m->buff;
-                state_m->p_state=VER;
-                state_m->resp->status_code=0;
-                state_m->resp->http_ver=0;
-                state_m->use_content_length=0;
-                state_m->use_chunked=0;
-                state_m->content_length=0;
-                state_m->total_content_length=0;
-                state_m->curr_chunked_size=0;
-                state_m->parsed_len=0; // prevent from reading wrong starting point
- 
-                break;
-            case RCODE_NOT_SUPPORT: /* cautious: this case could be caused by parsing error. */
-                LOG(KB_SM, "Not support.");
-                flag=0; // do not keep parsing, break 
-                /* FIXME: do we need to recover from this kind of error? */
-                state_m->buf_idx=state_m->last_fin_idx;
-                state_m->parsed_len=0;
-                break; 
-            default:
-                LOG(KB_SM, "Unknown: %d", control_var.rcode);
-                flag=0;
-                break;
-        }
-    }
-    
-    control_var.num_resp=fin_resp;
-    return control_var;
-}
-
-static inline 
-control_var_t
+static inline control_var_t
 http_resp_parser(
     state_machine_t *state_m)
 {
@@ -688,6 +416,336 @@ http_resp_parser(
     return control_var;
 }
 
+control_var_t
+multi_bytes_http_parsing_state_machine_non_blocking(
+    state_machine_t *state_m,
+    int sockfd,
+    u32 num_reqs)
+{
+    /* get all the data:
+     * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
+     */
+    /* stats */
+    int flag=1, recvbytes=0, fin_resp=0, fin_idx=0;
+    control_var_t control_var;
+    /* Parse the data, and store the result into respones objs */
+    while(flag){
+        // call parser (store the state and response obj into state_machine's instance)
+        control_var=http_resp_parser(state_m);
+recv_again:
+        switch (control_var.rcode)
+        {
+            case RCODE_POLL_DATA:
+                // if not enough, keep polling 
+                if(num_reqs==0){ // finish all response
+                    control_var.num_resp=fin_resp;
+                    control_var.rcode=RCODE_FIN;
+                    return control_var;
+                }
+                /* require another recv() to poll new data */
+                // check upperbound & move (prevent using too many realloc, and too much buff length)
+                if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                    /** 
+                     * Meaning of each idx:
+                     * - last_fin_idx: end idx of previous response 
+                     * - data_size: available data size (data we want to move)
+                     * - parsed_len: how many data has been parsed
+                     * - msg_hdr_len: header length
+                     * 
+                     * Logic:
+                     * We move the unfinished data to the front
+                     */
+                    // then move the leftover to the front
+                    if(state_m->use_content_length || state_m->use_chunked){ 
+                        state_m->data_size=state_m->resp->msg_hdr_len; 
+                        state_m->parsed_len=0; 
+                    } else {
+                        if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
+                            state_m->data_size=state_m->resp->msg_hdr_len;
+                        } else {
+                            // other case (e.g. while parsing header and not finished yet)
+                            state_m->data_size=state_m->data_size-state_m->last_fin_idx;
+                        }
+                    }
+                    // need to adjust the offset of each response obj
+                    update_res_header_idx(state_m->resp, state_m->last_fin_idx);
+                    LOG(KB_SM ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
+                    state_m->buf_idx=state_m->data_size;
+                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size); // move the unfinished data to the front of buffer
+                    // FIXME: do we need to reset the rest?
+                    // memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
+                    state_m->last_fin_idx=0; // move the last_fin_idx to the starting point
+                }
+
+                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, MSG_DONTWAIT);
+                if(recvbytes>0){
+                    LOG(KB_SM, "RECV: %d bytes", recvbytes);
+                    state_m->prev_rcv_len=recvbytes;
+                    state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
+                } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
+                    if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
+                        LOG(KB_SM, "Keep parsing: %d (%d)", state_m->buf_idx, state_m->data_size);
+                        //continue;
+                        break;
+                    } else {
+                        LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, state_m->data_size);
+                        // reset state machine
+                        reset_parsing_state_machine(state_m);
+                        control_var.rcode=RCODE_CLOSE; // server turn off the connection, let conn_mgnt handle
+                        flag=0;
+                        break;
+                    }
+                } else { 
+                    // -1
+                    // LOG(NORMAL, "ERROR RECV: %d bytes, num_reqs: %d, fin_resp: %d, %d", recvbytes, num_reqs, fin_resp, control_var.rcode);
+                    if(num_reqs>0){ // not recv all resp, but don't hang in here, turn back (don't block)
+                        flag=0;
+                        break;
+                    } else { // num_reqs<=0, 
+                        control_var.num_resp=fin_resp;
+                        control_var.rcode=RCODE_FIN;
+                        return control_var;
+                    }
+                }
+                break;
+            case RCODE_REDIRECT:
+                /* perform redirection, notify caller that need to abort the response and resend */
+                LOG(KB_SM, "Require rediretion.");
+                // return control_var;
+                flag=0;
+                break;
+            case RCODE_ERROR:
+                // print the error message instead of exit?
+                LOG(KB_SM, "Parsing error occur.");
+                flag=0;
+                break;
+            case RCODE_SERVER_ERR: // 5xx
+            case RCODE_CLIENT_ERR: // 4xx
+                LOG(KB_SM, "%s", rcode_str[control_var.rcode]);
+                /* increase stats */
+                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
+                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
+                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
+                flag=0;
+                break;
+            case RCODE_FIN:
+            case RCODE_NEXT_RESP:
+                LOG(KB_SM, "Finish one respose.");
+                num_reqs--; // finish one response
+                fin_resp++;
+                /* increase stats */
+                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
+                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
+                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
+                if(num_reqs<=0){ // check if we have finished all response or not
+                    LOG(KB_SM, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
+                    control_var.num_resp=fin_resp;
+                    control_var.rcode=RCODE_FIN;
+                    return control_var;
+                }
+                /* update fin_idx */
+                state_m->last_fin_idx=state_m->buf_idx;
+
+                // Finish one resp, and need to parse next:
+                // - create a new resp obj (TODO: maintain a response queue to store
+                //  all the parsed responses.)
+                // - we don't modify the buf_idx, just pass buff ptr to response obj.
+                // - reset the essential states, prepare for parsing next response.
+                memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
+                state_m->resp->buff=state_m->buff;
+                state_m->p_state=VER;
+                state_m->resp->status_code=0;
+                state_m->resp->http_ver=0;
+                state_m->use_content_length=0;
+                state_m->use_chunked=0;
+                state_m->content_length=0;
+                state_m->total_content_length=0;
+                state_m->curr_chunked_size=0;
+                state_m->parsed_len=0; // prevent from reading wrong starting point
+                break;
+            case RCODE_NOT_SUPPORT: 
+                /* cautious: this case could be caused by parsing error. 
+                 * but mostly it will cause by non-blocking recv (which means 
+                 * that still need to check if there still need to poll another
+                 * data)
+                 */
+                LOG(KB_SM, "Not support."); // huge burst will hang up here
+                state_m->parsed_len=0;
+                if(state_m->buf_idx < state_m->data_size){ // still have other data, which means that parsing error 
+                    flag=0;
+                    control_var.rcode=RCODE_ERROR; // or using RCODE_ERROR
+                } else {
+                    // require another data (keep parsing)
+                    state_m->buf_idx=state_m->last_fin_idx;
+                    control_var.rcode=RCODE_POLL_DATA;
+                    goto recv_again; /* receive as more as it can */
+                }
+                break;
+            default:
+                LOG(KB_SM, "Unknown: %d", control_var.rcode);
+                flag=0;
+                break;
+        }
+    }
+
+    control_var.num_resp=fin_resp;
+    return control_var;
+}
+
+control_var_t
+multi_bytes_http_parsing_state_machine(
+    state_machine_t *state_m,
+    int sockfd,
+    u32 num_reqs)
+{
+    /* get all the data:
+     * - poll the data until connection state is TCP_CLOSE_WAIT, and recvbytes is 0 
+     */
+    /* stats */
+    int flag=1, recvbytes=0, fin_resp=0;
+    control_var_t control_var;
+    /* Parse the data, and store the result into respones objs */
+    /* FIXME: enhancement - need to free buffer (e.g. finished resp) 
+     *  to prevent occupying too much memory ?
+     */
+    while(flag){
+        // call parser (store the state and response obj into state_machine's instance)
+        control_var=http_resp_parser(state_m);
+        switch (control_var.rcode)
+        {
+            case RCODE_POLL_DATA:
+                // if not enough, keep polling 
+                if(!num_reqs){ // finish all response
+                    flag=0;
+                    break;
+                }
+                /* require another recv() to poll new data */
+                // check upperbound & move (prevent using too many realloc, and too much buff length)
+                // if( (strlen(state_m->buff)) > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                if( state_m->data_size > ((RECV_BUFF_SCALE-1)*CHUNK_SIZE) ){
+                    /* we need to skip the chunked data (or store it temporary) to prevent override the http header */
+                    if(state_m->chunked_size==0 && state_m->curr_chunked_size>0){
+                        // override current chunk (to prevent too many chunked in one response) 
+                        // can't override the hdr, so move the reading ptr to `last_fin_idx + msg_hdr_len`
+                        // FIXME: what if last_fin_idx is too large?
+                        state_m->data_size=state_m->resp->msg_hdr_len;
+                    } else {
+                        // other case
+                        state_m->data_size=state_m->data_size-state_m->last_fin_idx;
+                    }
+                    LOG(KB_SM ,"Data bytes: %d, last_fin_idx=%d (use_chunked: %d, chunked size=%d)", state_m->data_size, state_m->last_fin_idx, state_m->use_chunked, state_m->chunked_size);
+                    // then move the leftover to the front, also need to reset buf_idx;
+                    if(state_m->use_content_length ){ // if parsing chunk data now, then we just set the data_size & parse_len to 0
+                        state_m->data_size=0; // if parsing "content length" (chunked need to consider more case), we don't care the data_size (just set to 0, means that all parsed content has been dropped -> we don't store it currently)
+                        state_m->parsed_len=0; 
+                    }
+                    // need to adjust the offset of each response obj
+                    update_res_header_idx(state_m->resp, state_m->last_fin_idx);
+                    LOG(KB_SM ,"( Prevbytes: %d ) Last fin idx: %d, Move %d bytes", state_m->prev_rcv_len, state_m->last_fin_idx, state_m->data_size);
+                    state_m->buf_idx=state_m->data_size;
+                    memcpy(state_m->buff, state_m->buff+state_m->last_fin_idx, state_m->data_size);
+                    // reset the rest and fin_idx
+                    memset(state_m->buff+state_m->data_size, 0x00, state_m->max_buff_size-state_m->data_size);
+                    state_m->last_fin_idx=0; 
+                }
+
+                recvbytes=recv(sockfd, state_m->buff+state_m->data_size, CHUNK_SIZE, 0);
+                state_m->prev_rcv_len=recvbytes;
+                if(recvbytes>0){
+                    LOG(KB_SM, "RECV: %d bytes", recvbytes);
+                    state_m->prev_rcv_len=recvbytes;
+                    state_m->data_size+=recvbytes; // save (recvbytes <= CHUNK_SIZE)
+                } else if(recvbytes==0){ // handle the state that RX is empty and server has send fin
+                    if(state_m->buf_idx < state_m->data_size){ // if there are something still in the buffer
+                        LOG(KB_SM, "Keep parsing: %d (%ld)(%d)", state_m->buf_idx, strlen(state_m->buff), state_m->data_size);
+                        break;
+                    } else {
+                        LOG(KB_SM, "Finish all response parsing, buf_idx=%d, strlen(buff)=%ld", state_m->buf_idx, strlen(state_m->buff));
+                        // reset state machine
+                        reset_parsing_state_machine(state_m);
+                        // FIXME: does here need to use get_tcp_conn_stat() ? (syscall)
+                        control_var.rcode=RCODE_CLOSE; // server turn off the connection
+                        flag=0;
+                        break;
+                    }
+                } else { // don't hang in here, turn back
+                    // -1
+                    flag=0;
+                    break; 
+                }
+                break;
+            case RCODE_REDIRECT:
+                /* perform redirection, notify caller that need to abort the response and resend */
+                LOG(KB_SM, "Require rediretion.");
+                return control_var;
+                //flag=0;
+                //break;
+            case RCODE_ERROR:
+                // print the error message instead of exit?
+                LOG(KB_SM, "Parsing error occur.");
+                flag=0;
+                break;
+            case RCODE_SERVER_ERR: // 5xx
+            case RCODE_CLIENT_ERR: // 4xx
+                LOG(KB_SM, "%s", rcode_str[control_var.rcode]);
+                /* increase stats */
+                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
+                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
+                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
+                STATS_INC_RESP_NUM(state_m->thrd_num, 1);
+                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
+                flag=0;
+                break;
+            case RCODE_FIN:
+            case RCODE_NEXT_RESP:
+                LOG(KB_SM, "Finish one respose.");
+                num_reqs--; // finish one response
+                fin_resp++;
+                /* increase stats */
+                STATS_INC_PKT_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len+state_m->total_content_length); // CL and TE use same memory
+                STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
+                STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
+                STATS_INC_RESP_NUM(state_m->thrd_num, 1);
+                STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
+                /* update fin_idx */
+                state_m->last_fin_idx=state_m->buf_idx;
+
+                // Finish one resp, and need to parse next:
+                // - create a new resp obj (TODO: maintain a response queue to store
+                //  all the parsed responses.)
+                // - we don't modify the buf_idx, just pass buff ptr to response obj.
+                // - reset the essential states, prepare for parsing next response.
+                memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
+                state_m->resp->buff=state_m->buff;
+                state_m->p_state=VER;
+                state_m->resp->status_code=0;
+                state_m->resp->http_ver=0;
+                state_m->use_content_length=0;
+                state_m->use_chunked=0;
+                state_m->content_length=0;
+                state_m->total_content_length=0;
+                state_m->curr_chunked_size=0;
+                state_m->parsed_len=0; // prevent from reading wrong starting point
+ 
+                break;
+            case RCODE_NOT_SUPPORT: /* cautious: this case could be caused by parsing error. */
+                LOG(KB_SM, "Not support.");
+                flag=0; // do not keep parsing, break 
+                /* FIXME: do we need to recover from this kind of error? */
+                state_m->buf_idx=state_m->last_fin_idx;
+                state_m->parsed_len=0;
+                break; 
+            default:
+                LOG(KB_SM, "Unknown: %d", control_var.rcode);
+                flag=0;
+                break;
+        }
+    }
+    
+    control_var.num_resp=fin_resp;
+    return control_var;
+}
+
 state_machine_t *
 create_parsing_state_machine()
 {
@@ -733,71 +791,3 @@ reset_parsing_state_machine(
     state_m->parsed_len=0;
 }
 
-// current only use in Response
-http_state
-next_http_state(http_state cur_state, char ch)
-{
-    switch(cur_state)
-    {
-        // start-line
-        case START_LINE:
-            return VER;
-        case VER:
-            switch(ch){
-                case ' ':
-                    return CODE_OR_TOKEN;
-                default:
-                    return VER;
-            }
-        case CODE_OR_TOKEN:
-            switch(ch){
-                case ' ':
-                    return REASON_OR_RESOURCE;
-                case '\r':
-                case '\n':
-                    return HEADER;
-                default:
-                    return CODE_OR_TOKEN;
-            }
-        case REASON_OR_RESOURCE:
-            switch(ch){
-                case ' ':
-                    return REASON_OR_RESOURCE;
-                case '\r':
-                case '\n':
-                default:
-                    return HEADER;
-            }
-        // header
-        case HEADER:
-            switch(ch){
-                case '\r':
-                case '\n':
-                    return FIELD_NAME;
-                default:
-                    return HEADER;
-            }
-        case FIELD_NAME:
-            switch(ch){
-                case ':':
-                    return FIELD_VALUE;
-                case '\r':
-                    return MSG_BODY;
-                default:
-                    return FIELD_NAME;
-            }
-        case FIELD_VALUE:
-            switch(ch){
-                case '\r':
-                    return HEADER;
-                default:
-                    return FIELD_VALUE;
-            }
-        case MSG_BODY:
-            return MSG_BODY;
-        case CHUNKED:
-            return CHUNKED;
-        default:
-            return cur_state;
-    }
-}

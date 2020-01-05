@@ -30,17 +30,9 @@ struct urls {
 };
 
 typedef struct _parsed_args_t {
-    u8                          flags;  // user parameters (see argparse.h)
-    struct {
-        u8  use_non_block:1,
-            use_probe_mode:1,
-            enable_pipe:1,
-            use_url:1,
-            use_template:1,
-            reserved:3;
-    };
+    u8                          flags;          // user parameters (see argparse.h)
     u16                         port;
-    u32                         thrd;           // threads
+    u16                         thrd;           // threads (MAX=1000)
     u32                         conn;           // connections (per thread)
     u32                         reqs;           // total requests
     union {
@@ -53,6 +45,14 @@ typedef struct _parsed_args_t {
     char*                       host;
     char*                       path;
     http_req_header_status_t *  http_req;
+    struct {
+        u8  use_non_block:1,
+            use_probe_mode:1,
+            enable_pipe:1,
+            use_url:1,
+            use_template:1,
+            reserved:3;
+    };
 } parsed_args_t;
 
 #endif
