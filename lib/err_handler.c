@@ -4,53 +4,6 @@
  * https://www-numi.fnal.gov/offline_software/srt_public_context/WebDocs/Errors/unix_system_errors.html
  */
 
-int sock_sent_err_handler(
-    void *obj)
-{   
-    // printf("Errno: %d\n", errno);
-    switch(errno){
-        case EINTR: /* A signal occurred before any data was transmitted */
-            LOG(KB_EH, "Sent: interrupted(EINTR)");
-            break;
-        case EPIPE: /* Broken pipe (client or server side close its socket) */
-            LOG(KB_EH, "Sent: broken pipe");
-            /* need to create a new connection here? */
-            break;
-        case ECONNRESET: /* Connection reset by peer */
-            LOG(KB_EH, "Sent: connection reset by peer");
-            goto close_check;
-            //break;
-        case ECONNREFUSED: { /* Connection refuse, close program */
-            LOG(KB_EH, "Sent: connection refused");
-            goto close_check;
-            //break;
-        }
-        case EAGAIN: /* Resource temporarily unavailable */ {
-            // in non-blocking mode will have this errno,
-            // means that this operation (e.g. send) would block 
-            // may cause by sending too much data 
-            // => just let recv part to adjust the num_gap 
-            LOG(KB_EH, "Sent: resource temporarily unavailable"); 
-            // struct _conn_t *conn=(struct _conn_t*)obj;
-            // max_req_size/=2;
-            break;
-        }
-        default:
-            LOG(KB_EH, "Other socket sent errno: %d", errno);
-            break;
-    }
-
-close_check: {// terminate 
-    struct _conn_t *conn=(struct _conn_t*)obj;
-    if(conn->retry > MAX_RETRY){
-        // LOG(NORMAL, "Cannot retry anymore, close kb");
-        printf("Cannot retry anymore, close kb");
-        exit(1);
-    }
-    return 0;
-}
-}
-
 int sock_recv_err_handler()
 {
     switch(errno){

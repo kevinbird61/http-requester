@@ -16,9 +16,9 @@ typedef struct _http_header_t {
 } http_header_t;
 
 struct offset_t {
-    u32 idx;    // record the starting index(address) of the buffer
-    u32 offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
-}__attribute__((packed)); // 4+4 bytes
+    u16                     idx;    // record the starting index(address) of the buffer
+    u16                     offset; // record the length of the data (you can using memcpy from idx + offset to fetch the entire data)
+}; // 4 bytes
 
 // request header (send request)
 typedef struct _http_req_header_status_t {
@@ -123,41 +123,46 @@ typedef struct _http_res_header_status_t {
     } __attribute__((packed));
     // chunk extension goes here, format: `token = "...(ext)"` (process the result at the end)
     struct offset_t *chunk_ext;
-    u8  use_chunked;
-    // status-line
-    u8 http_ver;
-    u8 status_code;
+    struct {
+        u16         use_chunked:1,
+                    http_ver: 3,
+                    status_code: 6,
+                    reserved: 6;
+    };
 } __attribute__((aligned(64))) http_res_header_status_t;    // align with 64
 
 /* for state_machine */
 typedef struct _state_machine_t {
-    char                            *buff;              // buf 
-    http_res_header_status_t        *resp;              // response instances 
-    /* idx & offset */
-    u32                             last_fin_idx;       // idx of latest work (resp, or msg hdr, ...)
-    u32                             prev_rcv_len;       // previous recv bytes
-    u32                             buf_idx;            // current reading buffer hdr idx
-    u32                             parsed_len;         // parsed data length (e.g. offset)
-    u32                             data_size;          // buffer size 
-    u32                             max_buff_size;      // 
+    u8                              *buff;                  // buf 
+    http_res_header_status_t        *resp;                  // response instances 
+    /* idx & offset (size=6*10240, < 16-bits) */
+    struct {
+        u32                         buf_idx: 16,            // current reading buffer hdr idx
+                                    last_fin_idx: 16;       // idx of latest work (resp, or msg hdr, ...)
+        u32                         data_size: 16,          // buffer size 
+                                    parsed_len: 16;         // parsed data length (e.g. offset)
+        u32                         prev_rcv_len: 16,       // previous recv bytes
+                                    max_buff_size: 16;
+    };
     /* state_m info */
-    u8                              thrd_num;           // thrd_num 
-    u8                              p_state;            // parsing state            
+    struct {
+        u16                         p_state: 6,             // thrd_num 
+                                    thrd_num: 10;           // parsing state
+    };
     /* record size */
     union {
-        u32 content_length;
-        u32 chunked_size;
+        u32                         content_length;
+        u32                         chunked_size;
     };
     union {
-        u32 total_content_length;
-        u32 total_chunked_size;
+        u32                         total_content_length;
+        u32                         total_chunked_size;
     };
-    u32 curr_chunked_size;
-    /* flag (FIXME: use 1 bit to record) */
+    /* flag */
     struct {
-        u8  use_content_length: 1,
-            use_chunked: 1,
-            reserved: 6;
+        u32                         use_content_length: 1,
+                                    use_chunked: 1,
+                                    curr_chunked_size: 30;  /* FIXME: this field should not be here */
     };
 } __attribute__((packed)) state_machine_t;
 

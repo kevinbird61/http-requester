@@ -4,6 +4,33 @@
 u32 g_burst_length=NUM_GAP;
 u8  g_fast=0; // default is false
 
+static inline int 
+conn_mgnt_close_handler(
+    conn_mgnt_t *this, 
+    int socket_idx)
+{
+    if(this->sockets[socket_idx].sent_req>0){ // means that we have sent some reqs before, but this conn has been closed => we should decrease max-req size
+        int prev_num_gap=this->sockets[socket_idx].num_gap;
+        this->sockets[socket_idx].num_gap=((this->sockets[socket_idx].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)); // decrease max_req_size, and reset num_gap (burst length)
+        this->sockets[socket_idx].num_gap=((this->sockets[socket_idx].num_gap<MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[socket_idx].num_gap); // min-pipe size
+        LOG(KB_CM, "(THR: %d, SOCK: %d) ERROR-RESIZE, from %d to %d.",
+            this->thrd_num, this->sockets[socket_idx].sockfd,
+            prev_num_gap, this->sockets[socket_idx].num_gap);
+    }
+    // not finish yet, need to open new connection
+    close(this->sockets[socket_idx].sockfd);
+    // need to wait a second 
+    LOG(KB_CM, "Close the connection (%d) and wait `%d sec.` to create a new one.", this->sockets[socket_idx].sockfd, RETRY_WAIT_TIME); // FIXME: warning ?
+    sleep(RETRY_WAIT_TIME); // sleep will hang the user that using huge burst length
+    char *port=itoa(this->args->port);
+    this->sockets[socket_idx].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
+    this->sockets[socket_idx].retry_conn_num++; // inc. the number of retry connection
+    this->sockets[socket_idx].sent_req=0;
+    this->sockets[socket_idx].leftover=0; // we don't need to shift sending data for incomplete request                            
+    reset_parsing_state_machine(this->sockets[socket_idx].state_m); // reset the parsing state machine 
+    free(port);
+}
+
 int 
 conn_mgnt_run_non_blocking(conn_mgnt_t *this)
 {
@@ -73,12 +100,14 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                     } else {
                         // remote device is unavailable, create a new one
                         LOG(KB_CM, "POLLERR");
-                        goto close_and_create;
+                        conn_mgnt_close_handler(this, i);
+                        ufds[i].fd=this->sockets[i].sockfd;
                     }
                 } else if( ufds[i].revents & POLLHUP ){
                     /* The device has been disconnected */
                     LOG(KB_CM, "POLLHUP"); // create a new one for it
-                    goto close_and_create;
+                    conn_mgnt_close_handler(this, i);
+                    ufds[i].fd=this->sockets[i].sockfd;
                 } else if( ufds[i].revents & POLLNVAL ){
                     /* The specified fd value is invalid. This flag is only valid in the revents member; it shall ignored in the events member. */
                     LOG(KB_CM, "POLLNVAL");
@@ -114,7 +143,6 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             break;
                         case RCODE_FIN: // finish (with no more data)
                         case RCODE_CLOSE: // connection close by peer, check the workload
-                            reset_parsing_state_machine(this->sockets[i].state_m);
                             if(all_fin==this->total_req){ 
                                 goto end;
                             }
@@ -127,22 +155,27 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                 this->sockets[i].sent_req=0; // new connection, set sent_req to 0
                                 LOG(KB_CM, "(THR: %d, SOCK: %d) CLOSE-RESIZE, from %d to %d.", this->thrd_num, this->sockets[i].sockfd, prev_num_gap, this->sockets[i].num_gap);
                             }
-
+                            reset_parsing_state_machine(this->sockets[i].state_m);
                             // LOG(KB_CM, "(THR: %d, SOCK: %d) CONN still ESTAB, waiting ... ", this->thrd_num, this->sockets[i].sockfd);
                             LOG(KB_CM, "(THR: %d, SOCK: %d) All: %d, Total: %d | Sent: %d, Unsent: %d, Rcvd: %d | NUM_GAP: %d", 
                                 this->thrd_num, this->sockets[i].sockfd,
                                 all_fin, this->total_req,
                                 this->sockets[i].sent_req,  this->sockets[i].unsent_req,  this->sockets[i].rcvd_res,
                                 this->sockets[i].num_gap);
-
-                            close(this->sockets[i].sockfd); // do we need to wait ?
-                            char *port=itoa(this->args->port);
-                            this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
-                            ufds[i].fd=this->sockets[i].sockfd;
-                            this->sockets[i].leftover=0; // need to reset leftover 
-                            free(port);
-                            // because fd has been changed, we need to move to next connection
-                            continue;
+                            
+                            // check connection 
+                            if(get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE_WAIT || 
+                                get_tcp_conn_stat(this->sockets[i].sockfd)==TCP_CLOSE){
+                                    close(this->sockets[i].sockfd); // do we need to wait ?
+                                    char *port=itoa(this->args->port);
+                                    this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
+                                    ufds[i].fd=this->sockets[i].sockfd;
+                                    this->sockets[i].leftover=0; // need to reset leftover 
+                                    free(port);
+                                    // because fd has been changed, we need to move to next connection
+                                    continue;
+                                }
+                            
                             break;
                         case RCODE_REDIRECT: /* TODO: require redirection (need to update URL) */
                             // 1) need to close all current connection and create new one
@@ -179,30 +212,10 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                                  * the connection will be closed by server side.
                                  * FIXME: other 4xx response ?
                                  */
-close_and_create:
-                            if(this->sockets[i].sent_req>0){ // means that we have sent some reqs before, but this conn has been closed => we should decrease max-req size
-                                int prev_num_gap=this->sockets[i].num_gap;
-                                this->sockets[i].num_gap=((this->sockets[i].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)); // decrease max_req_size, and reset num_gap (burst length)
-                                this->sockets[i].num_gap=((this->sockets[i].num_gap<MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[i].num_gap); // min-pipe size
-                                LOG(KB_CM, "(THR: %d, SOCK: %d) ERROR-RESIZE, from %d to %d.",
-                                    this->thrd_num, this->sockets[i].sockfd,
-                                    prev_num_gap, this->sockets[i].num_gap);
-                            }
-                            // not finish yet, need to open new connection
-                            close(this->sockets[i].sockfd);
-                            // need to wait a second 
-                            LOG(KB_CM, "Close the connection (%d) and wait `%d sec.` to create a new one.", this->sockets[i].sockfd, RETRY_WAIT_TIME); // FIXME: warning ?
-                            sleep(RETRY_WAIT_TIME); // sleep will hang the user that using huge burst length
-                            char *port=itoa(this->args->port);
-                            this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
-                            ufds[i].fd=this->sockets[i].sockfd;
-                            this->sockets[i].retry_conn_num++; // inc. the number of retry connection
-                            this->sockets[i].sent_req=0;
-                            this->sockets[i].leftover=0; // we don't need to shift sending data for incomplete request                            
-                            reset_parsing_state_machine(this->sockets[i].state_m); // reset the parsing state machine 
-                            free(port);
-                            // because current fd is invalid, go to next connection
-                            continue;
+                                conn_mgnt_close_handler(this, i);
+                                ufds[i].fd=this->sockets[i].sockfd;               
+                                // because current fd is invalid, go to next connection
+                                continue;
                             } /* close connection by status_code (4xx) */
                             /* get_tcp_conn_stat (only close and create when server close this conn first) */
                         }
@@ -239,8 +252,21 @@ close_and_create:
                                     this->sockets[i].sent_req++;
                                     if((send(this->sockets[i].sockfd, http_request, request_size, 0)) < 0){
                                         // handle errno
-                                        sock_sent_err_handler(&(this->sockets[i]));
-                                        break;
+                                        if(errno==EPIPE || errno==ECONNRESET){
+                                            /**
+                                             * EPIPE: Broken pipe (client or server side close its socket)
+                                             * ECONNRESET: Connection reset by peer
+                                             */
+                                            // close the connection
+                                            conn_mgnt_close_handler(this, i);
+                                            ufds[i].fd=this->sockets[i].sockfd;
+                                            continue;
+                                        } else if(errno==ECONNREFUSED){
+                                            // ECONNREFUSED: Connection refuse, close program
+                                            goto end;
+                                        } else {
+                                            continue;
+                                        }
                                     }
                                     STATS_INC_SENT_BYTES(this->thrd_num, request_size);
                                     STATS_INC_SENT_REQS(this->thrd_num, 1);
@@ -251,7 +277,21 @@ close_and_create:
 
                                 if( (sentbytes=send(this->sockets[i].sockfd, packed_req+this->sockets[i].leftover, workload_bytes, MSG_DONTWAIT)) < 0){
                                     // req not sent complete
-                                    sock_sent_err_handler(&(this->sockets[i]));
+                                    if(errno==EPIPE || errno==ECONNRESET){
+                                        /**
+                                         * EPIPE: Broken pipe (client or server side close its socket)
+                                         * ECONNRESET: Connection reset by peer
+                                         */
+                                        // close the connection 
+                                        conn_mgnt_close_handler(this, i);
+                                        ufds[i].fd=this->sockets[i].sockfd;
+                                        continue;
+                                    } else if(errno==ECONNREFUSED){
+                                        // ECONNREFUSED: Connection refuse, close program
+                                        goto end;
+                                    } else {
+                                        continue;
+                                    }
                                 } else if(sentbytes==0) {
                                     // do we need to adjust num_gap again in here?
                                     continue;
@@ -272,7 +312,22 @@ close_and_create:
                             if(this->sockets[i].sent_req==0 && this->sockets[i].unsent_req>0){
                                 if(send(this->sockets[i].sockfd, http_request, request_size, 0) < 0){
                                     // req sent not success
-                                    sock_sent_err_handler(&(this->sockets[i]));
+                                    // req not sent complete
+                                    if(errno==EPIPE || errno==ECONNRESET){
+                                        /**
+                                         * EPIPE: Broken pipe (client or server side close its socket)
+                                         * ECONNRESET: Connection reset by peer
+                                         */
+                                        // close the connection (fallthrough to close_and_create)
+                                        conn_mgnt_close_handler(this, i);
+                                        ufds[i].fd=this->sockets[i].sockfd;
+                                        continue;
+                                    } else if(errno==ECONNREFUSED){
+                                        // Connection refuse, close the program
+                                        goto end;
+                                    } else {
+                                        continue;
+                                    }
                                 } else {
                                     this->sockets[i].sent_req++;
                                     STATS_INC_SENT_BYTES(this->thrd_num, request_size);
@@ -284,10 +339,7 @@ close_and_create:
                                 }
                             }
                         } 
-                    } else { /* else => don't sent (unsent_req < 0) */ 
-                        //this->num_gap=((this->num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)); // decrease max_req_size, and reset num_gap (burst length)
-                        //this->num_gap=((this->num_gap<MIN_NUM_GAP)? MIN_NUM_GAP: this->num_gap); // min-pipe size
-                    }
+                    } 
                 } /* POLLOUT */
             } /* for loop for each poll event */
         } else if (ret==-1){

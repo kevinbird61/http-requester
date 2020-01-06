@@ -61,6 +61,8 @@ typedef struct _conn_mgnt_t {
 // create 
 conn_mgnt_t *create_conn_mgnt_non_blocking(parsed_args_t *args);
 conn_mgnt_t *create_conn_mgnt(parsed_args_t *args);
+// handler
+// int conn_mgnt_close_handler(conn_mgnt_t *this, int socket_idx);
 // runner
 int conn_mgnt_run_non_blocking(conn_mgnt_t *this); // full non-blocking (connect, send, recv)
 int conn_mgnt_run(conn_mgnt_t *this); // hybrid mode (non-blocking recv + blocking send)

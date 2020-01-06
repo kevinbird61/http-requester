@@ -144,7 +144,7 @@ http_resp_parser(
 
         // header will go to here, count length
         http_h_status_check->msg_hdr_len++;
-
+        
         // read byte, check the byte
         switch(state_m->buff[state_m->buf_idx-1]){
             case '\r':
@@ -432,7 +432,6 @@ multi_bytes_http_parsing_state_machine_non_blocking(
     while(flag){
         // call parser (store the state and response obj into state_machine's instance)
         control_var=http_resp_parser(state_m);
-recv_again:
         switch (control_var.rcode)
         {
             case RCODE_POLL_DATA:
@@ -498,14 +497,8 @@ recv_again:
                 } else { 
                     // -1
                     // LOG(NORMAL, "ERROR RECV: %d bytes, num_reqs: %d, fin_resp: %d, %d", recvbytes, num_reqs, fin_resp, control_var.rcode);
-                    if(num_reqs>0){ // not recv all resp, but don't hang in here, turn back (don't block)
-                        flag=0;
-                        break;
-                    } else { // num_reqs<=0, 
-                        control_var.num_resp=fin_resp;
-                        control_var.rcode=RCODE_FIN;
-                        return control_var;
-                    }
+                    flag=0; // return with RCODE_POLL_DATA (non-blocking, don't block)
+                    break;
                 }
                 break;
             case RCODE_REDIRECT:
@@ -554,14 +547,13 @@ recv_again:
                 memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
                 state_m->resp->buff=state_m->buff;
                 state_m->p_state=VER;
-                state_m->resp->status_code=0;
-                state_m->resp->http_ver=0;
                 state_m->use_content_length=0;
                 state_m->use_chunked=0;
                 state_m->content_length=0;
                 state_m->total_content_length=0;
                 state_m->curr_chunked_size=0;
                 state_m->parsed_len=0; // prevent from reading wrong starting point
+
                 break;
             case RCODE_NOT_SUPPORT: 
                 /* cautious: this case could be caused by parsing error. 
@@ -571,15 +563,8 @@ recv_again:
                  */
                 LOG(KB_SM, "Not support."); // huge burst will hang up here
                 state_m->parsed_len=0;
-                if(state_m->buf_idx < state_m->data_size){ // still have other data, which means that parsing error 
-                    flag=0;
-                    control_var.rcode=RCODE_ERROR; // or using RCODE_ERROR
-                } else {
-                    // require another data (keep parsing)
-                    state_m->buf_idx=state_m->last_fin_idx;
-                    control_var.rcode=RCODE_POLL_DATA;
-                    goto recv_again; /* receive as more as it can */
-                }
+                flag=0;
+                control_var.rcode=RCODE_ERROR;
                 break;
             default:
                 LOG(KB_SM, "Unknown: %d", control_var.rcode);
@@ -768,10 +753,8 @@ void
 reset_parsing_state_machine(
     state_machine_t *state_m)
 {
-    // state_m->resp=create_http_header_status(state_m->buff);
     memset(state_m->resp, 0x00, 1*sizeof(http_res_header_status_t));
-    memset(state_m->buff, 0x00, state_m->max_buff_size*sizeof(char));
-    state_m->resp->msg_hdr_len=0;
+    // memset(state_m->buff, 0x00, state_m->max_buff_size*sizeof(char));
     state_m->resp->buff=state_m->buff;
 
     state_m->p_state=VER;

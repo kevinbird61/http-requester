@@ -14,7 +14,7 @@
 #define POLL_MAX_TIMEOUT    (16000)         // 16 sec (will exit sending process)
 
 #define RECV_BUFF_SCALE     (10)            // scale x chunk_size = TOTAL_RECV_BUFF 
-#define CHUNK_SIZE          (8*1024)        //
+#define CHUNK_SIZE          (6*1024)        //
 
 #define CLEAR_SCREEN()      (printf("\e[1;1H\e[2J"))
 #define UPDATE_SCREEN()     (printf("\e[1;1H"))

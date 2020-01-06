@@ -25,6 +25,11 @@ kb_probe_mode:{
 } /* kb_probe_mode */
 
 kb_loadgen:{
+    // var
+    struct _thrd_t *thrds=NULL;
+    u16 num_failed_thrd=0;
+    u32 total_req=0, leftover=0;
+
     // signal handler
     SIG_HANDLE(SIGINT);
     SIG_HANDLE(SIGALRM);
@@ -36,15 +41,15 @@ kb_loadgen:{
     STATS_TIME_START();
 
     // enable multiple threads
-    struct _thrd_t* thrds=calloc((args->thrd), sizeof(struct _thrd_t)); 
+    thrds=calloc((args->thrd), sizeof(struct _thrd_t)); 
     if(thrds==NULL){
         LOG(KB_EH, "Cannot allocate memory for thread information.");
         exit(1);
     }
     // distribute the total reqs (e.g. args->conn) to each thread 
     // Notice: args->conn has been modified later, need to store this value first
-    u32 total_req=args->reqs;
-    int leftover=args->reqs%args->thrd; /* FIXME: how to deal with leftover */
+    total_req=args->reqs;
+    leftover=args->reqs%args->thrd; /* FIXME: how to deal with leftover */
     args->reqs=(args->reqs/args->thrd);
     // need to create more threads
     for(int i=0; i<args->thrd; i++){
@@ -56,7 +61,11 @@ kb_loadgen:{
             thrds[i].mgnt=create_conn_mgnt_non_blocking(args);
             thrds[i].mgnt->thrd_num=i;
             if(ret==USE_URL){
-                int rc=pthread_create(&thrds[i].tid, NULL, (void *)&conn_mgnt_run_non_blocking, thrds[i].mgnt);
+                if(pthread_create(&thrds[i].tid, NULL, (void *)&conn_mgnt_run_non_blocking, thrds[i].mgnt) < 0){
+                    num_failed_thrd++;
+                    perror("Cannot create new thread.");
+                    exit(1);
+                }
             } else { // not support
                 exit(1);
             }
@@ -64,7 +73,11 @@ kb_loadgen:{
             thrds[i].mgnt=create_conn_mgnt(args);
             thrds[i].mgnt->thrd_num=i;
             if(ret==USE_URL){
-                int rc=pthread_create(&thrds[i].tid, NULL, (void *)&conn_mgnt_run, thrds[i].mgnt);
+                if(pthread_create(&thrds[i].tid, NULL, (void *)&conn_mgnt_run, thrds[i].mgnt) < 0) {
+                    num_failed_thrd++;
+                    perror("Cannot create new thread.");
+                    exit(1);
+                }
             } else { // not support
                 exit(1);
             }
