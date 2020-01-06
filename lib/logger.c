@@ -4,6 +4,7 @@ unsigned char g_log_visible=0;
 char *g_log_dir="/tmp/";
 char *g_log_filename="kb";
 char *g_log_ext=".log";
+FILE *g_logfd[MAX_THREAD];
 
 char *g_log_level_str[]={
     [KB_DEBUG]="DEBUG (Developer)",
@@ -17,6 +18,33 @@ char *g_log_level_str[]={
     [LOGONLY]="LOGONLY",
     [LOG_LEVEL_MAXIMUM]=NULL
 };
+
+int 
+log_init(
+    u32 thrd_num)
+{
+    char *logfile = malloc( (strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(thrd_num))+1) * sizeof(char));
+    // check logfile
+    if(logfile==NULL){
+        perror("Cannot malloc logfile.");
+        exit(1);
+    }
+    sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, thrd_num, g_log_ext);
+    g_logfd[thrd_num]=fopen(logfile, "w");
+    // check g_logfd
+    if(g_logfd[thrd_num] < 0){
+        perror("Cannot open log file descriptor.");
+        exit(1);
+    }
+    free(logfile);
+}
+
+int 
+log_close(
+    u32 thrd_num)
+{
+    fclose(g_logfd[thrd_num]);
+}
 
 int 
 syslog(
@@ -50,21 +78,12 @@ syslog(
         return -1;
     }
 
-    // write into logfile (FIXME: date)
-    char *logfile=malloc((strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(get_thrd_tid_from_id(thread_id)))+1)*sizeof(char));
-    sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, get_thrd_tid_from_id(thread_id), g_log_ext);
-    FILE *logfd=fopen(logfile, "a+");
-    fwrite(loginfo, sizeof(char), strlen(loginfo), logfd);
-
-    // write into screen
-    if(loglevel<LOGONLY){
-        fprintf(stdout, "%s", loginfo);
-    } 
+    // write into file
+    fwrite(loginfo, sizeof(char), strlen(loginfo), g_logfd[get_thrd_tid_from_id(thread_id)]);
+    // currently we do not output to screen (too many info that can't be read immediately)
 
     // free
     free(loginfo);
-    free(logfile);
-    fclose(logfd);
     return 1;
 }
 

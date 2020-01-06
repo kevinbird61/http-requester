@@ -65,7 +65,7 @@ create_argparse()
 
     parsed_args_t *new_argparse=calloc(1, sizeof(parsed_args_t));
     if(new_argparse==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        perror("Cannot allocate memory for thread information.");
         exit(1);
     }
     new_argparse->port=DEFAULT_PORT;
@@ -148,7 +148,7 @@ argparse(
                     if((*this)->urls==NULL){
                         (*this)->urls=calloc(1, sizeof(struct urls));
                         if((*this)->urls==NULL){
-                            LOG(KB_EH, "Cannot allocate memory for thread information.");
+                            perror("Cannot allocate memory for thread information.");
                             exit(1);
                         }
                         (*this)->urls->url=argv[optind];
@@ -160,7 +160,7 @@ argparse(
                         }
                         root->next=calloc(1, sizeof(struct urls));
                         if(root->next==NULL){
-                            LOG(KB_EH, "Cannot allocate memory for thread information.");
+                            perror("Cannot allocate memory for thread information.");
                             exit(1);
                         }
                         root->next->url=argv[optind];

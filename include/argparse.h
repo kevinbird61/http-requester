@@ -8,7 +8,6 @@
 #include "http.h"
 
 #define NUM_PARAMS          (15)
-#define MAX_THREAD          (1000)    // max thread number
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define __FILENAME__        (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)

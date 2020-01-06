@@ -34,7 +34,8 @@ typedef enum _log_level {
     LOG_LEVEL_MAXIMUM /* maximum */
 } log_level;
 
-
+#define LOG_INIT(thrd_num)          log_init(thrd_num)
+#define LOG_CLOSE(thrd_num)         log_close(thrd_num)
 #define LOG(loglevel, format, args...)                  \
     do {                                                \
     /* only record specified level  */                  \
@@ -61,6 +62,9 @@ typedef enum _log_level {
     }                                                   \
     } while(0)
 
+// init for logger
+int log_init(u32 thrd_num);
+int log_close();
 // write the log
 int syslog(u8 loglevel, u64 thread_id, char *info_args, ...);
 // turn va_list into char array

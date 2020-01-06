@@ -43,7 +43,7 @@ kb_loadgen:{
     // enable multiple threads
     thrds=calloc((args->thrd), sizeof(struct _thrd_t)); 
     if(thrds==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
+        perror("Cannot allocate memory for thread information.");
         exit(1);
     }
     // distribute the total reqs (e.g. args->conn) to each thread 
@@ -53,6 +53,7 @@ kb_loadgen:{
     args->reqs=(args->reqs/args->thrd);
     // need to create more threads
     for(int i=0; i<args->thrd; i++){
+        LOG_INIT(i);
         thrds[i].num=i;
         if(i==(args->thrd-1)){ // the last thread carry the leftover
             args->reqs+=leftover;
@@ -102,6 +103,7 @@ kb_loadgen:{
 
     for(int i=0; i<args->thrd; i++){
         pthread_join(thrds[i].tid, NULL);
+        LOG_CLOSE(i);
     }
     
     // t_end

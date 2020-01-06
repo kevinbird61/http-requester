@@ -38,7 +38,11 @@ $(RELEASE): $(OBJS)
 %.exe: src/%.c $(OBJS)
 	$(CC) $(CFLAGS) $(INC) -o $@ $(OBJS) $< $(INC) -lpthread
 
-.PHONY=clean
+.PHONY=clean clean_log clean_all
+
+clean_all: clean clean_log
 
 clean:
-	rm -rf $(OBJS) $(EXEC) $(STATIC_BUILD) $(RELEASE) $(TEST) $(TOOLS) && rm -rf /tmp/kb* 
+	rm -rf $(OBJS) $(EXEC) $(STATIC_BUILD) $(RELEASE) $(TEST) $(TOOLS)
+clean_log:
+	rm -rf /tmp/kb*

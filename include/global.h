@@ -1,9 +1,11 @@
 #ifndef __GLOBAL__
 #define __GLOBAL__
 
+#include <stdio.h>
 #include "types.h"
 
 #define MAX_RETRY           (50000)         // wait 5 sec (permit 5 retry time)
+#define MAX_THREAD          (1000)          // max thread number
 #define RETRY_WAIT_TIME     (1)             // 4xx, or other error, wait 1 sec and create a new conn to retry
 #define NUM_GAP             (100)           // max-request size
 #define MIN_NUM_GAP         (5)             // min-request size
@@ -30,6 +32,7 @@ extern int      g_total_thrd_num;           // store number of available thrds
 extern char *g_log_dir;
 extern char *g_log_filename;
 extern char *g_log_ext;
+extern FILE *g_logfd[MAX_THREAD];
 // log level string
 extern char *g_log_level_str[];
 // log enable (global)
