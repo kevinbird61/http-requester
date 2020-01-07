@@ -50,9 +50,7 @@ typedef enum _log_level {
                 LOG_LEVEL_STR[loglevel],                \
                 __func__,                               \
                 userlog);                               \
-    } else if(g_log_visible==0){ /* developer mode */   \
-        /* do nothing now */                            \
-    } else {                                            \
+    } else if(g_log_visible==LOG_ALL){                  \
         char *userlog=parse_valist(format, ##args);     \
         syslog(loglevel,                                \
             pthread_self(),                             \
@@ -61,6 +59,8 @@ typedef enum _log_level {
             LOG_LEVEL_STR[loglevel],                    \
             __func__,                                   \
             userlog);                                   \
+    } else {                                            \
+        /* do nothing now */                            \
     }                                                   \
     } while(0)
 

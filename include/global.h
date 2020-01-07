@@ -13,7 +13,7 @@
 #define DEC_RATE_NUMERAT    (9)             // decrease rate = (MAX-request size)*(DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)
 #define DEC_RATE_DENOMIN    (10)            // 
 #define POLL_TIMEOUT        (1000)          // 1 sec (normal/start case)
-#define POLL_MAX_TIMEOUT    (32000)         // 32 sec (after `63 sec` poll timeout, kb will exit sending process)
+#define POLL_MAX_TIMEOUT    (64000)         // 64 sec (after `127 sec` poll timeout, kb will exit sending process). 
 
 #define NUM_PARAMS          (15)
 #define DEFAULT_PORT        (80)
@@ -26,6 +26,9 @@
 
 #define CLEAR_SCREEN()      (printf("\e[1;1H\e[2J"))
 #define UPDATE_SCREEN()     (printf("\e[1;1H"))
+
+#define likely(x)           __builtin_expect((x), 1)
+#define unlikely(x)         __builtin_expect((x), 0)
 
 extern u32      g_burst_length;             // max-request size
 extern u8       g_fast;                     // flag for enable aggressive pipe

@@ -33,6 +33,7 @@ static inline void sig_handler(int signal){
                     free(protect_conn_mgnt->protect_obj);
                     protect_conn_mgnt=protect_conn_mgnt->next;
                     free_cm++;
+                    LOG_CLOSE(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num); // close logfile
                 }
             }
             STATS_TIME_END(); // calculate total execution time (otherwise will get wrong result: only calculate the starting timestamp)

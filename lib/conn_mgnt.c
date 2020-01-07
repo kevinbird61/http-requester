@@ -21,7 +21,8 @@ conn_mgnt_close_handler(
     close(this->sockets[socket_idx].sockfd);
     // need to wait a second 
     LOG(KB_CM, "Close the connection (%d) and wait `%d sec.` to create a new one.", this->sockets[socket_idx].sockfd, RETRY_WAIT_TIME); // FIXME: warning ?
-    sleep(RETRY_WAIT_TIME); // sleep will hang the user that using huge burst length
+
+    usleep( (RETRY_WAIT_TIME*USEC)/this->args->conn ); /* each connection wait a small portion of time */
     char *port=itoa(this->args->port);
     this->sockets[socket_idx].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
     this->sockets[socket_idx].retry_conn_num++; // inc. the number of retry connection
@@ -69,15 +70,17 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
     }
 
     while(all_fin<this->total_req){
-        if ( (ret=poll(ufds, this->args->conn, timeout) )>0 ) { // poll
+        if ( (ret=poll(ufds, this->args->conn, timeout) ) > 0 ) { // poll
             // reset timeout to 1 sec
             timeout=POLL_TIMEOUT;
 
             // using ring-like sending model (not always start from 0, each node has equal change)
             for(int i=0; i<this->args->conn; i++){
-                if(this->sockets[i].unsent_req==0 && this->sockets[i].sent_req==0){ // we can skip this one (which have finish its sending process)
+                if((this->sockets[i].unsent_req==0)){ // we can skip this one (which have finish its sending process)
                     // finish
                     ufds[i].events = 0; // Don't monitor anything
+                    //ufds[i].fd=-1;
+                    //close(this->sockets[i].sockfd);
                     continue;
                 }
 
@@ -353,7 +356,11 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
             timeout*=2; // increase timeout (reset when ret>0)
             if(timeout > POLL_MAX_TIMEOUT){ // wait until POLL_MAX_TIMEOUT
                 LOG(KB_CM, "CLOSE sending process, we can't wait it anymore.\n");
-                // FIXME: do we need to retry again ?
+                // FIXME: do we need to retry again ? -> yes
+                /** Observation: when you specified too many connections (thrd*conn), some thrd's 
+                 *  connections will not be able to send/recv, and go here (poll timeout).
+                 *  And cause the result is less than user-specified max requests.
+                 */
                 break;
             }
         }
