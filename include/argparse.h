@@ -7,14 +7,12 @@
 #include "types.h"
 #include "http.h"
 
-#define NUM_PARAMS          (15)
-#define DEFAULT_PORT        (80)
-#define DEFAULT_SSL_PORT    (443)
-#define __FILENAME__        (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define AGENT               "kb"
+enum {
+    USE_URL=1,
+    USE_TEMPLATE
+};
 
 extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
-
 // create argparse object
 parsed_args_t *create_argparse();
 // parse from argc, argv
@@ -56,30 +54,5 @@ MWWWWWMWWWWMWWWWMMWWWWMWWWWMWWWWMMWNNWNNXXXXXXXXXXKKKXXKKKXXXXKKXXNXNNWWWWWWMWWW
 WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW\n\
 NWWMMWNWMMWNWMMWWWMMMWWWMMWNWMMWWWMMMWNWMMWNWMMWWWWMWWWWMMWWWWMMWNWWMWWWWMMWNWMMWWWMM\n\
 ";
-
-/* user parameters:
- * - using flags to determine using default or user specified value:
- *      0x01: conn  (connections)
- *      0x02: reqs  (total requests)
- *      0x04: file  (if this bit is set, then disable url and method)
- *      0x08: url   
- *      0x10: port
- *      0x20: method
- *      0x40: thrd
- */
-enum {
-    SPE_CONN=0x01,
-    SPE_REQS=0x02,
-    SPE_FILE=0x04,
-    SPE_URL=0x08,
-    SPE_PORT=0x10,
-    SPE_METHOD=0x20,
-    SPE_THRD=0x40
-};
-
-enum {
-    USE_URL=1,
-    USE_TEMPLATE
-};
 
 #endif

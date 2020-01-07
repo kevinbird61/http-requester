@@ -30,7 +30,16 @@ struct urls {
 };
 
 typedef struct _parsed_args_t {
-    u8                          flags;          // user parameters (see argparse.h)
+    struct {
+        u8                      have_conn: 1,
+                                have_reqs: 1,
+                                have_file: 1,
+                                have_url: 1,
+                                have_port: 1,
+                                have_method: 1,
+                                have_thrd: 1,
+                                rsvd: 1;
+    }; // user parameters (see argparse.h)
     u16                         port;
     u16                         thrd;           // threads (MAX=1000)
     u32                         conn;           // connections (per thread)

@@ -13,7 +13,13 @@
 #define DEC_RATE_NUMERAT    (9)             // decrease rate = (MAX-request size)*(DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)
 #define DEC_RATE_DENOMIN    (10)            // 
 #define POLL_TIMEOUT        (1000)          // 1 sec (normal/start case)
-#define POLL_MAX_TIMEOUT    (16000)         // 16 sec (will exit sending process)
+#define POLL_MAX_TIMEOUT    (32000)         // 32 sec (after `63 sec` poll timeout, kb will exit sending process)
+
+#define NUM_PARAMS          (15)
+#define DEFAULT_PORT        (80)
+#define DEFAULT_SSL_PORT    (443)
+#define __FILENAME__        (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define AGENT               "kb"
 
 #define RECV_BUFF_SCALE     (10)            // scale x chunk_size = TOTAL_RECV_BUFF 
 #define CHUNK_SIZE          (6*1024)        //

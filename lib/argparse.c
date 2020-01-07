@@ -121,25 +121,24 @@ argparse(
             case 'c':   // connections (socket)
                 (*this)->conn=atoi(optarg);
                 (*this)->conn=(*this)->conn>0? (*this)->conn: 1; // default value (when illegal)
-                (*this)->flags|=SPE_CONN;
+                (*this)->have_conn=1;
                 break;
             case 'n':   // total requests
                 (*this)->reqs=atoi(optarg);
                 (*this)->reqs=(*this)->reqs>0? (*this)->reqs: 1; // default value (when illegal)
-                (*this)->flags|=SPE_REQS;
+                (*this)->have_reqs=1;
                 break;
             case 't':   // thread number
                 (*this)->thrd=atoi(optarg);
                 (*this)->thrd=(*this)->thrd>0? (*this)->thrd: 1; // default value (set to 1 if value is 0)
-                (*this)->flags|=SPE_THRD;
+                (*this)->have_thrd=1;
                 break;
             case 'f':   // using template file
                 (*this)->filename=optarg;
-                (*this)->flags|=SPE_FILE;
+                (*this)->have_file=1;
                 break;
             case 'u':   // url
-                // (*this)->url=optarg;
-                (*this)->flags|=SPE_URL;
+                (*this)->have_url=1;
                 /* multi url */
                 int url_cnt=0;
                 optind--;
@@ -173,14 +172,14 @@ argparse(
                 break;
             case 'p':   // port
                 (*this)->port=atoi(optarg);
-                (*this)->flags|=SPE_PORT;
+                (*this)->have_port=1;
                 break;
             case 'P':   // probe mode
                 (*this)->use_probe_mode=1;
                 break;
             case 'm':   // method
                 (*this)->method=optarg;
-                (*this)->flags|=SPE_METHOD;
+                (*this)->have_method=1;
                 break;
             case 'l':
                 g_log_visible=atoi(optarg); /* set log-level */
@@ -230,17 +229,17 @@ argparse(
     }
 
     // print the system parameters 
-    if(!((*this)->flags&SPE_CONN)){
+    if(!((*this)->have_conn)){
         (*this)->conn=1;
     } 
-    if(!((*this)->flags&SPE_REQS)){
+    if(!((*this)->have_reqs)){
         (*this)->reqs=2;
     }
-    if(!((*this)->flags&SPE_FILE)){
+    if(!((*this)->have_file)){
         // use url & method
         (*this)->filename=NULL;
         // check url
-        if(!((*this)->flags&SPE_URL)){
+        if(!((*this)->have_url)){
             // if not specified URL, then print help info and exit
             fprintf(stderr, "You need to specify `template file` (-f) or `url` (-u).\n");
             print_manual(0);
@@ -251,7 +250,7 @@ argparse(
         // use template
         // also need to check URL
     }
-    if(!((*this)->flags&SPE_PORT)){
+    if(!((*this)->have_port)){
         // if not specified, use port 80
         (*this)->port=DEFAULT_PORT;
     } else {
@@ -261,12 +260,12 @@ argparse(
             exit(1);
         }
     }
-    if(!((*this)->flags&SPE_METHOD)){
+    if(!((*this)->have_method)){
         (*this)->method="GET";
     } else {
         // TODO: check the method is legal or not
     }
-    if(!((*this)->flags&SPE_THRD)){ // if not set, using default value
+    if(!((*this)->have_thrd)){ // if not set, using default value
         (*this)->thrd=1;
         g_total_thrd_num=1;
     } else {
@@ -447,12 +446,12 @@ update_url_info_rand(
     ret=parse_url(*this);
     switch(ret){
         case ERR_NONE:
-            if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
+            if(!((*this)->have_port)){ // user hasn't specifed port-num
                 (*this)->port=DEFAULT_PORT;
             }
             break;
         case ERR_USE_SSL_PORT:
-            if(!((*this)->flags&SPE_PORT)){ // user hasn't specifed port-num
+            if(!((*this)->have_port)){ // user hasn't specifed port-num
                 (*this)->port=DEFAULT_SSL_PORT;
             }
             break;

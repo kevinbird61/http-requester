@@ -39,8 +39,9 @@ typedef enum _log_level {
 #define LOG(loglevel, format, args...)                  \
     do {                                                \
     /* only record specified level  */                  \
-    if(g_log_visible < LOG_ALL){                          \
-        if(loglevel == g_log_visible){                    \
+    if( g_log_visible > 0 &&                            \
+        g_log_visible < LOG_ALL &&                      \
+        loglevel == g_log_visible){                     \
             char *userlog=parse_valist(format, ##args); \
             syslog(loglevel,                            \
                 pthread_self(),                         \
@@ -49,7 +50,8 @@ typedef enum _log_level {
                 LOG_LEVEL_STR[loglevel],                \
                 __func__,                               \
                 userlog);                               \
-        }                                               \
+    } else if(g_log_visible==0){ /* developer mode */   \
+        /* do nothing now */                            \
     } else {                                            \
         char *userlog=parse_valist(format, ##args);     \
         syslog(loglevel,                                \
@@ -64,7 +66,7 @@ typedef enum _log_level {
 
 // init for logger
 int log_init(u32 thrd_num);
-int log_close();
+int log_close(u32 thrd_num);
 // write the log
 int syslog(u8 loglevel, u64 thread_id, char *info_args, ...);
 // turn va_list into char array
