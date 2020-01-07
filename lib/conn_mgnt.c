@@ -79,7 +79,7 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                 if((this->sockets[i].unsent_req==0)){ // we can skip this one (which have finish its sending process)
                     // finish
                     ufds[i].events = 0; // Don't monitor anything
-                    //ufds[i].fd=-1;
+                    ufds[i].fd=-1;
                     //close(this->sockets[i].sockfd);
                     continue;
                 }
