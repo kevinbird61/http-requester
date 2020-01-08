@@ -12,7 +12,7 @@ enum {
     USE_TEMPLATE
 };
 
-extern struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM];
+extern struct option options[NUM_PARAMS];
 // create argparse object
 parsed_args_t *create_argparse();
 // parse from argc, argv

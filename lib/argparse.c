@@ -22,15 +22,13 @@ int     *g_thrd_id_mapping=NULL;
  * - [x] `--fast`           Reduce the send() syscall
  * - [x] `-v, --verbose`    Output more debug information
  * ...
- * 
- * (Other: HTTP request headers)
  */
 // number need to be changed if you want to add new options
-struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={ 
+struct option options[NUM_PARAMS]={ 
         [0]={"url", required_argument, NULL, 'u'},
         [1]={"port", required_argument, NULL, 'p'},
-        [2]={"conn", required_argument, NULL, 'c'}, /* connections (FIXME: also need to modified the field name in parsed_args_t!) */
-        [3]={"num", required_argument, NULL, 'n'}, /* total requests (FIXME: also need to modified the field name in parsed_args_t!) */
+        [2]={"conn", required_argument, NULL, 'c'}, 
+        [3]={"num", required_argument, NULL, 'n'}, 
         [4]={"file", required_argument, NULL, 'f'},
         [5]={"method", required_argument, NULL, 'm'},
         [6]={"pipe", no_argument, NULL, 'i'},
@@ -38,31 +36,17 @@ struct option options[NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM]={
         [8]={"burst", required_argument, NULL, 'b'},
         [9]={"fast", no_argument, NULL, 'a'}, /* use 'a' here. */
         [10]={"verbose", no_argument, NULL, 'v'},
-        [11]={"thread", required_argument, NULL, 't'}, 
+        [11]={"thread", required_argument, NULL, 't'},
         [12]={"nonblk", no_argument, NULL, 'N'}, /* using non-blocking */
         [13]={"probe", no_argument, NULL, 'P'}, /* probe mode */
+        [14]={"custom", required_argument, NULL, 'H'}, /* customized header */
         /* request headers (using itoa(REQ_*) as option name) */    
-        [NUM_PARAMS+REQ_HEADER_NAME_MAXIMUM-1]={0, 0, 0, 0}
+        [15]={0, 0, 0, 0}
 };
 
 parsed_args_t *
 create_argparse()
 {
-    /* add request headers */
-    for(int i=1; i<(REQ_HEADER_NAME_MAXIMUM); i++){
-        // forbidden
-        if( (i!=REQ_HOST) ){
-            // printf("%d: %s\n", (NUM_PARAMS-2)+i, get_req_header_name_by_idx[i]);
-            char *name=strdup(get_req_header_name_by_idx[i]);
-            to_lowercase(name);
-            options[(NUM_PARAMS-2)+i].name=name;
-            options[(NUM_PARAMS-2)+i].has_arg=required_argument;
-            options[(NUM_PARAMS-2)+i].flag=NULL;
-            options[(NUM_PARAMS-2)+i].val=0;
-            free(name);
-        }
-    }
-
     parsed_args_t *new_argparse=calloc(1, sizeof(parsed_args_t));
     if(new_argparse==NULL){
         perror("Cannot allocate memory for thread information.");
@@ -95,17 +79,28 @@ argparse(
         int this_option_optind=optind? optind: 1;
         int option_index=0;
         char *field_name, *field_value;
-        c=getopt_long(argc, argv, ":iavhNl:b:u:p:m:c:n:f:t:", options, &option_index);
+        c=getopt_long(argc, argv, ":iavhNPl:b:u:p:m:c:n:f:t:H:", options, &option_index);
         if(c==-1){ break; }
 
         switch(c){
-            case 0:
-                /* http request headers:
-                 *  atoi(options[option_index].name) = field-name enum
-                 *  optarg = field-value
-                 */
-                http_req_obj_ins_header_by_idx(&((*this)->http_req), option_index-(NUM_PARAMS-2), optarg);
+            case 'H':{ /* customized header */
+                int http_req_enum;
+                char *field_name=calloc(256, sizeof(char)), *field_value=calloc(256, sizeof(char));
+                if(field_name==NULL || field_value==NULL){
+                    perror("Memory allocate error.");
+                    exit(1);
+                }
+                sscanf(optarg, "%[^:]:%[^:]", field_name, field_value);
+                // printf("Field name: %s, value: %s\n", field_name, field_value);
+                if( (http_req_enum=get_req_header_name_enum_by_str(field_name)) > 0 ){
+                    http_req_obj_ins_header_by_idx(&((*this)->http_req), http_req_enum, field_value);
+                } else {
+                    // other customized header
+                    // currently not support
+                    printf("Not support %s now\n", optarg);
+                }
                 break;
+            }
             case 'a':   // fast (cooperate with -b, burst length)
                 (*this)->enable_pipe=1; /* using fast, also enable pipe */
                 g_fast=1;
@@ -189,30 +184,8 @@ argparse(
                 break;
             case '?':
                 /** unknown will go to here:
-                 *  - argv[this_option_optind]+2 : field-name, need to skip `--` (+2)
-                 *  - argv[this_option_optind+1] : field-value
                  */
-                printf("Using ambiguous matching on `%s`.\n", argv[this_option_optind]+2);
-                if(get_req_header_name_enum_by_str(argv[this_option_optind]+2)>0 
-                    && argv[this_option_optind+1]!=NULL){ 
-                    // also checking its value is valid & not another req header 
-                    if(get_req_header_name_enum_by_str(argv[this_option_optind+1]+2)==0){ 
-                        http_req_obj_ins_header_by_idx(&((*this)->http_req), 
-                            get_req_header_name_enum_by_str(argv[this_option_optind]+2), 
-                            argv[this_option_optind+1]);
-                        break;
-                    } else {
-                        // print debug message
-                        fprintf(stderr, "You need to specify a value for header `%s`\n", argv[this_option_optind]);
-                    }
-                } else {
-                    // unknown options
-                    if(argv[this_option_optind+1]==NULL){
-                        fprintf(stderr, "You need to specify a value for header `%s`\n", argv[this_option_optind]);
-                    } else {
-                        fprintf(stderr, "[ERROR] Unknown option '%s'.\n", argv[this_option_optind]);
-                    }
-                }
+                printf("Using ambiguous matching on `%s`.\n", argv[this_option_optind]);
                 fprintf(stderr, "Please using `-h` to learn more about support options.\n");
                 print_manual(0);
                 exit(1);
@@ -501,20 +474,18 @@ print_manual(
         printf("\t  %s= %s\n", "99", "Show & log all");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'v', "verbose", " ", "Enable verbose printing (using `-h -v` to print more helper info)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500), enable pipe too.");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Enable aggressive HTTP pipelining (default is false), enable pipe too.");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'N', "nonblk", " ", "Enable non-blocking connect, send and recv.");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500), enable pipe too");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Enable aggressive HTTP pipelining (default is false), enable pipe too");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'N', "nonblk", " ", "Enable non-blocking connect, send and recv");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'P', "probe", " ", "Using probe mode (different with default mode)");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'H', "custom", "HDR:VAL", "Add request header's field name and field value (Support headers: using `-h -v` to find out)");
 
     if(detail){
-        printf("[Customized Request Header]-----------------------------------------------------\n");
-        for(int i=1;i<REQ_HEADER_NAME_MAXIMUM;i++){
-            if( (i!=REQ_HOST) ){
-                char *name=strdup(get_req_header_name_by_idx[i]);
-                to_lowercase(name);
-                // printf("--%-20s <VALUE> : Request header field-value of `%s`\n", name, get_req_header_name_by_idx[i]);
-                printf("--%-20s <VALUE>\n", name);
-            }
+        printf("[Support request header]--------------------------------------------------------\n");
+        for(int i=1; i<REQ_HEADER_NAME_MAXIMUM; i++){
+            printf("%s | ", get_req_header_name_by_idx[i]);
         }
+        printf("\n");
         printf("[Example]-----------------------------------------------------------------------\n");
         printf("%s -u http://httpd.apache.org -n 1000 -c 10 -t 1 -N\n", g_program);
         printf("  : using 1 thread and open 10 connections to deliver 1000 requests with non-blocking mode.\n");

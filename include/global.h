@@ -15,7 +15,7 @@
 #define POLL_TIMEOUT        (1000)          // 1 sec (normal/start case)
 #define POLL_MAX_TIMEOUT    (64000)         // 64 sec (after `127 sec` poll timeout, kb will exit sending process). 
 
-#define NUM_PARAMS          (15)
+#define NUM_PARAMS          (16)
 #define DEFAULT_PORT        (80)
 #define DEFAULT_SSL_PORT    (443)
 #define __FILENAME__        (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
