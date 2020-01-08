@@ -27,6 +27,16 @@ http_req_obj_create(http_req_header_status_t **req)
         }
     }
 
+    // other field (only support 10 arbitrary request headers)
+    (*req)->other_field=calloc(10, sizeof(u8 *));
+    if((*req)->other_field==NULL){
+        LOG(KB_EH, "Create HTTP request header field_value failed.");
+        return ERR_MEMORY;
+    }
+    for(int i=0; i < MAX_ARBIT_REQS; i++){
+        (*req)->other_field[i]=NULL;
+    }
+
     return ERR_NONE;
 }
 
@@ -96,6 +106,21 @@ http_req_finish(
         if(req->dirty_bit_align& (1<<(i-1)) ){
             http_req_ins_header(rawdata, get_req_header_name_by_idx[i], req->field_value[i]);
         }
+    }
+
+    // insert other request header (format of other_field is HDR:VAL)
+    for(int i=0; req->other_field[i]!=NULL; i++){
+        // fetch field name & value
+        char *field_value=strchr(req->other_field[i], ':');
+        if(field_value!=NULL){
+            field_value[0]='\0';
+            ++ field_value; // need to move 1 byte (because [0] is \0 now)
+        } else {
+            field_value=" "; // if not specified, using SP instead
+        }
+        char *field_name=req->other_field[i];
+        sscanf(req->other_field[i], "%[^:]:%[^:]", field_name, field_value);
+        http_req_ins_header(rawdata, field_name, field_value);
     }
 
     // CRLF 

@@ -23,6 +23,7 @@ struct offset_t {
 // request header (send request)
 typedef struct _http_req_header_status_t {
     u8 **field_value;
+    u8 **other_field; /* non-standard */
     // dirty bit (record existence), using u64
     union {
         u32 dirty_bit_align;

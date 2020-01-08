@@ -96,8 +96,17 @@ argparse(
                     http_req_obj_ins_header_by_idx(&((*this)->http_req), http_req_enum, field_value);
                 } else {
                     // other customized header
-                    // currently not support
-                    printf("Not support %s now\n", optarg);
+                    int success=0;
+                    for(int i=0; i < MAX_ARBIT_REQS; i++){
+                        if((*this)->http_req->other_field[i]==NULL){
+                            (*this)->http_req->other_field[i]=optarg;
+                            success=1;
+                            break;
+                        }
+                    }
+                    if(!success){
+                        printf("Not enough room for arbitrary header, discard: %s\n", optarg);
+                    }
                 }
                 break;
             }
