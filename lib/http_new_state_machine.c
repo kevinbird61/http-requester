@@ -210,7 +210,15 @@ http_resp_parser(
                         LOG(KB_PS, "Response from server : %s (%s)", 
                             get_http_status_code_by_idx[state_m->resp->status_code], 
                             get_http_reason_phrase_by_idx[state_m->resp->status_code]);
-                        // keep processing
+                        
+                        switch(state_m->resp->status_code){
+                            case _204_NO_CONTENT: // not content, then we can just return
+                                control_var.rcode = RCODE_FIN;
+                                return control_var;
+                            default: // keep processing
+                                break; 
+                        }
+                        
                     } else if(state_m->resp->status_code>=_300_MULTI_CHOICES && state_m->resp->status_code<_400_BAD_REQUEST){
                         switch(state_m->resp->status_code){
                             case _301_MOVED_PERMANENTLY:
@@ -238,25 +246,40 @@ http_resp_parser(
                         return control_var;
                     }
 
-                    /** Transfer coding/Message body info -
-                     * check current using Transfer-Encoding or Content-Length
-                     */
-                    if(http_h_status_check->content_len_dirty){
-                        state_m->use_content_length=1;
-                        state_m->content_length=atoi(state_m->buff+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
-                        LOG(KB_PS, "[Content length] size = %d", state_m->content_length);
-                        state_m->total_content_length=state_m->content_length;
-                        flag=(state_m->content_length==0) ? 0: flag;
-                    } else if(http_h_status_check->transfer_encoding_dirty){
-                        // need to parse under chunked size=0
-                        state_m->p_state=CHUNKED;
-                    }
-
                     /**
                      * FIXME: need to check the connection state (close, or keep-alive)
                      * - close: client side need to close the connection, and assume those sent pipelining requests have not been processed by server
                      * - keep-alive: calculate the "max" and "timeout" value fron `Keep-Alive` header
                      */
+                    if(http_h_status_check->conn_dirty){
+                        // check connection value
+                        if(!strncasecmp("close", state_m->buff+1+http_h_status_check->field_value[RES_CONN].idx, strlen("close"))){
+                            // using another bit to represent "close" state (because we need to close the connection after recv all data, cannot close connection immediately) 
+                            LOG(KB_PS, "Server tend to close the connection");
+                            http_h_status_check->is_close=1;
+                        }
+                    }
+
+                    /** Transfer coding/Message body info -
+                     * check current using Transfer-Encoding or Content-Length (Transfer-Encoding > Content-Length)
+                     */
+                    if(http_h_status_check->transfer_encoding_dirty){
+                        // need to parse under chunked size=0
+                        state_m->p_state=CHUNKED;
+                    } else if(http_h_status_check->content_len_dirty){
+                        state_m->use_content_length=1;
+                        state_m->content_length=atoi(state_m->buff+http_h_status_check->field_value[RES_CONTENT_LEN].idx);
+                        if(state_m->content_length==0){
+                            // check status_code, if not 204, then it might be error or anomaly. We tend to close the connection 
+                            if(state_m->resp->status_code != _204_NO_CONTENT){
+                                control_var.rcode = RCODE_CLOSE;
+                                return control_var;
+                            }
+                        }
+                        LOG(KB_PS, "[Content length] size = %d", state_m->content_length);
+                        state_m->total_content_length=state_m->content_length;
+                        flag=(state_m->content_length==0) ? 0: flag;
+                    } 
 
                 } else if(state_m->p_state==CHUNKED){
                     // check if it is `chunked` (If no extension)
@@ -530,6 +553,14 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                 STATS_INC_HDR_BYTES(state_m->thrd_num, state_m->resp->msg_hdr_len);
                 STATS_INC_BODY_BYTES(state_m->thrd_num, state_m->total_content_length);
                 STATS_INC_CODE(state_m->thrd_num, state_m->resp->status_code);
+                // check is_close flag
+                if(state_m->resp->is_close){
+                    LOG(KB_SM, "Server tend to close the connection");
+                    control_var.rcode = RCODE_CLOSE;
+                    flag=0;
+                    break;
+                }
+
                 if(num_reqs<=0){ // check if we have finished all response or not
                     LOG(KB_SM, "FIN: num_reqs: %d, fin_resp: %d", num_reqs, fin_resp);
                     control_var.num_resp=fin_resp;

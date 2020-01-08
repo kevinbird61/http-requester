@@ -149,8 +149,23 @@ conn_mgnt_run_non_blocking(conn_mgnt_t *this)
                             if(all_fin==this->total_req){ 
                                 goto end;
                             }
+                            
+                            // if "close" has found, then we then to reconnect without decrease the burst size
+                            if(this->sockets[i].state_m->resp->is_close){ 
+                                reset_parsing_state_machine(this->sockets[i].state_m);
+                                this->sockets[i].sent_req = 0;
+                                close(this->sockets[i].sockfd);
+                                char *port=itoa(this->args->port);
+                                this->sockets[i].sockfd=create_tcp_conn_non_blocking(this->args->host, port);
+                                ufds[i].fd=this->sockets[i].sockfd;
+                                this->sockets[i].leftover=0; // need to reset leftover 
+                                free(port);
+                                continue;
+                            }
+
                             // recv 0: means that peer side has disconnected, we don't need to check tcp state again.
-                            if(this->sockets[i].sent_req>0){ // you sent too much, recv side can't consume
+                            if(this->sockets[i].sent_req > 0){ 
+                                // you sent too much, recv side can't consume (with abnormally close)
                                 int prev_num_gap=this->sockets[i].num_gap;
                                 this->sockets[i].num_gap=((this->sockets[i].num_gap*DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN));
                                 this->sockets[i].num_gap=((this->sockets[i].num_gap< MIN_NUM_GAP)? MIN_NUM_GAP: this->sockets[i].num_gap); // min-pipe size

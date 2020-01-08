@@ -128,7 +128,8 @@ typedef struct _http_res_header_status_t {
         u16         use_chunked:1,
                     http_ver: 3,
                     status_code: 6,
-                    reserved: 6;
+                    is_close: 1,        // notify that we need to close the connection
+                    reserved: 5;
     };
 } __attribute__((aligned(64))) http_res_header_status_t;    // align with 64
 
