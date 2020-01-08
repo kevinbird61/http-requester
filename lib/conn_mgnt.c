@@ -423,22 +423,19 @@ conn_mgnt_run(conn_mgnt_t *this)
         }
     }
     int packed_len=0, request_size=strlen(http_request);
-    // timeout
-    int timeout=POLL_TIMEOUT;
+    // timeout & total workload 
+    int timeout=POLL_TIMEOUT, all_fin=0; 
+    u64 t_start=0, t_end=0;
+
+    struct pollfd ufds[this->args->conn];
+    for(int i=0;i<this->args->conn;i++){
+        ufds[i].fd=this->sockets[i].sockfd;
+        ufds[i].events = POLLIN;
+        this->sockets[i].state_m->thrd_num=this->thrd_num; // set thrd_num 
+    }
 
     if(this->args->enable_pipe){
         /* support pipeline */
-        u64 t_start=0, t_end=0;
-        // using poll()
-        struct pollfd ufds[this->args->conn];
-        for(int i=0;i<this->args->conn;i++){
-            ufds[i].fd=this->sockets[i].sockfd;
-            ufds[i].events = POLLIN;
-            this->sockets[i].state_m->thrd_num=this->thrd_num; // set thrd_num 
-        }
-
-        // each sockfd check its workload, and send its request 
-        int all_fin=0;
         // if unfinished, keep send & recv
         while(all_fin<this->total_req){
             u32 workload=0; // in each iteration
@@ -592,15 +589,7 @@ conn_mgnt_run(conn_mgnt_t *this)
         }
     } else {
         /* not pipeline */
-        u64 t_start=0, t_end=0;
         u64 resp_intvl=0;
-        struct pollfd ufds[this->args->conn];
-        for(int i=0;i<this->args->conn;i++){
-            ufds[i].fd=this->sockets[i].sockfd;
-            ufds[i].events = POLLIN;
-        }
-
-        int all_fin=0;
         while(all_fin<this->total_req){
             // workload in current iteration
             u32 workload=0;

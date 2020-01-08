@@ -8,6 +8,10 @@ int main(int argc, char *argv[]){
 
     /* global var init */
     g_thrd_id_mapping=calloc(args->thrd, sizeof(int)); /* FIXME: check return */
+    if(g_thrd_id_mapping==NULL){
+        perror("Cannot allocate memory for g_thrd_id_mapping.");
+        exit(1);
+    }
 
     /* select mode (default is loadgen) */
     if(args->use_probe_mode){

@@ -69,7 +69,7 @@ create_tcp_conn(
     }
 
     // logging
-    LOG(KB, "[Success][client, port=%d]: connecting to %s:%d", ntohs(sin.sin_port), s, ntohs( ((struct sockaddr_in*)p->ai_addr)->sin_port) );
+    // LOG(KB, "[Success][client, port=%d]: connecting to %s:%d", ntohs(sin.sin_port), s, ntohs( ((struct sockaddr_in*)p->ai_addr)->sin_port) );
     freeaddrinfo(res);
 
     return sockfd;
@@ -160,7 +160,7 @@ create_tcp_keepalive_conn(
     }
 
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof(s));
-    LOG(KB_CM, "client: connecting to %s\n", s);
+    //LOG(KB_CM, "client: connecting to %s\n", s);
     freeaddrinfo(res);
 
     /* setup SO_KEEPALIVE */
@@ -170,7 +170,7 @@ create_tcp_keepalive_conn(
         close(sockfd);
         exit(EXIT_FAILURE);                     
     }
-    LOG(KB_CM, "SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
+    //LOG(KB_CM, "SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
 
     optval = 1;
     optlen = sizeof(optval);
@@ -180,7 +180,7 @@ create_tcp_keepalive_conn(
         close(sockfd);
         exit(EXIT_FAILURE); 
     }
-    LOG(KB_CM, "SO_KEEPALIVE set on socket\n");
+    //LOG(KB_CM, "SO_KEEPALIVE set on socket\n");
     
     // keepalive interval
     if(setsockopt(sockfd, SOL_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(int)))
@@ -189,7 +189,7 @@ create_tcp_keepalive_conn(
         close(sockfd);
         exit(EXIT_FAILURE); 
     }
-    LOG(KB_CM, "TCP_KEEPINTVL: %d sec.\n", keepintvl);
+    //LOG(KB_CM, "TCP_KEEPINTVL: %d sec.\n", keepintvl);
 
     // keepalive idletime
     if(setsockopt(sockfd, SOL_TCP, TCP_KEEPIDLE, &keepidle, sizeof(int)))
@@ -198,7 +198,7 @@ create_tcp_keepalive_conn(
         close(sockfd);
         exit(EXIT_FAILURE); 
     }
-    LOG(KB_CM, "TCP_KEEPIDLE: %d sec.\n", keepidle);
+    //LOG(KB_CM, "TCP_KEEPIDLE: %d sec.\n", keepidle);
 
     // keepalive probes
     if(setsockopt(sockfd, SOL_TCP, TCP_KEEPCNT, &keepcnt, sizeof(int)))
@@ -207,7 +207,7 @@ create_tcp_keepalive_conn(
         close(sockfd);
         exit(0); 
     } 
-    LOG(KB_CM, "TCP_KEEPCNT: %d pkts.\n", keepcnt);
+    //LOG(KB_CM, "TCP_KEEPCNT: %d pkts.\n", keepcnt);
     
     optval=0;
     if(getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &optval, &optlen) < 0) {
@@ -215,7 +215,7 @@ create_tcp_keepalive_conn(
         close(sockfd);
         exit(EXIT_FAILURE);                     
     }
-    LOG(KB_CM, "SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
+    //LOG(KB_CM, "SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
 
     return sockfd;
 }
@@ -231,7 +231,7 @@ check_tcp_conn_stat(int sockfd)
         exit(EXIT_FAILURE);
     }
     /* Perform the check here */
-    LOG(KB_CM, "(%d)[TCP conn state: %s]\n", sockfd, tcpi_state_str[tcp_state.tcpi_state]);
+    //LOG(KB_CM, "(%d)[TCP conn state: %s]\n", sockfd, tcpi_state_str[tcp_state.tcpi_state]);
 
     return 0;
 }
