@@ -23,14 +23,11 @@ int
 log_init(
     u32 thrd_num)
 {
-    char *logfile = malloc( (strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(thrd_num))+1) * sizeof(char));
-    // check logfile
-    if(logfile==NULL){
-        perror("Cannot malloc logfile.");
-        exit(1);
-    }
+    char *logfile = NULL;
+    SAVE_ALLOC(logfile, (strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(thrd_num))+1), char);
+
     sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, thrd_num, g_log_ext);
-    g_logfd[thrd_num]=fopen(logfile, "w");
+    g_logfd[thrd_num] = fopen(logfile, "w");
     // check g_logfd
     if(g_logfd[thrd_num] < 0){
         perror("Cannot open log file descriptor.");
@@ -65,9 +62,7 @@ syslog(
 
     // malloc for size
     size++; // for `\n`
-    loginfo=malloc(size);
-    if(loginfo==NULL){ return -1;}
-
+    SAVE_ALLOC(loginfo, size, char);
     // read the info args into loginfo
     va_start(ap, info_args);
     size=vsnprintf(loginfo, size, info_args, ap);
@@ -103,8 +98,7 @@ parse_valist(char *info_args, ...)
 
     // malloc for size
     size++; 
-    loginfo=malloc(size);
-    if(loginfo==NULL){ return NULL;}
+    SAVE_ALLOC(loginfo, size, char);
 
     // read the info args into loginfo
     va_start(ap, info_args);

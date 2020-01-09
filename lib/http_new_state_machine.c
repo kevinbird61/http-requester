@@ -291,7 +291,8 @@ http_resp_parser(
                     /** FIXME: need to using strtok to parse all possible value
                      */
                     if(http_h_status_check->use_chunked){
-                        char *tmp=calloc(state_m->parsed_len, sizeof(char));
+                        char *tmp=NULL;
+                        SAVE_ALLOC(tmp, state_m->parsed_len, char);
                         char *chunked_str=strndup(state_m->buff+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len);
                         sprintf(tmp, "%ld", strtol(chunked_str, NULL, 16));
                         if((atoi(tmp))>0){
@@ -354,11 +355,8 @@ http_resp_parser(
                                 LOG(KB_PS, "[Version: %s]",  get_http_version_by_idx[ret]);
                                 state_m->resp->http_ver=ret;
                             } else { // if not support, just terminate
-                                char *tmp=malloc((state_m->parsed_len)*sizeof(char));
-                                if(tmp==NULL){
-                                    LOG(KB_EH, "Cannot allocate memory for thread information.");
-                                    exit(1);
-                                }
+                                char *tmp = NULL;
+                                SAVE_ALLOC(tmp, state_m->parsed_len, char);
                                 snprintf(tmp, state_m->parsed_len, "%s", state_m->buff+(state_m->buf_idx-state_m->parsed_len));
                                 LOG(KB_PS, "[Version not support: %s]", tmp);
                                 free(tmp);
@@ -394,11 +392,9 @@ http_resp_parser(
                 } else if(state_m->p_state==CHUNKED){
                     // need to parse the chunk size here, and prepare to parse chunk extension
                     if( http_h_status_check->use_chunked ){
-                        char *tmp=calloc(state_m->parsed_len, sizeof(char));
-                        if(tmp==NULL){
-                            LOG(KB_EH, "Cannot allocate memory for thread information.");
-                            exit(1);
-                        }
+                        char *tmp=NULL;
+                        SAVE_ALLOC(tmp, state_m->parsed_len, char);
+                        
                         char *chunked_str=strndup(state_m->buff+(state_m->buf_idx-state_m->parsed_len), state_m->parsed_len);
                         sprintf(tmp, "%ld", strtol(chunked_str, NULL, 16));
                         if((atoi(tmp))>0){
@@ -783,16 +779,9 @@ multi_bytes_http_parsing_state_machine(
 state_machine_t *
 create_parsing_state_machine()
 {
-    state_machine_t *new_obj = calloc(1, sizeof(state_machine_t));
-    if(new_obj==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
-        exit(1);
-    }
-    new_obj->buff=calloc(RECV_BUFF_SCALE*CHUNK_SIZE, sizeof(char));
-    if(new_obj->buff==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    state_machine_t *new_obj = NULL;
+    SAVE_ALLOC(new_obj, 1, state_machine_t);
+    SAVE_ALLOC(new_obj->buff, RECV_BUFF_SCALE*CHUNK_SIZE, char);
     new_obj->resp=create_http_header_status(new_obj->buff);
     new_obj->max_buff_size=RECV_BUFF_SCALE*CHUNK_SIZE;
     return new_obj;

@@ -6,37 +6,18 @@
 int 
 http_req_obj_create(http_req_header_status_t **req)
 {
-    *req=calloc(1, sizeof(http_req_header_status_t));
-    if((*req)==NULL){
-        LOG(KB_EH, "Create HTTP request header object failed.");
-        return ERR_MEMORY;
-    }
+    SAVE_ALLOC((*req), 1, http_req_header_status_t);
     // assign dynamic 2d array (e.g. string array)
-    (*req)->field_value=calloc(REQ_HEADER_NAME_MAXIMUM, sizeof(u8 *));
-    if(((*req)->field_value)==NULL){
-        LOG(KB_EH, "Create HTTP request header field_value failed.");
-        return ERR_MEMORY;
-    }
-
+    SAVE_ALLOC((*req)->field_value, REQ_HEADER_NAME_MAXIMUM, u8 *);
     for(int i=0;i<REQ_HEADER_NAME_MAXIMUM;i++){
         // default length = 255 
-        (*req)->field_value[i]=calloc(DEFAULT_FIELD_VAL_LEN, sizeof(char));
-        if(((*req)->field_value)==NULL){
-            LOG(KB_EH, "Create HTTP request header field_value's element (%d) failed.", i);
-            return ERR_MEMORY;
-        }
+        SAVE_ALLOC((*req)->field_value[i], DEFAULT_FIELD_VAL_LEN, char);
     }
-
     // other field (only support 10 arbitrary request headers)
-    (*req)->other_field=calloc(10, sizeof(u8 *));
-    if((*req)->other_field==NULL){
-        LOG(KB_EH, "Create HTTP request header field_value failed.");
-        return ERR_MEMORY;
-    }
+    SAVE_ALLOC((*req)->other_field, 10, u8 *);
     for(int i=0; i < MAX_ARBIT_REQS; i++){
         (*req)->other_field[i]=NULL;
     }
-
     return ERR_NONE;
 }
 
@@ -69,10 +50,7 @@ http_req_create_start_line(
     char *target, u8 http_version)
 {
     int h_len=strlen(method)+strlen(get_http_version_by_idx[http_version])+strlen(target)+4; // + 2 SP + CRLF
-    *rawdata=calloc(h_len, sizeof(char));
-    if(*rawdata==NULL){
-        return ERR_MEMORY;
-    }
+    SAVE_ALLOC((*rawdata), h_len, char);
     sprintf(*rawdata, "%s %s %s\r\n", method, target, get_http_version_by_idx[http_version]);
 
     return ERR_NONE;

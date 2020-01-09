@@ -44,11 +44,7 @@ stats_push_resp_intvl(
 
     // push interval into queue
     if(resp_intvl_queue[thrd_num].next==NULL){
-        resp_intvl_queue[thrd_num].next=calloc(1, sizeof(struct _resp_intvl_t));
-        if(resp_intvl_queue[thrd_num].next==NULL){
-            perror("Cannot allocate memory for thread information.");
-            exit(1);
-        }
+        SAVE_ALLOC(resp_intvl_queue[thrd_num].next, 1, struct _resp_intvl_t);
         resp_intvl_queue[thrd_num].next->resp_intvl=intvl;
         resp_intvl_queue[thrd_num].next->next=NULL;
         return;
@@ -58,11 +54,7 @@ stats_push_resp_intvl(
     while(head->next!=NULL){
         head=head->next;
     }
-    head->next=calloc(1, sizeof(struct _resp_intvl_t));
-    if(head->next==NULL){
-        perror("Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    SAVE_ALLOC(head->next, 1, struct _resp_intvl_t);
     head->next->resp_intvl=intvl;
     head->next->next=NULL;
 }
@@ -264,13 +256,10 @@ stats_dump()
             printf("------------------------------------------------------------------------------------------------------\n");
             for(int i=0; i<g_total_thrd_num; i++){
                 // logfile
-                char *logfile=malloc((strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(get_thrd_tid_from_id(priv_statistics[i].thrd_cnt)))+1)*sizeof(char));
-                if(logfile==NULL){
-                    perror("Cannot allocate memory for thread information.");
-                    exit(1);
-                }
+                char *logfile = NULL;
+                SAVE_ALLOC(logfile, (strlen(g_log_dir)+strlen(g_log_filename)+strlen(g_log_ext)+strlen(itoa(get_thrd_tid_from_id(priv_statistics[i].thrd_cnt)))+1), char);
                 sprintf(logfile, "%s%s%d%s", g_log_dir, g_log_filename, get_thrd_tid_from_id(priv_statistics[i].thrd_cnt), g_log_ext);
-
+                
                 printf("|%-5s| %-12d | %-12f | %-12d | %-12d | %-12d | %-12s |\n", 
                     " ",  get_thrd_tid_from_id(priv_statistics[i].thrd_cnt),  
                     priv_statistics[i].total_time/((float)cpuFreq),

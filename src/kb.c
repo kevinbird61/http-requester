@@ -7,11 +7,7 @@ int main(int argc, char *argv[]){
     u8 ret=argparse(&args, argc, argv);
 
     /* global var init */
-    g_thrd_id_mapping=calloc(args->thrd, sizeof(int)); /* FIXME: check return */
-    if(g_thrd_id_mapping==NULL){
-        perror("Cannot allocate memory for g_thrd_id_mapping.");
-        exit(1);
-    }
+    SAVE_ALLOC(g_thrd_id_mapping, args->thrd, int);
 
     /* select mode (default is loadgen) */
     if(args->use_probe_mode){
@@ -45,11 +41,8 @@ kb_loadgen:{
     STATS_TIME_START();
 
     // enable multiple threads
-    thrds=calloc((args->thrd), sizeof(struct _thrd_t)); 
-    if(thrds==NULL){
-        perror("Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    SAVE_ALLOC(thrds, args->thrd, struct _thrd_t);
+    
     // distribute the total reqs (e.g. args->conn) to each thread 
     // Notice: args->conn has been modified later, need to store this value first
     total_req=args->reqs;

@@ -47,11 +47,8 @@ struct option options[NUM_PARAMS]={
 parsed_args_t *
 create_argparse()
 {
-    parsed_args_t *new_argparse=calloc(1, sizeof(parsed_args_t));
-    if(new_argparse==NULL){
-        perror("Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    parsed_args_t *new_argparse;
+    SAVE_ALLOC(new_argparse, 1, parsed_args_t);
     new_argparse->port=DEFAULT_PORT;
     new_argparse->urls=NULL;
     // init http_req_obj
@@ -85,11 +82,9 @@ argparse(
         switch(c){
             case 'H':{ /* customized header */
                 int http_req_enum;
-                char *field_name=calloc(256, sizeof(char)), *field_value=calloc(256, sizeof(char));
-                if(field_name==NULL || field_value==NULL){
-                    perror("Memory allocate error.");
-                    exit(1);
-                }
+                char *field_name = NULL, *field_value = NULL;
+                SAVE_ALLOC(field_name, 256, char);
+                SAVE_ALLOC(field_value, 256, char);
                 sscanf(optarg, "%[^:]:%[^:]", field_name, field_value);
                 // printf("Field name: %s, value: %s\n", field_name, field_value);
                 if( (http_req_enum=get_req_header_name_enum_by_str(field_name)) > 0 ){
@@ -149,7 +144,7 @@ argparse(
                 for( ;optind < argc && *argv[optind] != '-'; optind++){
                     // append each url
                     if((*this)->urls==NULL){
-                        (*this)->urls=calloc(1, sizeof(struct urls));
+                        SAVE_ALLOC((*this)->urls, 1, struct urls);
                         if((*this)->urls==NULL){
                             perror("Cannot allocate memory for thread information.");
                             exit(1);
@@ -161,7 +156,7 @@ argparse(
                         while(root->next!=NULL){
                             root=root->next;
                         }
-                        root->next=calloc(1, sizeof(struct urls));
+                        SAVE_ALLOC(root->next, 1, struct urls);
                         if(root->next==NULL){
                             perror("Cannot allocate memory for thread information.");
                             exit(1);
@@ -323,44 +318,6 @@ argparse(
     return ret;
 }
 
-void 
-print_config(
-    parsed_args_t *this)
-{
-    struct urls *url_trav=(this)->urls;
-    printf("================================================================================\n");
-    printf("%-50s: %d\n", "Number of threads", (this)->thrd);
-    printf("%-50s: %d\n", "Number of connections", (this)->conn);
-    printf("%-50s: %d\n", "Number of total requests", (this)->reqs);
-    printf("%-50s: %s\n", "Scheme: ", this->scheme);
-    if(this->use_probe_mode){
-        /* show probe options */
-        printf("%-50s: %s\n", "Probe mode", "Enable");
-    } else {
-        printf("%-50s: %d\n", "Max-requests size", g_burst_length);
-        printf("%-50s: %s\n", "HTTP Pipeline", (this->enable_pipe==1)? "Enable": "-");
-        printf("%-50s: %s\n", "Aggressive Pipe", (g_fast==1)? "Enable": "-");
-        printf("%-50s: %s\n", "Non-Blocking Mode", (this->use_non_block==1)? "Enable": "-");
-        printf("%-50s: %s\n", "Verbose Mode", (g_verbose==1)? "Enable": "-");
-        printf("%-50s: %s\n", "Logging Level", g_log_level_str[g_log_visible]);
-        printf("%-50s: %s\n", "URI: ", this->path);
-    }
-    if(this->use_url){ // only enable in non-probe mode
-        printf("%-50s:\n", "Available URL(s): ");
-        url_trav=this->urls;
-        while(url_trav!=NULL){
-            printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
-            url_trav=url_trav->next;
-        }
-        printf("%-50s: %s\n", "Target URL: ", this->url==NULL? "None": (char*)this->url);
-    } else {
-        printf("%-50s: %s\n", "Using HTTP header template", this->filename==NULL? "None": (char*)this->filename);
-    }
-    printf("%-50s: %d\n", "Port number: ", this->port);
-    printf("%-50s: %s\n", "Method: ", this->method);
-    printf("================================================================================\n");
-}
-
 // parse user's URL
 int 
 parse_url(
@@ -469,6 +426,45 @@ update_url_info_rand(
     return USE_URL;
 }
 
+void 
+print_config(
+    parsed_args_t *this)
+{
+    struct urls *url_trav=(this)->urls;
+    printf("================================================================================\n");
+    printf("%-50s: %d\n", "Number of threads", (this)->thrd);
+    printf("%-50s: %d\n", "Number of connections", (this)->conn);
+    printf("%-50s: %d\n", "Number of total requests", (this)->reqs);
+    printf("%-50s: %s\n", "Scheme: ", this->scheme);
+    if(this->use_probe_mode){
+        /* show probe options */
+        printf("%-50s: %s\n", "Probe mode", "Enable");
+    } else {
+        printf("%-50s: %d\n", "Max-requests size", g_burst_length);
+        printf("%-50s: %s\n", "HTTP Pipeline", (this->enable_pipe==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Aggressive Pipe", (g_fast==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Non-Blocking Mode", (this->use_non_block==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Verbose Mode", (g_verbose==1)? "Enable": "-");
+        printf("%-50s: %s\n", "Logging Level", g_log_level_str[g_log_visible]);
+        printf("%-50s: %s\n", "URI: ", this->path);
+    }
+    if(this->use_url){ // only enable in non-probe mode
+        printf("%-50s:\n", "Available URL(s): ");
+        url_trav=this->urls;
+        while(url_trav!=NULL){
+            printf(" -> %s\n", url_trav->url==NULL? "None": (char*)url_trav->url);
+            url_trav=url_trav->next;
+        }
+        printf("%-50s: %s\n", "Target URL: ", this->url==NULL? "None": (char*)this->url);
+    } else {
+        printf("%-50s: %s\n", "Using HTTP header template", this->filename==NULL? "None": (char*)this->filename);
+    }
+    printf("%-50s: %d\n", "Port number: ", this->port);
+    printf("%-50s: %s\n", "Method: ", this->method);
+    printf("================================================================================\n");
+}
+
+
 // print out usage/helper page
 void 
 print_manual(
@@ -504,7 +500,7 @@ print_manual(
         printf("\t  %s= %s\n", "99", "Show & log all");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'v', "verbose", " ", "Enable verbose printing (using `-h -v` to print more helper info)");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'i', "pipe", " ", "Enable HTTP pipelining");
-    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 500), enable pipe too");
+    printf("\t-%-2c, --%-7s %-7s: %s.\n", 'b', "burst", "LENGTH", "Configure burst length for HTTP pipelining (default is 100, min. is 1), enable pipe too");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'a', "fast", " ", "Enable aggressive HTTP pipelining (default is false), enable pipe too");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'N', "nonblk", " ", "Enable non-blocking connect, send and recv");
     printf("\t-%-2c, --%-7s %-7s: %s.\n", 'P', "probe", " ", "Using probe mode (different with default mode)");

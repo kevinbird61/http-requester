@@ -734,29 +734,23 @@ conn_mgnt_t *
 create_conn_mgnt_non_blocking(
     parsed_args_t *args)
 {
-    conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
-    if(mgnt==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    conn_mgnt_t *mgnt = NULL;
+    SAVE_ALLOC(mgnt, 1, conn_mgnt_t);
+
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=g_burst_length; // configurable
     mgnt->total_req=args->reqs;
 
     /* create socket lists */
-    mgnt->sockets=calloc(args->conn, sizeof(struct _conn_t));
-    if(mgnt->sockets==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
-        exit(1);
-    }
-    for(int i=0;i<args->conn;i++){
+    SAVE_ALLOC(mgnt->sockets, args->conn, struct _conn_t);
+    for(int i=0; i<args->conn; i++){
         // create sockfd
         mgnt->sockets[i].sockfd=create_tcp_conn_non_blocking(args->host, itoa(args->port));
         mgnt->sockets[i].state_m=create_parsing_state_machine();
         // reset state machine
         reset_parsing_state_machine(mgnt->sockets[i].state_m);
-        if(mgnt->sockets[i].sockfd<0){
+        if(mgnt->sockets[i].sockfd < 0){
             printf("Fail to create sockfd: %d\n", mgnt->sockets[i].sockfd);
             // should we retry ? or using non-blocking to handle
             exit(1);
@@ -776,29 +770,24 @@ conn_mgnt_t *
 create_conn_mgnt(
     parsed_args_t *args)
 {
-    conn_mgnt_t *mgnt=calloc(1, sizeof(conn_mgnt_t));
-    if(mgnt==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    conn_mgnt_t *mgnt = NULL;
+    SAVE_ALLOC(mgnt, 1, conn_mgnt_t);
+
     mgnt->thrd_num=0; // default is 0 (new thread need to set this value)
     mgnt->args=args;
     mgnt->num_gap=g_burst_length; // configurable
     mgnt->total_req=args->reqs;
 
     /* create socket lists */
-    mgnt->sockets=calloc(args->conn, sizeof(struct _conn_t));
-    if(mgnt->sockets==NULL){
-        LOG(KB_EH, "Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    SAVE_ALLOC(mgnt->sockets, args->conn, struct _conn_t);
+
     for(int i=0;i<args->conn;i++){
         // create sockfd
         mgnt->sockets[i].sockfd=create_tcp_conn(args->host, itoa(args->port));
         mgnt->sockets[i].state_m=create_parsing_state_machine();
         // reset state machine
         reset_parsing_state_machine(mgnt->sockets[i].state_m);
-        if(mgnt->sockets[i].sockfd<0){
+        if(mgnt->sockets[i].sockfd < 0){
             printf("Fail to create sockfd: %d\n", mgnt->sockets[i].sockfd);
             // should we retry ? or using non-blocking to handle
             exit(1);
