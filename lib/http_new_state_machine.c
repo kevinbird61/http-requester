@@ -272,7 +272,7 @@ http_resp_parser(
                         if(state_m->content_length==0){
                             // check status_code, if not 204, then it might be error or anomaly. We tend to close the connection 
                             if(state_m->resp->status_code != _204_NO_CONTENT){
-                                control_var.rcode = RCODE_CLOSE;
+                                control_var.rcode = RCODE_FIN;
                                 return control_var;
                             }
                         } else if (state_m->content_length < 0){
@@ -344,6 +344,12 @@ http_resp_parser(
                     switch (state_m->p_state)
                     {
                         case VER:
+                            if(state_m->parsed_len > 9){ // more than 8 bytes + 1 (SP)
+                                LOG(KB_PS, "Version more than 8 bytes");
+                                // error, return 
+                                control_var.rcode = RCODE_ERROR;
+                                return control_var;
+                            }
                             if((ret=encap_http_version(state_m->buff+(state_m->buf_idx-state_m->parsed_len))) > 1){ // current only support HTTP/1.1
                                 LOG(KB_PS, "[Version: %s]",  get_http_version_by_idx[ret]);
                                 state_m->resp->http_ver=ret;
@@ -364,6 +370,12 @@ http_resp_parser(
                             state_m->parsed_len=0;
                             break;
                         case CODE_OR_TOKEN:
+                            if(state_m->parsed_len > 4){ // more than 3 bytes + 1 (SP)
+                                LOG(KB_PS, "Code more than 3 bytes");
+                                // error, return 
+                                control_var.rcode = RCODE_ERROR;
+                                return control_var;
+                            }
                             if((ret=encap_http_status_code(atoi(state_m->buff+(state_m->buf_idx-state_m->parsed_len)))) > 0){
                                 state_m->resp->status_code=ret;
                                 LOG(KB_PS, "[Status code: %s]", get_http_status_code_by_idx[ret]);
@@ -519,6 +531,7 @@ multi_bytes_http_parsing_state_machine_non_blocking(
                         // reset state machine
                         reset_parsing_state_machine(state_m);
                         control_var.rcode=RCODE_CLOSE; // server turn off the connection, let conn_mgnt handle
+                        // control_var.rcode = RCODE_FIN;
                         flag=0;
                         break;
                     }

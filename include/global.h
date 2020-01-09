@@ -8,7 +8,7 @@
 #define MAX_THREAD          (1000)          // max thread number
 #define RETRY_WAIT_TIME     (1)             // 4xx, or other error, wait 1 sec and create a new conn to retry
 #define NUM_GAP             (100)           // max-request size
-#define MIN_NUM_GAP         (5)             // min-request size
+#define MIN_NUM_GAP         (1)             // min-request size
 #define MAX_SENT_REQ        (1000)          // how many sent_req (unanswered reqs) allow
 #define MAX_ARBIT_REQS      (10)            // argparse.c
 #define DEC_RATE_NUMERAT    (9)             // decrease rate = (MAX-request size)*(DEC_RATE_NUMERAT)/(DEC_RATE_DENOMIN)

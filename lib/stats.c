@@ -106,13 +106,13 @@ stats_progress(
     leftover=total_workload-curr_workload;
     remain_time=(leftover*exec_time)/curr_workload;
     // main thread (total progress)
-    printf("Completed: %-3d%% (%10d reqs), execution time: %-5.2f sec. (Remaining: %-5.2f sec.)\n", 
-        (curr_workload*100)/total_workload, curr_workload,
+    printf("Completed: %-3.4f %% (%10d reqs), execution time: %-5.2f sec. (Remaining: %-5.2f sec.)\n", 
+        (curr_workload/(double)total_workload)*100, curr_workload,
         exec_time, remain_time);
     // other thread (individual progress)
     for(int i=0; i<g_total_thrd_num; i++){
-        printf("└─> (Thrd: %-3d) Completed: %-3lld%% (%10lld reqs)\n", 
-            i, (priv_statistics[i].recv_resps*100)/(total_workload/g_total_thrd_num), 
+        printf("└─> (Thrd: %-3d) Completed: %-3.4f %% (%10lld reqs)\n", 
+            i, (priv_statistics[i].recv_resps/(double)(total_workload/g_total_thrd_num))*100, 
             priv_statistics[i].recv_resps);
     }
 
