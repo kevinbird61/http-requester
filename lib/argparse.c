@@ -256,6 +256,27 @@ argparse(
         g_total_thrd_num=(*this)->thrd;
     }
 
+    /**************************************************** Check limitation here ****************************************************/
+
+    /** check total threads and total connections :
+     * each thread will open a log file, which consume 1 fd; and each connection will
+     * occupy 1 fd too, so we need to calculate this and constrain the total fd 
+     */
+    struct rlimit limit;
+    get_max_num_open_fds(&limit);
+    if( (((*this)->thrd)*((*this)->conn) + (*this)->thrd) > (limit.rlim_cur-10) ){ // 10 is just an offset 
+        printf("Too many open file descriptor, please reduce your threads or connections.\n");
+        printf("[INFO] The soft limit is %lu (current setting)\n", limit.rlim_cur);
+        printf("[INFO] The hard limit is %lu (maximum value)\n", limit.rlim_max);
+        exit(1);
+    }
+
+    // check max requests 
+    if( (*this)->reqs > MAX_REQS_NUM) {
+        printf("Total requests number exceed maximum requests size: %d, close kb.\n", MAX_REQS_NUM);
+        exit(1);
+    }
+
     /* check total requests & number of connections */ 
     if((*this)->reqs < (((*this)->thrd)*((*this)->conn)) ){
         // then we assign args->conn to args->thrd*args->conc

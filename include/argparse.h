@@ -2,6 +2,7 @@
 #define __ARGPARSE__
 
 #include <getopt.h>
+#include "sysconfig.h"
 #include "global.h"
 #include "logger.h"
 #include "types.h"
