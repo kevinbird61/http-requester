@@ -275,6 +275,11 @@ http_resp_parser(
                                 control_var.rcode = RCODE_CLOSE;
                                 return control_var;
                             }
+                        } else if (state_m->content_length < 0){
+                            // invalid content length
+                            LOG(KB_PS, "[Content length] invalid size = %d", state_m->content_length);
+                            control_var.rcode = RCODE_ERROR;
+                            return control_var;
                         }
                         LOG(KB_PS, "[Content length] size = %d", state_m->content_length);
                         state_m->total_content_length=state_m->content_length;
