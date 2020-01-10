@@ -31,7 +31,7 @@ kb_loadgen:{
     u32 total_req=0, leftover=0;
 
     // signal handler
-    SIG_HANDLE(SIGINT);
+    // SIG_HANDLE(SIGINT);
     SIG_HANDLE(SIGALRM);
     SIG_HANDLE(SIGSEGV);
     SIG_HANDLE(SIGPIPE);
@@ -84,8 +84,11 @@ kb_loadgen:{
         g_thrd_id_mapping[i]=(int)thrds[i].tid; // setup id mapping
         STATS_THR_INIT(i, (u32)thrds[i].tid);
         // these protected obj can be handled when exception occur (e.g. SIGXXX) and close them elegantly
+        // SIG_PROTECT_THR(&thrds[i]);
         SIG_PROTECT_CM(thrds[i].mgnt);
     }
+
+    SIG_HANDLE(SIGINT); /* only main thread capture/handle SIGINT */
 
     if(g_verbose){ // only enable when user specify `-v`
         CLEAR_SCREEN();

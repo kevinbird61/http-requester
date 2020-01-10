@@ -15,6 +15,7 @@ struct _protect_t {
     struct _protect_t*   next;
 };
 
+// static struct _protect_t* protect_thrds;        // threads 
 static struct _protect_t* protect_conn_mgnt; // conn_mgnt list 
 
 static inline void sig_handler(int signal){
@@ -28,12 +29,14 @@ static inline void sig_handler(int signal){
             int free_cm=0;
             while(protect_conn_mgnt!=NULL){
                 if(protect_conn_mgnt->protect_obj!=NULL){
+                    // pthread_kill((pthread_t) get_thrd_tid_from_id(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num), SIGINT);
                     STATS_CONN((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj); // store all conn stats from each conn_mgnt
                     STATS_THR_TIME_END(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num); // calculate for end time of each thread
-                    free(protect_conn_mgnt->protect_obj);
-                    protect_conn_mgnt=protect_conn_mgnt->next;
-                    free_cm++;
                     LOG_CLOSE(((struct _conn_mgnt_t *)protect_conn_mgnt->protect_obj)->thrd_num); // close logfile
+                    
+                    // free(protect_conn_mgnt->protect_obj);
+                    free_cm++;     
+                    protect_conn_mgnt=protect_conn_mgnt->next;
                 }
             }
             STATS_TIME_END(); // calculate total execution time (otherwise will get wrong result: only calculate the starting timestamp)
@@ -78,5 +81,6 @@ void push_protect(struct _protect_t **protect_list, void *obj){
 #define SIG_IGNORE(sig)     (signal(sig, SIGIGN))       // ignore this signal
 #define SIG_HANDLE(sig)     (signal(sig, sig_handler))
 #define SIG_PROTECT_CM(cm)  (push_protect(&protect_conn_mgnt, cm))
+// #define SIG_PROTECT_THR(t)  (push_protect(&protect_thrds, t))
 
 #endif
