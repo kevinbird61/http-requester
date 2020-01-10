@@ -16,14 +16,14 @@
 #include "types.h"
 
 #define USEC    1000000
-#define SAVE_ALLOC(ptr, num, type)      \
-    do {                                \
-        ptr = malloc(num*sizeof(type)); \
+#define SAVE_ALLOC(ptr, num, type)          \
+    do {                                    \
+        ptr = malloc(num * sizeof(type));   \
         if(ptr==NULL){                          \
             perror("Cannot allocate memory");   \
             exit(1);                            \
-        }                               \
-        memset(ptr, 0x00, num);         \
+        }                                       \
+        memset(ptr, 0x00, num*sizeof(type));    \
     } while(0)
 
 static inline void *
@@ -49,11 +49,8 @@ get_digits(u64 input)
 static inline u8 *
 itoa(u64 number)
 {
-    char *str=malloc((get_digits(number)+1)*sizeof(char));
-    if(str==NULL){
-        perror("Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    char *str = NULL;
+    SAVE_ALLOC(str, get_digits(number)+1, char);
     sprintf(str, "%lld", number);
     return str;
 }
@@ -80,11 +77,8 @@ gettime(void)
 static inline u8 *
 getdate(void)
 {
-    char *date=malloc(32*sizeof(char));
-    if(date==NULL){
-        perror("Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    char *date = NULL;
+    SAVE_ALLOC(date, 32, char);
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     sprintf(date, "%04d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1,tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -94,11 +88,9 @@ getdate(void)
 static inline char *
 copy_str_n_times(char *ori, int n_times)
 {
-    char *total=malloc((n_times+1)*(strlen(ori)));
-    if(total==NULL){
-        perror("Cannot allocate memory for thread information.");
-        exit(1);
-    }
+    char *total = NULL;
+    SAVE_ALLOC(total, (n_times+1)*(strlen(ori)), char);
+
     sprintf(total, "%s", ori);
     for(int i=1;i<n_times;i++){
         sprintf(total+strlen(total), "%s", ori);

@@ -86,7 +86,7 @@ argparse(
                 SAVE_ALLOC(field_name, 256, char);
                 SAVE_ALLOC(field_value, 256, char);
                 sscanf(optarg, "%[^:]:%[^:]", field_name, field_value);
-                // printf("Field name: %s, value: %s\n", field_name, field_value);
+                printf("Field name: %s, value: %s\n", field_name, field_value);
                 if( (http_req_enum=get_req_header_name_enum_by_str(field_name)) > 0 ){
                     http_req_obj_ins_header_by_idx(&((*this)->http_req), http_req_enum, field_value);
                 } else {
@@ -112,6 +112,11 @@ argparse(
             case 'b':   // burst length
                 (*this)->enable_pipe=1; /* also enable pipe */
                 g_burst_length=atoi(optarg);
+                // check upperbound
+                if( g_burst_length > MAX_NUM_GAP ) {
+                    g_burst_length = MAX_NUM_GAP;
+                }
+                // check lowerbound
                 g_burst_length=(g_burst_length<=0)? NUM_GAP: g_burst_length;
                 break;
             case 'N':   // using non-blocking
@@ -129,6 +134,13 @@ argparse(
                 break;
             case 't':   // thread number
                 (*this)->thrd=atoi(optarg);
+                // check upperbound
+                struct rlimit limit;
+                get_max_num_open_procs(&limit);
+                if( (*this)->thrd >= limit.rlim_cur ){
+                    printf("Exceed the MAX processes/threads number(=%ld), close kb.\n", limit.rlim_cur);
+                    exit(1);
+                }
                 (*this)->thrd=(*this)->thrd>0? (*this)->thrd: 1; // default value (set to 1 if value is 0)
                 (*this)->have_thrd=1;
                 break;
@@ -268,7 +280,7 @@ argparse(
 
     // check max requests 
     if( (*this)->reqs > MAX_REQS_NUM) {
-        printf("Total requests number exceed maximum requests size: %d, close kb.\n", MAX_REQS_NUM);
+        printf("Total requests number exceed maximum requests size: %ld, close kb.\n", MAX_REQS_NUM);
         exit(1);
     }
 

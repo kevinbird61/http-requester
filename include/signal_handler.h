@@ -65,6 +65,7 @@ static inline void sig_handler(int signal){
 void push_protect(struct _protect_t **protect_list, void *obj){
     if((*protect_list)==NULL){
         (*protect_list)=calloc(1, sizeof(struct _protect_t));
+        // SAVE_ALLOC((*protect_list), 1, struct _protect_t);
         (*protect_list)->protect_obj=obj;
         (*protect_list)->next=NULL;
     } else {
@@ -73,6 +74,7 @@ void push_protect(struct _protect_t **protect_list, void *obj){
             trav=trav->next;
         }
         trav->next=calloc(1, sizeof(struct _protect_t));
+        // SAVE_ALLOC(trav->next, 1, struct _protect_t);
         trav->next->protect_obj=obj;
         trav->next->next=NULL;
     }

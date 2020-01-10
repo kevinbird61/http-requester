@@ -2,7 +2,7 @@ LIBS:= $(wildcard lib/*.c)
 OBJS:= $(patsubst %.c, %.o, $(subst lib/,,$(wildcard lib/*.c)))
 EXEC:= $(patsubst %.c, %.exe, $(subst src/,,$(wildcard src/*.c)))
 VER_MAJOR=1
-VER_MINOR=1
+VER_MINOR=2
 VER_PATCH=0
 
 RELEASE:=libkb.a

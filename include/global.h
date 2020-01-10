@@ -6,8 +6,9 @@
 
 #define MAX_RETRY           (50000)         // wait 5 sec (permit 5 retry time)
 #define MAX_THREAD          (1000)          // max thread number
-#define MAX_REQS_NUM        (1000000000)    // max requests number
+#define MAX_REQS_NUM        (4294967295)    // max requests number
 #define RETRY_WAIT_TIME     (1)             // 4xx, or other error, wait 1 sec and create a new conn to retry
+#define MAX_NUM_GAP         (10000)
 #define NUM_GAP             (100)           // max-request size
 #define MIN_NUM_GAP         (1)             // min-request size
 #define MAX_SENT_REQ        (1000)          // how many sent_req (unanswered reqs) allow
